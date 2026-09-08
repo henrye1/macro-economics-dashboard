@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Series - Cyte Macro Data Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="prototype.css">
+<style>
+  .query-row {
+    display: grid;
+    grid-template-columns: 1.3fr 1.1fr repeat(4, 150px);
+    gap: var(--space-5);
+    padding: var(--space-5);
+    align-items: start;
+  }
+  .chip-set { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-3); }
+  .query-foot {
+    display: flex; align-items: center; gap: var(--space-4);
+    padding: var(--space-4) var(--space-5); border-top: 1px solid var(--border);
+  }
+  .query-foot .note { color: var(--muted); font-size: var(--text-sm); line-height: 1.5; max-width: 34ch; }
+  .query-foot .spacer { margin-left: auto; }
+
+  /* ---- series card ---- */
+  .series-title { display: flex; align-items: baseline; gap: var(--space-3); }
+  .series-title .code {
+    font-family: var(--font-mono);
+    font-size: var(--text-md);
+    font-weight: var(--weight-bold);
+    color: var(--navy);
+  }
+  .series-title .name { color: var(--text); }
+  .series-sub {
+    display: flex; gap: var(--space-5); flex-wrap: wrap;
+    padding: var(--space-4) var(--space-5);
+    border-bottom: 1px solid var(--border);
+    font-size: var(--text-sm);
+  }
+  .series-sub .item { display: flex; gap: var(--space-2); }
+  .series-sub .k { color: var(--muted); }
+  .series-sub .v { font-weight: var(--weight-bold); }
+  .series-sub .v.mono { font-family: var(--font-mono); }
+
+  .points { display: flex; align-items: stretch; padding: var(--space-5); overflow-x: auto; }
+  .point {
+    flex: 1 0 62px;
+    text-align: center;
+    padding: var(--space-3) var(--space-2);
+    border-radius: var(--radius);
+    margin-right: 2px;
+  }
+  .point .year { font-size: var(--text-xs); color: var(--muted); }
+  .point .val {
+    font-size: var(--text-md);
+    font-weight: var(--weight-bold);
+    font-variant-numeric: tabular-nums;
+    margin-top: var(--space-2);
+  }
+  .point.actual { background: var(--badge-actual-bg); }
+  .point.actual .val { color: var(--badge-actual-ink); }
+  .point.forecast { background: var(--badge-forecast-bg); }
+  .point.forecast .val { color: var(--badge-forecast-ink); }
+
+  /* the lastActualYear boundary, the whole point of this screen */
+  .boundary {
+    flex: none;
+    width: 34px;
+    margin: 0 var(--space-3);
+    border-left: 2px dashed var(--navy);
+    position: relative;
+  }
+  .boundary span {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-90deg);
+    white-space: nowrap;
+    font-size: var(--text-xs);
+    font-weight: var(--weight-bold);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--navy);
+  }
+
+  .legend {
+    display: flex; align-items: center; gap: var(--space-5);
+    font-size: var(--text-sm); color: var(--muted);
+  }
+  .legend .swatch { display: inline-flex; align-items: center; gap: var(--space-2); }
+  .legend .box { width: 14px; height: 14px; border-radius: 2px; }
+  .legend .box.actual { background: var(--badge-actual-bg); }
+  .legend .box.forecast { background: var(--badge-forecast-bg); }
+  .legend .box.boundary { border-left: 2px dashed var(--navy); width: 8px; }
+
+  .undesigned {
+    background: var(--surface-subtle);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--badge-significant-dot);
+    border-radius: var(--radius);
+    padding: var(--space-4) var(--space-5);
+    color: var(--text);
+    font-size: var(--text-sm);
+    line-height: 1.7;
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <span class="wordmark">Cyte<span class="product">Macro Data</span></span>
+  <span class="version-pill">V1</span>
+  <div class="topbar-right">
+    <div class="vintage-strip">
+      <div class="label">Latest vintages</div>
+      <div class="value">WEO 10.0.0 2026-04-14 &middot; WDI 2026-03-27</div>
+    </div>
+    <div class="token-pill"><span class="dot"></span> Token valid &middot; M2M client</div>
+  </div>
+</header>
+
+<nav class="tabs">
+  <a href="overview.html">Overview</a>
+  <a href="countries-indicators.html">Countries &amp; indicators</a>
+  <a href="series.html" class="active">Series</a>
+  <a href="observations.html">Observations</a>
+  <a href="vintages.html">Vintages &amp; revisions</a>
+  <a href="saved-queries.html">Saved queries &amp; export</a>
+  <a href="request-builder.html">Request builder</a>
+</nav>
+
+<main class="page stack">
+
+  <div class="undesigned">
+    <strong>This screen has no design reference.</strong> The seven PNGs in
+    <code>blueprint/references/</code> cover six tabs; <code>3-series.png</code> is actually
+    the Observations empty state. This layout is proposed from the project overview's stated
+    intent for feature 6: one series per indicator and country, with the
+    <code>lastActualYear</code> boundary made visible. Push back on it freely.
+  </div>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>Working query</h2>
+      <span class="meta">2 indicators &times; 2 countries &middot; 2018&ndash;2031 &middot; 3 series</span>
+    </div>
+
+    <div class="query-row">
+      <div>
+        <div class="field-label">Indicators</div>
+        <div class="chip-set">
+          <span class="chip indicator">GDP_GROWTH_REAL <span class="x">&times;</span></span>
+          <span class="chip indicator">CPI_INFLATION_AVG <span class="x">&times;</span></span>
+        </div>
+        <div class="field select">
+          <div class="inner"><span class="label">Add indicator</span><span class="value placeholder">Select indicator&hellip;</span></div>
+          <span class="caret">&#9660;</span>
+        </div>
+      </div>
+
+      <div>
+        <div class="field-label">Countries</div>
+        <div class="chip-set">
+          <span class="chip country">ZAF <span class="x">&times;</span></span>
+          <span class="chip country">NAM <span class="x">&times;</span></span>
+        </div>
+        <div class="field select">
+          <div class="inner"><span class="label">Add country</span><span class="value placeholder">Select country&hellip;</span></div>
+          <span class="caret">&#9660;</span>
+        </div>
+      </div>
+
+      <div class="field select">
+        <div class="inner"><span class="label">Year from</span><span class="value">2018</span></div>
+        <span class="caret">&#9660;</span>
+      </div>
+      <div class="field select">
+        <div class="inner"><span class="label">Year to</span><span class="value">2031</span></div>
+        <span class="caret">&#9660;</span>
+      </div>
+      <div class="field select">
+        <div class="inner"><span class="label">Source</span><span class="value">preferred</span></div>
+        <span class="caret">&#9660;</span>
+      </div>
+      <div class="field select">
+        <div class="inner"><span class="label">Forecast</span><span class="value">all</span></div>
+        <span class="caret">&#9660;</span>
+      </div>
+    </div>
+
+    <div class="query-foot">
+      <div class="field select" style="min-width: 240px;">
+        <div class="inner"><span class="label">Vintage</span><span class="value">latest (per source)</span></div>
+        <span class="caret">&#9660;</span>
+      </div>
+      <div class="note">
+        Latest published snapshot per source. Record meta.vintages ids with any result you
+        must reproduce.
+      </div>
+      <div class="spacer"></div>
+      <button class="btn outline-green">&#8635; Reset</button>
+      <button class="btn primary">&#9873; Save query</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2>Series</h2>
+      <span class="meta">3 series &middot; pagination counts series, not rows</span>
+      <div class="legend">
+        <span class="swatch"><span class="box actual"></span> Actual</span>
+        <span class="swatch"><span class="box forecast"></span> Forecast</span>
+        <span class="swatch"><span class="box boundary"></span> lastActualYear</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- series 1 -->
+  <section class="card">
+    <div class="card-head">
+      <div class="series-title">
+        <span class="code">GDP_GROWTH_REAL</span>
+        <span class="name">Real GDP growth</span>
+      </div>
+      <span class="meta">series 1 of 3</span>
+    </div>
+    <div class="series-sub">
+      <span class="item"><span class="k">Country</span><span class="v mono">ZAF</span></span>
+      <span class="item"><span class="k">Unit</span><span class="v">Percent</span></span>
+      <span class="item"><span class="k">Source</span><span class="v mono">IMF_WEO</span></span>
+      <span class="item"><span class="k">Vintage</span><span class="v mono">WEO 10.0.0 2026-04-14</span></span>
+      <span class="item"><span class="k">lastActualYear</span><span class="v">2025</span></span>
+    </div>
+    <div class="points">
+      <div class="point actual"><div class="year">2018</div><div class="val">0.8</div></div>
+      <div class="point actual"><div class="year">2019</div><div class="val">0.3</div></div>
+      <div class="point actual"><div class="year">2020</div><div class="val">-6.0</div></div>
+      <div class="point actual"><div class="year">2021</div><div class="val">4.7</div></div>
+      <div class="point actual"><div class="year">2022</div><div class="val">1.9</div></div>
+      <div class="point actual"><div class="year">2023</div><div class="val">0.7</div></div>
+      <div class="point actual"><div class="year">2024</div><div class="val">0.6</div></div>
+      <div class="point actual"><div class="year">2025</div><div class="val">1.0</div></div>
+      <div class="boundary"><span>lastActualYear</span></div>
+      <div class="point forecast"><div class="year">2026</div><div class="val">1.5</div></div>
+      <div class="point forecast"><div class="year">2027</div><div class="val">1.8</div></div>
+      <div class="point forecast"><div class="year">2028</div><div class="val">1.9</div></div>
+      <div class="point forecast"><div class="year">2029</div><div class="val">2.0</div></div>
+      <div class="point forecast"><div class="year">2030</div><div class="val">2.0</div></div>
+      <div class="point forecast"><div class="year">2031</div><div class="val">2.1</div></div>
+    </div>
+  </section>
+
+  <!-- series 2 -->
+  <section class="card">
+    <div class="card-head">
+      <div class="series-title">
+        <span class="code">GDP_GROWTH_REAL</span>
+        <span class="name">Real GDP growth</span>
+      </div>
+      <span class="meta">series 2 of 3</span>
+    </div>
+    <div class="series-sub">
+      <span class="item"><span class="k">Country</span><span class="v mono">NAM</span></span>
+      <span class="item"><span class="k">Unit</span><span class="v">Percent</span></span>
+      <span class="item"><span class="k">Source</span><span class="v mono">IMF_WEO</span></span>
+      <span class="item"><span class="k">Vintage</span><span class="v mono">WEO 10.0.0 2026-04-14</span></span>
+      <span class="item"><span class="k">lastActualYear</span><span class="v">2025</span></span>
+    </div>
+    <div class="points">
+      <div class="point actual"><div class="year">2018</div><div class="val">1.1</div></div>
+      <div class="point actual"><div class="year">2019</div><div class="val">-0.8</div></div>
+      <div class="point actual"><div class="year">2020</div><div class="val">-8.0</div></div>
+      <div class="point actual"><div class="year">2021</div><div class="val">3.5</div></div>
+      <div class="point actual"><div class="year">2022</div><div class="val">4.6</div></div>
+      <div class="point actual"><div class="year">2023</div><div class="val">4.2</div></div>
+      <div class="point actual"><div class="year">2024</div><div class="val">3.7</div></div>
+      <div class="point actual"><div class="year">2025</div><div class="val">3.9</div></div>
+      <div class="boundary"><span>lastActualYear</span></div>
+      <div class="point forecast"><div class="year">2026</div><div class="val">3.8</div></div>
+      <div class="point forecast"><div class="year">2027</div><div class="val">3.9</div></div>
+      <div class="point forecast"><div class="year">2028</div><div class="val">4.0</div></div>
+      <div class="point forecast"><div class="year">2029</div><div class="val">4.1</div></div>
+      <div class="point forecast"><div class="year">2030</div><div class="val">4.1</div></div>
+      <div class="point forecast"><div class="year">2031</div><div class="val">4.2</div></div>
+    </div>
+  </section>
+
+  <!-- series 3 -->
+  <section class="card">
+    <div class="card-head">
+      <div class="series-title">
+        <span class="code">CPI_INFLATION_AVG</span>
+        <span class="name">Inflation, average CPI</span>
+      </div>
+      <span class="meta">series 3 of 3</span>
+    </div>
+    <div class="series-sub">
+      <span class="item"><span class="k">Country</span><span class="v mono">ZAF</span></span>
+      <span class="item"><span class="k">Unit</span><span class="v">Percent</span></span>
+      <span class="item"><span class="k">Source</span><span class="v mono">IMF_WEO</span></span>
+      <span class="item"><span class="k">Vintage</span><span class="v mono">WEO 10.0.0 2026-04-14</span></span>
+      <span class="item"><span class="k">lastActualYear</span><span class="v">2025</span></span>
+    </div>
+    <div class="points">
+      <div class="point actual"><div class="year">2018</div><div class="val">3.0</div></div>
+      <div class="point actual"><div class="year">2019</div><div class="val">3.5</div></div>
+      <div class="point actual"><div class="year">2020</div><div class="val">4.0</div></div>
+      <div class="point actual"><div class="year">2021</div><div class="val">4.5</div></div>
+      <div class="point actual"><div class="year">2022</div><div class="val">4.9</div></div>
+      <div class="point actual"><div class="year">2023</div><div class="val">5.0</div></div>
+      <div class="point actual"><div class="year">2024</div><div class="val">5.0</div></div>
+      <div class="point actual"><div class="year">2025</div><div class="val">4.7</div></div>
+      <div class="boundary"><span>lastActualYear</span></div>
+      <div class="point forecast"><div class="year">2026</div><div class="val">4.3</div></div>
+      <div class="point forecast"><div class="year">2027</div><div class="val">3.7</div></div>
+      <div class="point forecast"><div class="year">2028</div><div class="val">3.2</div></div>
+      <div class="point forecast"><div class="year">2029</div><div class="val">3.0</div></div>
+      <div class="point forecast"><div class="year">2030</div><div class="val">3.0</div></div>
+      <div class="point forecast"><div class="year">2031</div><div class="val">3.0</div></div>
+    </div>
+    <div class="card-foot">
+      Split each series at <strong>lastActualYear</strong> to get history for fitting and the
+      forecast path for scenarios. No charting library until this tab genuinely needs one.
+    </div>
+  </section>
+
+</main>
+
+<footer class="attribution">
+  <div class="eyebrow">meta.attribution</div>
+  <div>Source: IMF World Economic Outlook database</div>
+  <div>Source: World Bank World Development Indicators (CC BY 4.0)</div>
+</footer>
+
+</body>
+</html>

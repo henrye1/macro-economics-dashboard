@@ -1,8 +1,41 @@
-<header class="app-header">
-  <h1>{{ title() }}</h1>
-  <p class="api-status">API: <strong>{{ apiStatus() }}</strong></p>
+<header class="topbar">
+  <span class="wordmark">Cyte<span class="product">Macro Data</span></span>
+  <span class="version-pill">V1</span>
+
+  <div class="topbar-right">
+    <div class="vintage-strip">
+      <div class="label">Latest vintages</div>
+      @if (loading()) {
+        <div class="value muted">Loading&hellip;</div>
+      } @else if (unavailable()) {
+        <div class="value muted">Unavailable</div>
+      } @else {
+        <div class="value">{{ vintageLabels().join(' · ') }}</div>
+      }
+    </div>
+
+    <!-- Reports the server-side M2M client, not the visitor's own session. -->
+    <div class="token-pill" title="State of the console's server-side M2M client, not your session">
+      <span class="dot"></span> Service token &middot; M2M client
+    </div>
+  </div>
 </header>
+
+<nav class="tabs">
+  @for (tab of tabs; track tab.path) {
+    <a [routerLink]="tab.path" routerLinkActive="active">{{ tab.label }}</a>
+  }
+</nav>
 
 <main class="app-main">
   <router-outlet />
 </main>
+
+<footer class="attribution">
+  <div class="eyebrow">meta.attribution</div>
+  @for (line of attribution(); track line) {
+    <div>{{ line }}</div>
+  } @empty {
+    <div class="muted">Attribution unavailable</div>
+  }
+</footer>

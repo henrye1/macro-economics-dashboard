@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Request builder - Cyte Macro Data Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="prototype.css">
+<style>
+  .query-row {
+    display: grid;
+    grid-template-columns: 1.3fr 1.1fr repeat(4, 150px);
+    gap: var(--space-5);
+    padding: var(--space-5);
+    align-items: start;
+  }
+  .chip-set { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-3); }
+  .query-foot {
+    display: flex; align-items: center; gap: var(--space-4);
+    padding: var(--space-4) var(--space-5); border-top: 1px solid var(--border);
+  }
+  .query-foot .note { color: var(--muted); font-size: var(--text-sm); line-height: 1.5; max-width: 34ch; }
+  .query-foot .spacer { margin-left: auto; }
+
+  .builder-grid { grid-template-columns: 1fr 1fr; align-items: start; }
+  .request-body { display: grid; gap: var(--space-4); padding: var(--space-5); }
+  .send-row { display: flex; gap: var(--space-4); }
+  .send-row .btn { flex: 1; }
+  .auth-note { color: var(--muted); font-size: var(--text-sm); line-height: 1.7; }
+
+  .not-sent {
+    margin-left: auto;
+    display: flex; align-items: center; gap: var(--space-3);
+    font-size: var(--text-sm);
+    color: var(--muted);
+  }
+  .not-sent .pill {
+    background: var(--surface-muted);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: var(--space-2) var(--space-3);
+    font-weight: var(--weight-bold);
+  }
+  .response-headers { border-bottom: 1px solid var(--border); }
+  .response-hint {
+    padding: var(--space-4) var(--space-5);
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: var(--text-sm);
+  }
+  .code-flat { border: none; border-radius: 0; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <span class="wordmark">Cyte<span class="product">Macro Data</span></span>
+  <span class="version-pill">V1</span>
+  <div class="topbar-right">
+    <div class="vintage-strip">
+      <div class="label">Latest vintages</div>
+      <div class="value">WEO 10.0.0 2026-04-14 &middot; WDI 2026-03-27</div>
+    </div>
+    <div class="token-pill"><span class="dot"></span> Token valid &middot; M2M client</div>
+  </div>
+</header>
+
+<nav class="tabs">
+  <a href="overview.html">Overview</a>
+  <a href="countries-indicators.html">Countries &amp; indicators</a>
+  <a href="series.html">Series</a>
+  <a href="observations.html">Observations</a>
+  <a href="vintages.html">Vintages &amp; revisions</a>
+  <a href="saved-queries.html">Saved queries &amp; export</a>
+  <a href="request-builder.html" class="active">Request builder</a>
+</nav>
+
+<main class="page stack">
+
+  <section class="card">
+    <div class="card-head">
+      <h2>Working query</h2>
+      <span class="meta">2 indicators &times; 2 countries &middot; 2018&ndash;2031 &middot; 56 observations</span>
+    </div>
+
+    <div class="query-row">
+      <div>
+        <div class="field-label">Indicators</div>
+        <div class="chip-set">
+          <span class="chip indicator">GDP_GROWTH_REAL <span class="x">&times;</span></span>
+          <span class="chip indicator">CPI_INFLATION_AVG <span class="x">&times;</span></span>
+        </div>
+        <div class="field select">
+          <div class="inner"><span class="label">Add indicator</span><span class="value placeholder">Select indicator&hellip;</span></div>
+          <span class="caret">&#9660;</span>
+        </div>
+      </div>
+
+      <div>
+        <div class="field-label">Countries</div>
+        <div class="chip-set">
+          <span class="chip country">ZAF <span class="x">&times;</span></span>
+          <span class="chip country">NAM <span class="x">&times;</span></span>
+        </div>
+        <div class="field select">
+          <div class="inner"><span class="label">Add country</span><span class="value placeholder">Select country&hellip;</span></div>
+          <span class="caret">&#9660;</span>
+        </div>
+      </div>
+
+      <div class="field select">
+        <div class="inner"><span class="label">Year from</span><span class="value">2018</span></div>
+        <span class="caret">&#9660;</span>
+      </div>
+      <div class="field select">
+        <div class="inner"><span class="label">Year to</span><span class="value">2031</span></div>
+        <span class="caret">&#9660;</span>
+      </div>
+      <div class="field select">
+        <div class="inner"><span class="label">Source</span><span class="value">preferred</span></div>
+        <span class="caret">&#9660;</span>
+      </div>
+      <div class="field select">
+        <div class="inner"><span class="label">Forecast</span><span class="value">all</span></div>
+        <span class="caret">&#9660;</span>
+      </div>
+    </div>
+
+    <div class="query-foot">
+      <div class="field select" style="min-width: 240px;">
+        <div class="inner"><span class="label">Vintage</span><span class="value">latest (per source)</span></div>
+        <span class="caret">&#9660;</span>
+      </div>
+      <div class="note">
+        Latest published snapshot per source. Record meta.vintages ids with any result you
+        must reproduce.
+      </div>
+      <div class="spacer"></div>
+      <button class="btn outline-green">&#8635; Reset</button>
+      <button class="btn primary">&#9873; Save query</button>
+    </div>
+  </section>
+
+  <div class="grid builder-grid">
+
+    <div class="stack">
+      <section class="card">
+        <div class="card-head"><h2>Request</h2></div>
+        <div class="request-body">
+          <div class="field select">
+            <div class="inner">
+              <span class="label">Endpoint</span>
+              <span class="value">GET /api/macro/series</span>
+            </div>
+            <span class="caret">&#9660;</span>
+          </div>
+
+          <div class="code-block">https://core.cyte.co.za/api/macro/series?indicators=GDP_GROWTH_REAL,CPI_INFLATION_AVG&amp;countries=ZAF,NAM&amp;yearFrom=2018&amp;yearTo=2031&amp;pageSize=25</div>
+
+          <div class="send-row">
+            <button class="btn primary lg">&#9655; Send request</button>
+            <button class="btn outline-green lg">&#10697; Copy curl</button>
+          </div>
+
+          <pre class="code-subtle">curl -s "https://core.cyte.co.za/api/macro/series?indicators=GDP_GROWTH_REAL,CPI_INFLATION_AVG&amp;countries=ZAF,NAM&amp;yearFrom=2018&amp;yearTo=2031&amp;pageSize=25" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "If-None-Match: \"v14-v13\""</pre>
+
+          <div class="auth-note">
+            Both authentication schemes are accepted: a suite token works as-is, M2M clients
+            use the client-credentials grant. There is no macro-specific scope.
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2>Status codes</h2></div>
+        <table>
+          <thead>
+            <tr><th>Status</th><th>Meaning</th><th>Typical cause</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="code-link">400</span></td>
+              <td>ProblemDetails, detail names the issue</td>
+              <td>Unknown indicator or ISO3, yearFrom &gt; yearTo, missing indicators</td>
+            </tr>
+            <tr>
+              <td><span class="code-link">401</span></td>
+              <td>Not authenticated</td>
+              <td>Missing or expired token, refresh and retry</td>
+            </tr>
+            <tr>
+              <td><span class="code-link">404</span></td>
+              <td>Not found</td>
+              <td>Unknown indicator on /indicators/{code}, unknown vintage</td>
+            </tr>
+            <tr>
+              <td><span class="code-link">304</span></td>
+              <td>Not modified</td>
+              <td>Your cached copy is still current (ETag hit)</td>
+            </tr>
+            <tr>
+              <td><span class="code-link">5xx</span></td>
+              <td>Server fault</td>
+              <td>Never caused by upstream outages, report it</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </div>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>Response</h2>
+        <div class="not-sent">
+          <span class="pill">Not sent</span>
+          <span>press send</span>
+        </div>
+      </div>
+
+      <div class="response-headers">
+        <pre class="code-subtle code-flat"><span class="key">ETag</span>: "v14-p1"
+<span class="key">Cache-Control</span>: private, max-age=3600
+<span class="key">X-Total-Count</span>: 4</pre>
+      </div>
+
+      <pre class="code-subtle code-flat"><span class="comment">// Press Send request to see the response envelope.</span></pre>
+
+      <div class="response-hint">
+        Send <strong>If-None-Match</strong> on repeat queries &mdash; you get 304 until a new
+        vintage publishes.
+      </div>
+    </section>
+
+  </div>
+
+</main>
+
+<footer class="attribution">
+  <div class="eyebrow">meta.attribution</div>
+  <div>Source: IMF World Economic Outlook database</div>
+  <div>Source: World Bank World Development Indicators (CC BY 4.0)</div>
+</footer>
+
+</body>
+</html>

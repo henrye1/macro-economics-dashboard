@@ -2,7 +2,7 @@
 
 ## MVP
 
-- [ ] 1. **App shell** - seven-tab navigation, Angular Material setup, header vintage
+- [x] 1. **App shell** - seven-tab navigation, Angular Material setup, header vintage
   strip, attribution footer, hand-written API contract types, and a typed data
   provider seam backed by fixtures
 - [ ] 2. **Overview page** - service summary, source cadence, and the countries,

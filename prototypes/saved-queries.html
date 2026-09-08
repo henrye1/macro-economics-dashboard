@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Saved queries &amp; export - Cyte Macro Data Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="prototype.css">
+<style>
+  .saved-grid { grid-template-columns: 1fr 430px; align-items: start; }
+  .row-actions { display: flex; gap: var(--space-3); justify-content: flex-end; }
+  .save-block { padding: var(--space-5); border-top: 1px solid var(--border); display: grid; gap: var(--space-4); }
+  .save-block .field { background: var(--surface-subtle); padding: var(--space-3) var(--space-4); }
+  .save-block .btn { justify-self: start; }
+  .export-body { display: grid; gap: var(--space-5); padding: var(--space-5); }
+  .export-body .count { color: var(--muted); font-size: var(--text-sm); }
+  .export-body .btn.download { width: 100%; }
+  .checkline .title { font-weight: var(--weight-bold); }
+  .checkline .body { color: var(--muted); font-size: var(--text-sm); line-height: 1.6; margin-top: var(--space-1); }
+  .habit { line-height: 1.8; }
+  .habit .k { color: var(--muted); font-size: var(--text-sm); }
+  .habit p { margin: var(--space-3) 0 0; }
+  .mono { font-family: var(--font-mono); }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <span class="wordmark">Cyte<span class="product">Macro Data</span></span>
+  <span class="version-pill">V1</span>
+  <div class="topbar-right">
+    <div class="vintage-strip">
+      <div class="label">Latest vintages</div>
+      <div class="value">WEO 10.0.0 2026-04-14 &middot; WDI 2026-03-27</div>
+    </div>
+    <div class="token-pill"><span class="dot"></span> Token valid &middot; M2M client</div>
+  </div>
+</header>
+
+<nav class="tabs">
+  <a href="overview.html">Overview</a>
+  <a href="countries-indicators.html">Countries &amp; indicators</a>
+  <a href="series.html">Series</a>
+  <a href="observations.html">Observations</a>
+  <a href="vintages.html">Vintages &amp; revisions</a>
+  <a href="saved-queries.html" class="active">Saved queries &amp; export</a>
+  <a href="request-builder.html">Request builder</a>
+</nav>
+
+<main class="page">
+  <div class="grid saved-grid">
+
+    <section class="card">
+      <div class="card-head">
+        <h2>Saved queries</h2>
+        <span class="meta">Vintage ids recorded with every save</span>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Scope</th>
+            <th>Vintage</th>
+            <th>Saved</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="strong">Q4 2025 ECL &mdash; ZAF, NAM</td>
+            <td>3 ind &times; 2 ctry &middot; 2018&ndash;2030</td>
+            <td class="mono">pinned id 12</td>
+            <td class="mono">2025-10-14</td>
+            <td>
+              <div class="row-actions">
+                <button class="btn outline-green">Load</button>
+                <button class="btn navy">Reproduce</button>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td class="strong">SADC benchmarking &mdash; growth</td>
+            <td>1 ind &times; 4 ctry &middot; 2015&ndash;2031</td>
+            <td class="mono">latest</td>
+            <td class="mono">2026-05-02</td>
+            <td>
+              <div class="row-actions">
+                <button class="btn outline-green">Load</button>
+                <button class="btn navy">Reproduce</button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="save-block">
+        <div class="field">
+          <span class="label">Name this query</span>
+          <span class="value">Q1 2026 ECL &mdash; ZAF</span>
+        </div>
+        <button class="btn primary lg">&#9873; Save current query</button>
+      </div>
+    </section>
+
+    <div class="stack">
+      <section class="card">
+        <div class="card-head">
+          <h2>Export</h2>
+        </div>
+        <div class="export-body">
+          <div>
+            <div class="field-label">Format</div>
+            <div class="segmented">
+              <span class="seg on">CSV</span>
+              <span class="seg">JSON</span>
+              <span class="seg">XLSX</span>
+            </div>
+          </div>
+
+          <div class="checkline">
+            <span class="box">&#10003;</span>
+            <div>
+              <div class="title">Pin vintage ids in the export</div>
+              <div class="body">
+                Writes WEO 10.0.0 2026-04-14 into the file header so the pull can be
+                reproduced exactly.
+              </div>
+            </div>
+          </div>
+
+          <div class="count">56 rows &middot; 2 indicators &middot; 2 countries</div>
+
+          <button class="btn primary lg download">&#8595; Download CSV</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-body habit">
+          <div class="k">Integration habit</div>
+          <p>
+            If your output must be reproducible, IFRS 9 reporting, audit, backtests, record
+            the vintage ids from <strong>meta.vintages</strong> alongside your results, and
+            re-query with those ids pinned.
+          </p>
+        </div>
+      </section>
+    </div>
+
+  </div>
+</main>
+
+<footer class="attribution">
+  <div class="eyebrow">meta.attribution</div>
+  <div>Source: IMF World Economic Outlook database</div>
+  <div>Source: World Bank World Development Indicators (CC BY 4.0)</div>
+</footer>
+
+</body>
+</html>

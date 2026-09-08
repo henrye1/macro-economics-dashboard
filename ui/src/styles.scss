@@ -1,1 +1,188 @@
-/* You can add global styles to this file, and also import other style files */
+@use '@angular/material' as mat;
+
+/* ==========================================================================
+   Theme tokens - ported from prototypes/theme.css, which is the design's
+   token set read off blueprint/references/.
+
+   This block is the single source of colour, type and scale for the console.
+   Never hardcode a colour, font or radius anywhere else: reference a variable.
+   ========================================================================== */
+
+:root {
+  /* surfaces */
+  --bg: #f7f8fa;              /* page background                          */
+  --surface: #ffffff;         /* cards, table rows, inputs                */
+  --surface-header: #f2f4f9;  /* card header bars                         */
+  --surface-subtle: #f4f6fb;  /* inset panels, curl block, property strip */
+  --surface-muted: #eef0f4;   /* disabled controls                        */
+  --border: #e2e6ee;
+  --border-strong: #d3d9e4;
+
+  /* text */
+  --text: #1f2733;            /* primary          */
+  --muted: #6b7280;           /* secondary, cells */
+  --faint: #9ca3af;           /* hints, eyebrows  */
+
+  /* navy - header, headings, active tab, secondary buttons, code block */
+  --navy: #1a2a8f;
+  --navy-hover: #16237a;
+  --navy-deep: #101c66;
+  --navy-ink: #ffffff;
+
+  /* green accent - primary buttons, uppercase links, wordmark */
+  --accent: #2fa83c;
+  --accent-hover: #268a31;
+  --accent-link: #1e9433;     /* uppercase links on white   */
+  --accent-bright: #4cbb52;   /* wordmark and dots on navy  */
+  --accent-ink: #ffffff;
+
+  /* semantic badges - each is a bg + ink pair, some with a dot */
+  --badge-actual-bg: #dff0e0;
+  --badge-actual-ink: #24702f;
+  --badge-forecast-bg: #fdf3d3;
+  --badge-forecast-ink: #8a6410;
+  --badge-significant-bg: #fdf3d3;
+  --badge-significant-ink: #8a6410;
+  --badge-significant-dot: #e0a415;
+  --badge-latest-bg: #d6e4fb;
+  --badge-latest-ink: #1a2a8f;
+  --badge-superseded-bg: #e9ebef;
+  --badge-superseded-ink: #5b6472;
+  --badge-curated-bg: #eaf7ec;
+  --badge-curated-ink: #1e9433;
+  --badge-curated-dot: #2fa83c;
+
+  /* query chips - indicators read navy, countries read green */
+  --chip-indicator-bg: #e4e8f8;
+  --chip-indicator-ink: #1a2a8f;
+  --chip-country-bg: #ddf1de;
+  --chip-country-ink: #1e7a2c;
+
+  /* change deltas - the only place red appears */
+  --change-up: #1e8e3e;
+  --change-down: #d93025;
+
+  /* code surfaces */
+  --code-bg: var(--navy);
+  --code-ink: #ffffff;
+  --code-subtle-bg: #f4f6fb;
+  --code-subtle-ink: #1f2733;
+  --code-key: #1a2a8f;
+
+  /* type */
+  --font-sans: "Lato", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "Courier New", "IBM Plex Mono", ui-monospace, monospace;
+
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-md: 16px;
+  --text-lg: 22px;
+  --text-xl: 30px;
+
+  --weight-normal: 400;
+  --weight-bold: 700;
+
+  /* scale - the designs are near-square with pill badges */
+  --radius: 3px;
+  --radius-pill: 999px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --cell-y: 16px;
+  --cell-x: 16px;
+  --header-h: 56px;
+  --content-max: 1640px;
+}
+
+/* ==========================================================================
+   Angular Material, pointed at the tokens above.
+
+   mat.theme() emits the --mat-sys-* system variables that every Material
+   component reads. Overriding them here is what makes Material inherit the
+   Cyte look instead of a stock palette, so component styles never need to
+   fight Material's defaults.
+   ========================================================================== */
+
+html {
+  @include mat.theme((
+    color: (
+      primary: mat.$azure-palette,
+      tertiary: mat.$green-palette,
+      theme-type: light,
+    ),
+    typography: Lato,
+    density: 0,
+  ));
+
+  --mat-sys-primary: var(--navy);
+  --mat-sys-on-primary: var(--navy-ink);
+  --mat-sys-primary-container: var(--chip-indicator-bg);
+  --mat-sys-on-primary-container: var(--navy);
+
+  --mat-sys-tertiary: var(--accent);
+  --mat-sys-on-tertiary: var(--accent-ink);
+  --mat-sys-tertiary-container: var(--chip-country-bg);
+  --mat-sys-on-tertiary-container: var(--chip-country-ink);
+
+  --mat-sys-error: var(--change-down);
+
+  --mat-sys-background: var(--bg);
+  --mat-sys-on-background: var(--text);
+  --mat-sys-surface: var(--surface);
+  --mat-sys-on-surface: var(--text);
+  --mat-sys-on-surface-variant: var(--muted);
+  --mat-sys-surface-container: var(--surface-header);
+  --mat-sys-surface-container-low: var(--surface-subtle);
+  --mat-sys-surface-container-highest: var(--surface-muted);
+
+  --mat-sys-outline: var(--border-strong);
+  --mat-sys-outline-variant: var(--border);
+
+  --mat-sys-corner-extra-small: var(--radius);
+  --mat-sys-corner-small: var(--radius);
+  --mat-sys-corner-medium: var(--radius);
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Shared page heading, used by the placeholder tabs until each feature builds
+   its own page. */
+
+.page-title {
+  margin: 0;
+  font-size: var(--text-lg);
+  color: var(--navy);
+}
+
+.page-note {
+  margin: var(--space-3) 0 0;
+  color: var(--muted);
+}
