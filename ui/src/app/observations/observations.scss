@@ -1,0 +1,19 @@
+.observations {
+  margin-top: var(--space-5);
+}
+
+/* Codes, ISO3s, sources and ids all read better without wrapping; only the
+   head-right state message is allowed to run long. */
+.observations tbody td {
+  white-space: nowrap;
+}
+
+.card-head .meta {
+  text-align: right;
+}
+
+.paging-controls {
+  margin-left: auto;
+  display: flex;
+  gap: var(--space-3);
+}

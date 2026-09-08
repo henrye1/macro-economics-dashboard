@@ -261,3 +261,64 @@ describe('WorkingQueryCard', () => {
     });
   });
 });
+
+describe('WorkingQueryCard observation count', () => {
+  let fixture: ComponentFixture<WorkingQueryCard>;
+  let store: WorkingQueryStore;
+
+  const summary = () =>
+    (fixture.nativeElement as HTMLElement)
+      .querySelector('.card-head .meta')
+      ?.textContent?.replace(/\s+/g, ' ')
+      .trim();
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [WorkingQueryCard],
+      providers: [{ provide: MACRO_DATA, useClass: FixtureMacroDataProvider }]
+    });
+
+    store = TestBed.inject(WorkingQueryStore);
+    store.reset();
+    store.addIndicator('GDP_GROWTH_REAL');
+    store.addCountry('ZAF');
+
+    fixture = TestBed.createComponent(WorkingQueryCard);
+  });
+
+  it('omits the count by default, so hosts with no result mount it unchanged', () => {
+    fixture.detectChanges();
+
+    expect(summary()).toBe('1 indicator × 1 country');
+    expect(summary()).not.toContain('observation');
+  });
+
+  it('appends the count when the host provides one', () => {
+    fixture.componentRef.setInput('observationCount', 56);
+    fixture.detectChanges();
+
+    expect(summary()).toBe('1 indicator × 1 country · 56 observations');
+  });
+
+  it('renders zero, because zero is a real answer', () => {
+    fixture.componentRef.setInput('observationCount', 0);
+    fixture.detectChanges();
+
+    expect(summary()).toBe('1 indicator × 1 country · 0 observations');
+  });
+
+  it('uses the singular for one observation', () => {
+    fixture.componentRef.setInput('observationCount', 1);
+    fixture.detectChanges();
+
+    expect(summary()).toBe('1 indicator × 1 country · 1 observation');
+  });
+
+  it('keeps the count last, after the year range', () => {
+    store.setYearRange(2018, 2031);
+    fixture.componentRef.setInput('observationCount', 56);
+    fixture.detectChanges();
+
+    expect(summary()).toBe('1 indicator × 1 country · 2018–2031 · 56 observations');
+  });
+});

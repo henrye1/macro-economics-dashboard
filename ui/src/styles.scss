@@ -439,10 +439,17 @@ tbody tr.clickable:hover {
   font-weight: var(--weight-bold);
 }
 
-.code-link {
+/* An indicator code rendered as text. The catalogue's `.code-link` is the same
+   look wearing a button; use this one wherever the code is not a control. */
+.code-text {
   color: var(--navy);
   font-weight: var(--weight-bold);
   font-family: var(--font-mono);
+}
+
+.code-link {
+  @extend .code-text;
+
   text-decoration: none;
   background: none;
   border: none;
@@ -483,6 +490,16 @@ tbody tr.clickable:hover {
     .dot {
       background: var(--badge-curated-dot);
     }
+  }
+
+  &.actual {
+    background: var(--badge-actual-bg);
+    color: var(--badge-actual-ink);
+  }
+
+  &.forecast {
+    background: var(--badge-forecast-bg);
+    color: var(--badge-forecast-ink);
   }
 }
 

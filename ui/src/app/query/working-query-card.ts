@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, input } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { catchError, combineLatest, map, of } from 'rxjs';
 
@@ -33,6 +33,16 @@ export class WorkingQueryCard {
 
   protected readonly sources = SOURCES;
   protected readonly forecasts = FORECASTS;
+
+  /**
+   * The number of observations the current result holds, when the host has one.
+   *
+   * Optional and `null` by default, so a host with no result - Saved queries and
+   * the Request builder - mounts `<app-working-query-card />` with no bindings
+   * and gets exactly the summary feature 3 shipped. `0` is a real answer and
+   * renders; `null` means "not known here" and is omitted.
+   */
+  readonly observationCount = input<number | null>(null);
 
   protected readonly query = this.store.query;
   protected readonly validation = this.store.validation;
@@ -97,8 +107,8 @@ export class WorkingQueryCard {
   );
 
   /**
-   * The design appends the observation count here. Feature 3 owns no results, so
-   * the summary stops at the year range and feature 5 appends the count.
+   * The design's one-line description of the query, ending in the observation
+   * count when the host knows it.
    */
   protected readonly summary = computed(() => {
     const query = this.query();
@@ -111,6 +121,11 @@ export class WorkingQueryCard {
     const to = query.yearTo;
     if (from !== null || to !== null) {
       parts.push(`· ${from ?? 'earliest'}–${to ?? 'latest'}`);
+    }
+
+    const count = this.observationCount();
+    if (count !== null) {
+      parts.push(`· ${count} ${plural(count, 'observation')}`);
     }
 
     return parts.join(' ');

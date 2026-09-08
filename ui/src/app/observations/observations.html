@@ -1,0 +1,93 @@
+<app-working-query-card [observationCount]="observationCount()" />
+
+<section class="card observations">
+  <div class="card-head">
+    <h2>Observations</h2>
+
+    @if (loading()) {
+      <span class="meta" role="status">Loading observations…</span>
+    } @else if (invalid()) {
+      <span class="meta" role="status">Fix the query above to see rows.</span>
+    } @else if (unavailable()) {
+      <span class="meta" role="status">Observations are unavailable.</span>
+    } @else if (empty()) {
+      <span class="meta" role="status">
+        No rows — the query was valid, the source just does not report this combination
+      </span>
+    } @else {
+      <span class="meta">{{ rowRange() }}</span>
+    }
+  </div>
+
+  <!--
+    The header row stays put in every state, matching the empty-state design:
+    the shape of the answer is part of the answer.
+  -->
+  <table>
+    <caption class="sr-only">
+      One row per indicator, country and year, with the vintage each value came from
+    </caption>
+    <thead>
+      <tr>
+        <th>Indicator</th>
+        <th>Country</th>
+        <th class="num">Year</th>
+        <th class="num">Value</th>
+        <th>isForecast</th>
+        <th>Source</th>
+        <th class="num">vintageId</th>
+      </tr>
+    </thead>
+    @if (rows().length) {
+      <tbody>
+        @for (row of rows(); track rowKey(row)) {
+          <tr>
+            <td><span class="code-text">{{ row.indicator }}</span></td>
+            <td>{{ row.country }}</td>
+            <td class="num">{{ row.year }}</td>
+            <td class="num">{{ value(row) }}</td>
+            <td>
+              @if (row.isForecast) {
+                <span class="badge forecast">Forecast</span>
+              } @else {
+                <span class="badge actual">Actual</span>
+              }
+            </td>
+            <td>{{ row.source }}</td>
+            <td class="num">{{ row.vintageId }}</td>
+          </tr>
+        }
+      </tbody>
+    }
+  </table>
+
+  <!--
+    The footer is present in every state. It names the page, the page size and
+    the vintages the values came from, which is the provenance a consumer is
+    told to record with any result they must reproduce.
+  -->
+  <div class="card-foot">
+    <span class="paging-state">
+      Page {{ page() }} of {{ pageCount() }} · pageSize {{ pageSize() }} ·
+      vintages {{ vintageLabels() }}
+    </span>
+
+    <span class="paging-controls">
+      <button
+        type="button"
+        class="btn outline-muted"
+        aria-label="Previous page"
+        [disabled]="!canPrev()"
+        (click)="prev()"
+      >&#8249; Prev</button>
+
+      <button
+        type="button"
+        class="btn outline-green"
+        aria-label="Next page"
+        [disabled]="!canNext()"
+        (click)="next()"
+      >Next &#8250;</button>
+    </span>
+  </div>
+</section>

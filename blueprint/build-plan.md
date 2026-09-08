@@ -12,7 +12,7 @@
 - [x] 4. **Catalogue browsing** - searchable country list plus the indicator catalogue
   with category, source and curated filters, where clicking an indicator row adds it
   to the working query
-- [ ] 5. **Observations table** - paginated flat rows with actual and forecast badges and
+- [x] 5. **Observations table** - paginated flat rows with actual and forecast badges and
   honest empty states
 - [ ] 6. **Series view** - grouped series per indicator and country with the
   `lastActualYear` boundary made visible
