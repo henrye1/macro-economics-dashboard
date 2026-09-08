@@ -1,11 +1,14 @@
 import { Component } from '@angular/core';
 
-/** Placeholder for the Observations tab. Replaced by its own feature. */
+import { WorkingQueryCard } from '../query/working-query-card';
+
+/**
+ * The working query lives here as of feature 3. Feature 5 adds the observations
+ * table below it.
+ */
 @Component({
   selector: 'app-observations',
-  template: `
-    <h1 class="page-title">Observations</h1>
-    <p class="page-note">The working query and observations table land here in features 3 and 5.</p>
-  `
+  imports: [WorkingQueryCard],
+  template: `<app-working-query-card />`
 })
 export class ObservationsPage {}

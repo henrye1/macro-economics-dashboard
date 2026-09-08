@@ -227,6 +227,168 @@ body {
   color: var(--faint);
 }
 
+/* ==========================================================================
+   Shared form primitives. Promoted from prototypes/prototype.css by feature 3;
+   the working-query card, the catalogue filters and the export panel reuse them.
+   ========================================================================== */
+
+.field {
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+
+  .label {
+    font-size: var(--text-xs);
+    color: var(--muted);
+  }
+
+  .value {
+    font-size: var(--text-md);
+
+    &.placeholder {
+      color: var(--faint);
+    }
+  }
+
+  select,
+  input {
+    font-family: var(--font-sans);
+    font-size: var(--text-md);
+    color: var(--text);
+    background: none;
+    border: none;
+    padding: 0;
+    width: 100%;
+
+    &:focus-visible {
+      outline: 2px solid var(--navy);
+      outline-offset: 2px;
+    }
+  }
+
+  &[aria-invalid='true'],
+  &:has([aria-invalid='true']) {
+    border-color: var(--change-down);
+  }
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px var(--space-3);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+
+  &.indicator {
+    background: var(--chip-indicator-bg);
+    color: var(--chip-indicator-ink);
+  }
+
+  &.country {
+    background: var(--chip-country-bg);
+    color: var(--chip-country-ink);
+  }
+
+  /* A real button, so the chip can be removed by keyboard. */
+  .remove {
+    border: none;
+    background: none;
+    padding: 0;
+    cursor: pointer;
+    color: inherit;
+    font: inherit;
+    font-weight: var(--weight-normal);
+    opacity: 0.75;
+    line-height: 1;
+
+    &:hover {
+      opacity: 1;
+    }
+
+    &:focus-visible {
+      outline: 2px solid currentcolor;
+      outline-offset: 2px;
+    }
+  }
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  background: none;
+
+  &.primary {
+    background: var(--accent);
+    color: var(--accent-ink);
+
+    &:hover {
+      background: var(--accent-hover);
+    }
+  }
+
+  &.navy {
+    background: var(--navy);
+    color: var(--navy-ink);
+
+    &:hover {
+      background: var(--navy-hover);
+    }
+  }
+
+  &.outline-green {
+    border-color: var(--accent);
+    color: var(--accent-link);
+    background: var(--surface);
+  }
+
+  &.outline-navy {
+    border-color: var(--navy);
+    color: var(--navy);
+    background: var(--surface);
+  }
+
+  &.outline-muted {
+    border-color: var(--border-strong);
+    color: var(--muted);
+    background: var(--surface);
+  }
+
+  &.lg {
+    padding: var(--space-4) var(--space-5);
+    font-size: var(--text-base);
+  }
+
+  &:disabled {
+    color: var(--faint);
+    border-color: var(--border);
+    background: var(--surface);
+    cursor: default;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--navy);
+    outline-offset: 2px;
+  }
+}
+
 /* Shared page heading, used by the placeholder tabs until each feature builds
    its own page. */
 

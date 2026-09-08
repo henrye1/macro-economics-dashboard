@@ -85,12 +85,11 @@ describe('App shell', () => {
     it('navigates to each placeholder tab and renders its page', async () => {
       const router = TestBed.inject(Router);
 
-      // Overview is a real page as of feature 2, so it is covered separately
-      // below and by overview.spec.ts. These six are still placeholders.
+      // Overview became a real page at feature 2 and Observations at feature 3;
+      // both are asserted separately below. These five are still placeholders.
       const cases: ReadonlyArray<readonly [string, string]> = [
         ['/countries-indicators', 'Countries & indicators'],
         ['/series', 'Series'],
-        ['/observations', 'Observations'],
         ['/vintages', 'Vintages & revisions'],
         ['/saved-queries', 'Saved queries & export'],
         ['/request-builder', 'Request builder']
@@ -115,6 +114,17 @@ describe('App shell', () => {
       expect(main?.querySelector('app-overview')).toBeTruthy();
       expect(main?.querySelector('h1')?.textContent)
         .toContain('Annual macroeconomic data for every country');
+    });
+
+    it('renders the working query card on Observations', async () => {
+      const router = TestBed.inject(Router);
+      await router.navigateByUrl('/observations');
+
+      const main = shell(fixture).querySelector('.app-main');
+
+      expect(router.url).toBe('/observations');
+      expect(main?.querySelector('app-working-query-card')).toBeTruthy();
+      expect(main?.querySelector('.card-head h2')?.textContent?.trim()).toBe('Working query');
     });
 
     it('marks the current tab active', async () => {

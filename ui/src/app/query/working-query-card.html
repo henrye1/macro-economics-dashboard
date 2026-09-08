@@ -1,0 +1,165 @@
+<section class="card">
+  <div class="card-head">
+    <h2>Working query</h2>
+    <span class="meta">{{ summary() }}</span>
+  </div>
+
+  @if (optionsUnavailable()) {
+    <p class="options-unavailable" role="status">
+      Indicator, country and vintage lists are unavailable. The query below is still editable.
+    </p>
+  }
+
+  <div class="query-row">
+
+    <div class="group">
+      <p class="group-label" id="indicators-label">Indicators</p>
+
+      @if (query().indicators.length) {
+        <div class="chip-set">
+          @for (code of query().indicators; track code) {
+            <span class="chip indicator">
+              {{ code }}
+              <button
+                type="button"
+                class="remove"
+                [attr.aria-label]="'Remove indicator ' + code"
+                (click)="removeIndicator(code)"
+              >&times;</button>
+            </span>
+          }
+        </div>
+      }
+
+      <label class="field select">
+        <span class="label">Add indicator</span>
+        <select
+          [disabled]="optionsLoading() || optionsUnavailable()"
+          [attr.aria-invalid]="noIndicators() ? 'true' : null"
+          [attr.aria-describedby]="noIndicators() ? 'indicators-problem' : null"
+          (change)="addIndicator($event)"
+        >
+          <option value="">{{ optionsLoading() ? 'Loading…' : 'Select indicator…' }}</option>
+          @for (code of indicatorOptions(); track code) {
+            <option [value]="code">{{ code }}</option>
+          }
+        </select>
+      </label>
+
+      <p class="problem" role="status">
+        @if (noIndicators()) {
+          <span id="indicators-problem">Add at least one indicator to run a query.</span>
+        }
+      </p>
+    </div>
+
+    <div class="group">
+      <p class="group-label">Countries</p>
+
+      @if (query().countries.length) {
+        <div class="chip-set">
+          @for (iso3 of query().countries; track iso3) {
+            <span class="chip country">
+              {{ iso3 }}
+              <button
+                type="button"
+                class="remove"
+                [attr.aria-label]="'Remove country ' + iso3"
+                (click)="removeCountry(iso3)"
+              >&times;</button>
+            </span>
+          }
+        </div>
+      } @else {
+        <p class="hint">All countries</p>
+      }
+
+      <label class="field select">
+        <span class="label">Add country</span>
+        <select
+          [disabled]="optionsLoading() || optionsUnavailable()"
+          (change)="addCountry($event)"
+        >
+          <option value="">{{ optionsLoading() ? 'Loading…' : 'Select country…' }}</option>
+          @for (country of countryOptions(); track country.iso3) {
+            <option [value]="country.iso3">{{ country.iso3 }} · {{ country.name }}</option>
+          }
+        </select>
+      </label>
+    </div>
+
+    <label class="field">
+      <span class="label">Year from</span>
+      <input
+        type="number"
+        inputmode="numeric"
+        [value]="query().yearFrom ?? ''"
+        [attr.aria-invalid]="invertedRange() ? 'true' : null"
+        [attr.aria-describedby]="invertedRange() ? 'year-problem' : null"
+        (change)="setYearFrom($event)"
+      >
+    </label>
+
+    <label class="field">
+      <span class="label">Year to</span>
+      <input
+        type="number"
+        inputmode="numeric"
+        [value]="query().yearTo ?? ''"
+        [attr.aria-invalid]="invertedRange() ? 'true' : null"
+        [attr.aria-describedby]="invertedRange() ? 'year-problem' : null"
+        (change)="setYearTo($event)"
+      >
+    </label>
+
+    <label class="field select">
+      <span class="label">Source</span>
+      <select [value]="query().source" (change)="setSource($event)">
+        @for (source of sources; track source) {
+          <option [value]="source">{{ source }}</option>
+        }
+      </select>
+    </label>
+
+    <label class="field select">
+      <span class="label">Forecast</span>
+      <select [value]="query().forecast" (change)="setForecast($event)">
+        @for (forecast of forecasts; track forecast) {
+          <option [value]="forecast">{{ forecast }}</option>
+        }
+      </select>
+    </label>
+
+  </div>
+
+  <p class="problem year-problem" role="status">
+    @if (invertedRange()) {
+      <span id="year-problem">
+        Year from is after year to. Adjust either end to run a query.
+      </span>
+    }
+  </p>
+
+  <div class="query-foot">
+    <label class="field select vintage">
+      <span class="label">Vintage</span>
+      <select
+        [value]="query().vintage === 'latest' ? 'latest' : query().vintage"
+        [disabled]="optionsUnavailable()"
+        (change)="setVintage($event)"
+      >
+        <option value="latest">latest (per source)</option>
+        @for (vintage of vintageOptions(); track vintage.value) {
+          <option [value]="vintage.value">{{ vintage.label }}</option>
+        }
+      </select>
+    </label>
+
+    <p class="note">
+      Latest published snapshot per source. Record meta.vintages ids with any
+      result you must reproduce.
+    </p>
+
+    <button type="button" class="btn outline-green" (click)="reset()">Reset</button>
+  </div>
+</section>

@@ -7,7 +7,7 @@
   provider seam backed by fixtures
 - [x] 2. **Overview page** - service summary, source cadence, and the countries,
   indicators and vintages counts
-- [ ] 3. **Working query** - shared query state (indicators, countries, years, source,
+- [x] 3. **Working query** - shared query state (indicators, countries, years, source,
   forecast, vintage) that persists across tabs
 - [ ] 4. **Catalogue browsing** - searchable country list plus the indicator catalogue
   with category, source and curated filters, where clicking an indicator row adds it
