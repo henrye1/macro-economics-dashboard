@@ -389,6 +389,151 @@ body {
   }
 }
 
+/* ==========================================================================
+   Shared table, badge and search primitives. Promoted from
+   prototypes/prototype.css by feature 4; features 5, 6 and 9 reuse them and add
+   their own badge variants.
+   ========================================================================== */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+thead th {
+  text-align: left;
+  font-weight: var(--weight-normal);
+  color: var(--muted);
+  font-size: var(--text-base);
+  padding: var(--space-4) var(--cell-x);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+tbody td {
+  padding: var(--cell-y) var(--cell-x);
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+tbody td:last-child {
+  border-right: none;
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Hover affordance only. The row's real control is a button inside it. */
+tbody tr.clickable:hover {
+  background: var(--surface-subtle);
+}
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.strong {
+  font-weight: var(--weight-bold);
+}
+
+.code-link {
+  color: var(--navy);
+  font-weight: var(--weight-bold);
+  font-family: var(--font-mono);
+  text-decoration: none;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+
+  &.selected {
+    color: var(--accent-link);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--navy);
+    outline-offset: 2px;
+  }
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 5px var(--space-3);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  white-space: nowrap;
+
+  .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: var(--radius-pill);
+  }
+
+  &.curated {
+    background: var(--badge-curated-bg);
+    color: var(--badge-curated-ink);
+
+    .dot {
+      background: var(--badge-curated-dot);
+    }
+  }
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+
+  input {
+    flex: 1;
+    min-width: 0;
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    color: var(--text);
+    background: none;
+    border: none;
+    padding: 0;
+
+    &::placeholder {
+      color: var(--faint);
+    }
+
+    &:focus-visible {
+      outline: none;
+    }
+  }
+
+  &:focus-within {
+    outline: 2px solid var(--navy);
+    outline-offset: 1px;
+  }
+}
+
+/* Available to assistive technology, invisible on screen. Used where the design
+   conveys state by colour alone. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* Shared page heading, used by the placeholder tabs until each feature builds
    its own page. */
 

@@ -9,7 +9,7 @@
   indicators and vintages counts
 - [x] 3. **Working query** - shared query state (indicators, countries, years, source,
   forecast, vintage) that persists across tabs
-- [ ] 4. **Catalogue browsing** - searchable country list plus the indicator catalogue
+- [x] 4. **Catalogue browsing** - searchable country list plus the indicator catalogue
   with category, source and curated filters, where clicking an indicator row adds it
   to the working query
 - [ ] 5. **Observations table** - paginated flat rows with actual and forecast badges and

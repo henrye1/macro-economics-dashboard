@@ -37,9 +37,13 @@ const DEFAULT_PAGE_SIZE = 500;
  * would put a timing value in production code for the sake of a demo. Feature 8
  * introduces real latency and exercises those states for the first time.
  *
- * Query arguments are accepted and ignored. Filtering, paging and vintage
- * pinning are the real service's job, and pretending to implement them here
- * would invent behaviour the API owns.
+ * The indicator filters (`q`, `category`, `source`, `curated`) are implemented
+ * exactly as the consumer guide documents them, so the catalogue's filtering is
+ * real now and needs no change when feature 8 swaps in the live service. This is
+ * not invented behaviour: the contract is written down.
+ *
+ * Paging and vintage pinning are still ignored. Nothing consumes them yet, and
+ * guessing at them would invent behaviour the API owns.
  */
 @Injectable()
 export class FixtureMacroDataProvider implements MacroDataProvider {
@@ -47,8 +51,8 @@ export class FixtureMacroDataProvider implements MacroDataProvider {
     return of(this.envelope([...FIXTURE_COUNTRIES]));
   }
 
-  indicators(_query?: IndicatorsQuery): Observable<Envelope<Indicator>> {
-    return of(this.envelope([...FIXTURE_INDICATORS]));
+  indicators(query?: IndicatorsQuery): Observable<Envelope<Indicator>> {
+    return of(this.envelope(filterIndicators(FIXTURE_INDICATORS, query)));
   }
 
   observations(_query: ObservationsQuery): Observable<Envelope<Observation>> {
@@ -79,4 +83,45 @@ export class FixtureMacroDataProvider implements MacroDataProvider {
       },
     };
   }
+}
+
+/**
+ * Applies the documented `/api/macro/indicators` filters. Exported so the
+ * catalogue's expectations can be asserted directly against the same rules the
+ * real service implements.
+ *
+ * `curated` defaults to true. Filters combine with AND. `q` is a
+ * case-insensitive substring match against the code or the name.
+ */
+export function filterIndicators(
+  indicators: readonly Indicator[],
+  query?: IndicatorsQuery
+): Indicator[] {
+  const curated = query?.curated ?? true;
+  const category = query?.category;
+  const source = query?.source;
+  const term = query?.q?.trim().toLowerCase();
+
+  return indicators.filter((indicator) => {
+    if (curated && !indicator.curated) {
+      return false;
+    }
+
+    if (category !== undefined && indicator.category !== category) {
+      return false;
+    }
+
+    if (source !== undefined && !indicator.sources.some((entry) => entry.source === source)) {
+      return false;
+    }
+
+    if (term) {
+      const haystack = `${indicator.code} ${indicator.name}`.toLowerCase();
+      if (!haystack.includes(term)) {
+        return false;
+      }
+    }
+
+    return true;
+  });
 }

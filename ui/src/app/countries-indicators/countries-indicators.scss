@@ -1,0 +1,84 @@
+.catalogue-grid {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.search-row {
+  padding-bottom: 0;
+}
+
+.state {
+  margin: 0;
+  padding: var(--space-5);
+  color: var(--muted);
+}
+
+/* ---------- countries ---------- */
+
+.country-list {
+  list-style: none;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  max-height: 660px;
+  overflow-y: auto;
+}
+
+.country-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border);
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  .who {
+    display: grid;
+    gap: var(--space-1);
+  }
+
+  .name {
+    font-weight: var(--weight-bold);
+  }
+
+  .sources {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--muted);
+  }
+
+  .iso {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-bold);
+    color: var(--navy);
+  }
+}
+
+/* ---------- catalogue ---------- */
+
+.filters {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr auto;
+  gap: var(--space-4);
+  align-items: center;
+  padding: var(--space-5);
+  border-bottom: 1px solid var(--border);
+}
+
+td.tight {
+  color: var(--muted);
+}
+
+.sources-cell {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--muted);
+  line-height: 1.6;
+}
