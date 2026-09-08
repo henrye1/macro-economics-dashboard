@@ -82,11 +82,12 @@ describe('App shell', () => {
       ]);
     });
 
-    it('navigates to each tab and renders its page', async () => {
+    it('navigates to each placeholder tab and renders its page', async () => {
       const router = TestBed.inject(Router);
 
+      // Overview is a real page as of feature 2, so it is covered separately
+      // below and by overview.spec.ts. These six are still placeholders.
       const cases: ReadonlyArray<readonly [string, string]> = [
-        ['/overview', 'Overview'],
         ['/countries-indicators', 'Countries & indicators'],
         ['/series', 'Series'],
         ['/observations', 'Observations'],
@@ -102,6 +103,18 @@ describe('App shell', () => {
         expect(router.url).toBe(path);
         expect(main?.querySelector('.page-title')?.textContent?.trim()).toBe(heading);
       }
+    });
+
+    it('renders the Overview page in the outlet', async () => {
+      const router = TestBed.inject(Router);
+      await router.navigateByUrl('/overview');
+
+      const main = shell(fixture).querySelector('.app-main');
+
+      expect(router.url).toBe('/overview');
+      expect(main?.querySelector('app-overview')).toBeTruthy();
+      expect(main?.querySelector('h1')?.textContent)
+        .toContain('Annual macroeconomic data for every country');
     });
 
     it('marks the current tab active', async () => {

@@ -173,6 +173,60 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* ==========================================================================
+   Shared card chrome. Promoted from prototypes/prototype.css by feature 2;
+   features 4, 5, 6 and 9 to 12 reuse it. Component styles stay small because
+   angular.json caps anyComponentStyle at a 4 kB warning.
+   ========================================================================== */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.card-head {
+  background: var(--surface-header);
+  border-bottom: 1px solid var(--border);
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+
+  h2 {
+    margin: 0;
+    font-size: var(--text-md);
+    color: var(--navy);
+  }
+
+  .meta {
+    margin-left: auto;
+    color: var(--muted);
+    font-size: var(--text-sm);
+  }
+}
+
+.card-body {
+  padding: var(--space-5);
+}
+
+.card-foot {
+  border-top: 1px solid var(--border);
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.eyebrow {
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
 /* Shared page heading, used by the placeholder tabs until each feature builds
    its own page. */
 

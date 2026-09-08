@@ -1,0 +1,197 @@
+.overview {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.top-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.side {
+  display: grid;
+  gap: var(--space-5);
+}
+
+/* ---------- hero ---------- */
+
+.hero {
+  h1 {
+    margin: var(--space-3) 0 var(--space-4);
+    font-size: var(--text-xl);
+    line-height: 1.35;
+    color: var(--navy);
+  }
+
+  .intro {
+    margin: 0;
+    line-height: 1.7;
+    max-width: 60ch;
+  }
+}
+
+.props {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  background: var(--surface-subtle);
+  margin-top: var(--space-5);
+
+  > div {
+    padding: var(--space-4);
+    border-right: 1px solid var(--border);
+
+    &:last-child {
+      border-right: none;
+    }
+  }
+
+  .claim {
+    margin: 0;
+    color: var(--muted);
+    font-size: var(--text-sm);
+  }
+
+  .consequence {
+    margin: var(--space-2) 0 0;
+    color: var(--navy);
+    font-weight: var(--weight-bold);
+    line-height: 1.5;
+  }
+}
+
+/* ---------- stat tiles ---------- */
+
+/* A definition list keeps each number tied to its label. Column-reverse shows
+   the value above the term without breaking dt-then-dd document order. */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 0;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: flex-end;
+  padding: var(--space-4) var(--space-5);
+  border-right: 1px solid var(--border);
+
+  &:last-child {
+    border-right: none;
+  }
+
+  dd {
+    margin: 0;
+    font-size: var(--text-xl);
+    font-weight: var(--weight-bold);
+    color: var(--navy);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+  }
+
+  dt {
+    color: var(--muted);
+    font-size: var(--text-sm);
+    margin-top: var(--space-1);
+  }
+}
+
+.pending {
+  display: flex;
+  align-items: center;
+  min-height: calc(var(--text-xl) * 1.2);
+}
+
+.skeleton {
+  display: block;
+  width: 2ch;
+  height: var(--text-base);
+  border-radius: var(--radius);
+  background: var(--surface-muted);
+}
+
+.stats-unavailable {
+  margin: 0;
+  padding: var(--space-5);
+  color: var(--muted);
+}
+
+/* ---------- vintage cadence ---------- */
+
+.cadence {
+  display: grid;
+  gap: var(--space-5);
+  margin-top: var(--space-4);
+}
+
+.cadence-item {
+  border-left: 3px solid var(--accent);
+  padding-left: var(--space-4);
+
+  p {
+    margin: 0;
+  }
+
+  .source-code {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-bold);
+    color: var(--navy);
+  }
+
+  .source-name {
+    font-weight: var(--weight-bold);
+    margin: var(--space-1) 0;
+  }
+
+  .line {
+    color: var(--muted);
+    font-size: var(--text-sm);
+    line-height: 1.7;
+  }
+}
+
+/* ---------- use-case cards ---------- */
+
+.use-cases {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-5);
+
+  .card-body {
+    display: grid;
+    gap: var(--space-4);
+    align-content: start;
+    height: 100%;
+  }
+
+  h2 {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    font-size: var(--text-md);
+    color: var(--navy);
+  }
+
+  p {
+    margin: 0;
+    line-height: 1.7;
+  }
+
+  .action {
+    margin-top: auto;
+    color: var(--accent-link);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-bold);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}

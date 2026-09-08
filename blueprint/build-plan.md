@@ -5,7 +5,7 @@
 - [x] 1. **App shell** - seven-tab navigation, Angular Material setup, header vintage
   strip, attribution footer, hand-written API contract types, and a typed data
   provider seam backed by fixtures
-- [ ] 2. **Overview page** - service summary, source cadence, and the countries,
+- [x] 2. **Overview page** - service summary, source cadence, and the countries,
   indicators and vintages counts
 - [ ] 3. **Working query** - shared query state (indicators, countries, years, source,
   forecast, vintage) that persists across tabs

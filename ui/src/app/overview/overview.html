@@ -1,0 +1,101 @@
+<div class="overview">
+
+  <div class="top-row">
+
+    <section class="card hero">
+      <div class="card-body">
+        <p class="eyebrow">Macro data service</p>
+        <h1>
+          Annual macroeconomic data for every country, from two public sources,
+          served from Cyte's own database.
+        </h1>
+        <p class="intro">
+          IMF World Economic Outlook contributes realised history and staff forecasts
+          about five years forward. World Bank WDI contributes realised history for a
+          curated set of core indicators. Both are ingested on a schedule, so reads
+          never touch the upstream sources.
+        </p>
+
+        <div class="props">
+          @for (property of properties; track property.claim) {
+            <div>
+              <p class="claim">{{ property.claim }}</p>
+              <p class="consequence">{{ property.consequence }}</p>
+            </div>
+          }
+        </div>
+      </div>
+    </section>
+
+    <div class="side">
+
+      <section class="card stats-card">
+        @if (unavailable()) {
+          <p class="stats-unavailable">Counts unavailable</p>
+        } @else {
+          <dl class="stats" [attr.aria-busy]="loading()">
+            <div class="stat">
+              @if (counts(); as value) {
+                <dd>{{ value.countries }}</dd>
+              } @else {
+                <dd class="pending"><span class="skeleton" aria-hidden="true"></span></dd>
+              }
+              <dt>Countries with data</dt>
+            </div>
+            <div class="stat">
+              @if (counts(); as value) {
+                <dd>{{ value.indicators }}</dd>
+              } @else {
+                <dd class="pending"><span class="skeleton" aria-hidden="true"></span></dd>
+              }
+              <dt>Curated indicators</dt>
+            </div>
+            <div class="stat">
+              @if (counts(); as value) {
+                <dd>{{ value.vintages }}</dd>
+              } @else {
+                <dd class="pending"><span class="skeleton" aria-hidden="true"></span></dd>
+              }
+              <dt>Published vintages</dt>
+            </div>
+          </dl>
+        }
+      </section>
+
+      <section class="card">
+        <div class="card-body">
+          <p class="eyebrow">Vintage cadence</p>
+          <div class="cadence">
+            @for (source of cadence; track source.code) {
+              <div class="cadence-item">
+                <p class="source-code">{{ source.code }}</p>
+                <p class="source-name">{{ source.name }}</p>
+                <p class="line">{{ source.contributes }}</p>
+                <p class="line">{{ source.updated }}</p>
+              </div>
+            }
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <div class="use-cases">
+    @for (useCase of useCases; track useCase.title) {
+      <section class="card">
+        <div class="card-body">
+          <h2>
+            <span class="icon" aria-hidden="true">{{ useCase.icon }}</span>
+            {{ useCase.title }}
+          </h2>
+          <p>{{ useCase.body }}</p>
+          <a class="action" [routerLink]="useCase.route">
+            {{ useCase.action }} <span aria-hidden="true">&#8594;</span>
+          </a>
+        </div>
+      </section>
+    }
+  </div>
+
+</div>
