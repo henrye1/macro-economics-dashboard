@@ -140,10 +140,14 @@ of the switch; the skills and `ai-interaction.md` only point back here.
 - Run them via the project's test command (see Commands in `AGENTS.md`), not a
   hardcoded tool name.
 
-Stack binding for this project: `ui/` has the scaffolded Angular Karma/Jasmine
-runner and `api/` has no runner at all, so **no `Test` command is declared in
-`AGENTS.md` and the test gate is off**. Run `/tests` to add an API runner,
-normalize the UI runner to a headless non-watch command, and turn the gate on.
+Stack binding for this project: both packages declare a `Test` command in
+`AGENTS.md`, so **the gate is on**. `api/` uses Vitest with `vi.mock()` for
+external dependencies and `vi.useFakeTimers()` for time-dependent logic; its
+tests are named `*.test.ts`, sit beside their source, are excluded from the
+emitted build, and are typechecked through `tsconfig.spec.json`. `ui/` uses the
+Angular Karma and Jasmine builder with `*.spec.ts` beside their source, and
+`TestBed` for component and injection-token work. There is no root
+`package.json`, so run `npm test` in whichever package you changed.
 Until then, verify logic by running the app, hitting the endpoint, and building.
 
 ## Browser Verification

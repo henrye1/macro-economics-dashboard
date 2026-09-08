@@ -267,22 +267,32 @@ Two packages, no root workspace. Run each command from its own directory.
 - Dev server: `npm run dev` (tsx watch, http://localhost:3000)
 - Build: `npm run build` (tsc to `dist/`)
 - Production server: `npm start`
-- Typecheck: `npm run typecheck`
+- Typecheck: `npm run typecheck` (source and tests)
+- Test: `npm test` (Vitest, one shot)
+- Test watch: `npm run test:watch`
 
 **ui/** (npm, `package-lock.json`)
 
 - Dev server: `npm start` (ng serve, http://localhost:4200, proxies `/api/*`)
 - Build: `npm run build` (production bundle to `dist/ui`)
 - Typecheck: covered by `npm run build`; no separate script
+- Test: `npm test` (Karma and Jasmine, headless Chrome, one shot)
+- Test watch: `npm run test:watch`
 
 No lint command is configured in either package. No `Verify` command exists yet.
 
-Testing is opt-in and **not a gate in this project yet**. `ui/` has the
-scaffolded Angular Karma/Jasmine runner (`npm test` in `ui/`, watch mode, real
-Chrome), but `api/` has no test runner at all, and most assertable logic will
-live there. No `Test` command is declared above, so the test gate is off. Run
-`/tests` or `$tests` to add an API runner, normalize the UI runner to a
-headless non-watch command, and turn the gate on.
+Testing is **on**. Both packages declare a `Test` command above, so tests are a
+gate for logic-bearing steps as defined in
+`blueprint/context/coding-standards.md`. Each package uses the runner native to
+its stack:
+
+- `api/` uses **Vitest**. Tests live beside their source as `*.test.ts` and are
+  excluded from the emitted build; `tsconfig.spec.json` keeps them typechecked.
+- `ui/` uses the **Angular Karma and Jasmine** builder that came with the
+  scaffold. Specs live beside their source as `*.spec.ts`.
+
+There is no root `package.json`, so there is no single command that runs both.
+Run `npm test` in each package you changed.
 
 Browser testing is also opt-in. Run `/browser-tests` or `$browser-tests` to add
 or normalize a browser harness and document its exact command as `Browser
