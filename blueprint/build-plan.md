@@ -16,7 +16,7 @@
   honest empty states
 - [x] 6. **Series view** - grouped series per indicator and country with the
   `lastActualYear` boundary made visible
-- [ ] 7. **Macro API service** - Express passthrough for the five read routes with
+- [x] 7. **Macro API service** - Express passthrough for the five read routes with
   server-side Auth0 token caching and retry
 - [ ] 8. **Live data wiring** - swap the fixture provider for the real service, including
   ETag passthrough and RFC 7807 error handling
