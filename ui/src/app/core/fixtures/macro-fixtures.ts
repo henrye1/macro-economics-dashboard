@@ -4,21 +4,22 @@
  * blueprint/references/ so the shell can be compared against them directly.
  *
  * Countries, indicators, vintages and attribution are populated because the
- * shell renders the vintage strip and footer from them. Series and revisions are
- * intentionally empty here: features 6 and 9 own that data and extend these
- * fixtures when they need it. An empty `data` array is a valid response, so
- * consumers must handle it regardless.
+ * shell renders the vintage strip and footer from them. Revisions are
+ * intentionally empty here: feature 9 owns that data and extends these fixtures
+ * when it needs it. An empty `data` array is a valid response, so consumers
+ * must handle it regardless.
  *
  * Observations live in `observation-fixtures.ts`, which is generated from the
  * countries, indicators and vintages below. Keeping them in their own module
- * avoids an import cycle back into this one.
+ * avoids an import cycle back into this one. Series are not stored at all: the
+ * provider groups them out of the observations, so the two routes cannot
+ * disagree about a number.
  */
 
 import type {
   Country,
   Indicator,
   Revision,
-  Series,
   Vintage,
   VintageRef,
 } from '../macro-contracts';
@@ -228,5 +229,4 @@ export const FIXTURE_INDICATORS: readonly Indicator[] = [
   },
 ];
 
-export const FIXTURE_SERIES: readonly Series[] = [];
 export const FIXTURE_REVISIONS: readonly Revision[] = [];

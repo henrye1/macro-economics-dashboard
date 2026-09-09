@@ -1,0 +1,9 @@
+:host {
+  display: block;
+}
+
+.paging-controls {
+  margin-left: auto;
+  display: flex;
+  gap: var(--space-3);
+}

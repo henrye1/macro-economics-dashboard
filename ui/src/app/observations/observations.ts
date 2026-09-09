@@ -4,7 +4,9 @@ import { catchError, map, of, switchMap } from 'rxjs';
 
 import type { EnvelopeMeta, Observation, ObservationsQuery } from '../core/macro-contracts';
 import { MACRO_DATA } from '../core/macro-data.provider';
+import { formatValue } from '../core/value-format';
 import { WorkingQueryStore } from '../core/working-query.store';
+import { PagingFooter } from '../query/paging-footer';
 import { WorkingQueryCard } from '../query/working-query-card';
 
 type ResultState =
@@ -12,19 +14,6 @@ type ResultState =
   /** The query cannot be sent: it would be a documented 400. */
   | { status: 'invalid' }
   | { status: 'unavailable' };
-
-/**
- * One decimal place, grouped thousands.
- *
- * The design only shows percent values, where one decimal matches it exactly.
- * Grouping is added because `GDP_PER_CAPITA_USD` reaches five figures and an
- * ungrouped `65324.1` is harder to read than `65,324.1`. The underlying value
- * is never rounded or mutated - this is display only.
- */
-const VALUE_FORMAT = new Intl.NumberFormat('en-GB', {
-  minimumFractionDigits: 1,
-  maximumFractionDigits: 1
-});
 
 /**
  * Observations: the working query answered as flat rows.
@@ -41,7 +30,7 @@ const VALUE_FORMAT = new Intl.NumberFormat('en-GB', {
  */
 @Component({
   selector: 'app-observations',
-  imports: [WorkingQueryCard],
+  imports: [PagingFooter, WorkingQueryCard],
   templateUrl: './observations.html',
   styleUrl: './observations.scss'
 })
@@ -107,8 +96,18 @@ export class ObservationsPage {
     return `Rows ${start}–${start + state.rows.length - 1} of ${totalCount}`;
   });
 
-  /** The count the shared query card appends; `null` whenever there is no result. */
-  protected readonly observationCount = computed(() => this.ready()?.meta.totalCount ?? null);
+  /**
+   * The phrase the shared query card appends. The card owns no noun, so the
+   * plural rule for "observation" lives here with the tab that knows it.
+   */
+  protected readonly resultSummary = computed(() => {
+    const state = this.ready();
+    if (state === null) {
+      return null;
+    }
+    const count = state.meta.totalCount;
+    return `${count} ${count === 1 ? 'observation' : 'observations'}`;
+  });
 
   // ---------- paging ----------
 
@@ -137,25 +136,17 @@ export class ObservationsPage {
     return vintages.length ? vintages.map((vintage) => vintage.label).join(' · ') : '—';
   });
 
-  protected readonly canPrev = computed(() => this.ready() !== null && this.page() > 1);
-  protected readonly canNext = computed(
-    () => this.ready() !== null && this.page() < this.pageCount()
-  );
-
+  /** The footer decides when a direction is available and only emits then. */
   protected prev(): void {
-    if (this.canPrev()) {
-      this.store.setPage(this.page() - 1);
-    }
+    this.store.setPage(this.page() - 1);
   }
 
   protected next(): void {
-    if (this.canNext()) {
-      this.store.setPage(this.page() + 1);
-    }
+    this.store.setPage(this.page() + 1);
   }
 
   protected value(row: Observation): string {
-    return VALUE_FORMAT.format(row.value);
+    return formatValue(row.value);
   }
 
   /** One row per (indicator, country, year, source), so this is unique. */

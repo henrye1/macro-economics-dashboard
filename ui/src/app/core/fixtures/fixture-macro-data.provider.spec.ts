@@ -10,6 +10,7 @@ import {
   FixtureMacroDataProvider,
   filterIndicators,
   filterObservations,
+  groupIntoSeries,
   vintageRefsFor
 } from './fixture-macro-data.provider';
 import { FIXTURE_OBSERVATIONS } from './observation-fixtures';
@@ -347,5 +348,185 @@ describe('FixtureMacroDataProvider observations paging', () => {
     const envelope = await firstValueFrom(provider.vintages());
 
     expect(envelope.data.length).toBe(FIXTURE_VINTAGES.length);
+  });
+});
+
+describe('groupIntoSeries', () => {
+  /** The same query feature 5 uses: 56 observation rows, grouped into 4 series. */
+  const designQuery: ObsQuery = {
+    indicators: ['GDP_GROWTH_REAL', 'CPI_INFLATION_AVG'],
+    countries: ['ZAF', 'NAM'],
+    yearFrom: 2018,
+    yearTo: 2031
+  };
+
+  const run = (overrides: Partial<ObsQuery> = {}) =>
+    groupIntoSeries(FIXTURE_OBSERVATIONS, { ...designQuery, ...overrides });
+
+  it('groups the same rows the observations route returns', () => {
+    const rows = filterObservations(FIXTURE_OBSERVATIONS, designQuery);
+    const series = run();
+
+    expect(rows.length).toBe(56);
+    expect(series.length).toBe(4);
+    expect(series.reduce((total, entry) => total + entry.points.length, 0)).toBe(56);
+  });
+
+  it('orders series by indicator, then country', () => {
+    expect(run().map((entry) => `${entry.indicator}/${entry.country}`)).toEqual([
+      'CPI_INFLATION_AVG/NAM',
+      'CPI_INFLATION_AVG/ZAF',
+      'GDP_GROWTH_REAL/NAM',
+      'GDP_GROWTH_REAL/ZAF'
+    ]);
+  });
+
+  it('takes name and unit from the catalogue, not from the rows', () => {
+    const series = run()[0];
+
+    expect(series?.indicator).toBe('CPI_INFLATION_AVG');
+    expect(series?.name).toBe('Inflation, average CPI');
+    expect(series?.unit).toBe('Percent');
+  });
+
+  it('reports the vintage label, not the id', () => {
+    const series = run()[0];
+
+    expect(series?.vintage).toBe('WEO 10.0.0 2026-04-14');
+    expect(series?.source).toBe('IMF_WEO');
+  });
+
+  it('carries points year-ascending, matching the underlying rows exactly', () => {
+    const series = run().find((entry) => entry.country === 'ZAF' && entry.indicator === 'GDP_GROWTH_REAL');
+    const rows = filterObservations(FIXTURE_OBSERVATIONS, {
+      ...designQuery,
+      indicators: ['GDP_GROWTH_REAL'],
+      countries: ['ZAF']
+    });
+
+    expect(series?.points.map((point) => point.year)).toEqual(rows.map((row) => row.year));
+    expect(series?.points.map((point) => point.value)).toEqual(rows.map((row) => row.value));
+    expect(series?.points.map((point) => point.isForecast)).toEqual(
+      rows.map((row) => row.isForecast)
+    );
+  });
+
+  it('splits history from forecast at lastActualYear', () => {
+    const series = run()[0];
+
+    expect(series?.lastActualYear).toBe(2025);
+
+    for (const point of series?.points ?? []) {
+      expect(point.isForecast).toBe(point.year > 2025);
+    }
+  });
+
+  it('keeps lastActualYear fixed when the year range hides the boundary', () => {
+    // Forecast-only window: every visible point is a forecast, and the boundary
+    // still reports 2025 rather than sliding to the newest visible year.
+    const series = run({ yearFrom: 2027, yearTo: 2031 })[0];
+
+    expect(series?.lastActualYear).toBe(2025);
+    expect(series?.points.map((point) => point.year)).toEqual([2027, 2028, 2029, 2030, 2031]);
+    expect(series?.points.every((point) => point.isForecast)).toBeTrue();
+  });
+
+  it('keeps lastActualYear fixed when the forecast filter hides the boundary', () => {
+    const actualOnly = run({ forecast: 'actual' })[0];
+
+    expect(actualOnly?.lastActualYear).toBe(2025);
+    expect(actualOnly?.points.every((point) => !point.isForecast)).toBeTrue();
+  });
+
+  it('moves lastActualYear when a genuinely older vintage is pinned', () => {
+    const series = run({ vintage: 12 })[0];
+
+    expect(series?.lastActualYear).toBe(2024);
+    expect(series?.vintage).toBe('WEO 9.0.0 2025-10-08');
+  });
+
+  it('reports the WDI boundary for a WDI-only indicator', () => {
+    const series = groupIntoSeries(FIXTURE_OBSERVATIONS, {
+      indicators: ['LENDING_RATE'],
+      countries: ['ZAF']
+    })[0];
+
+    expect(series?.source).toBe('WB_WDI');
+    expect(series?.vintage).toBe('WDI 2026-03-27');
+    expect(series?.lastActualYear).toBe(2024);
+    expect(series?.points.every((point) => !point.isForecast)).toBeTrue();
+  });
+
+  it('never spans more than one vintage per series', () => {
+    // Belt and braces: the filter resolves one vintage per source before
+    // grouping, so a mixed group would be a fixture bug. Grouping throws rather
+    // than reporting a vintage the values did not all come from.
+    for (const series of groupIntoSeries(FIXTURE_OBSERVATIONS, {
+      indicators: ['GDP_GROWTH_REAL', 'LENDING_RATE'],
+      countries: ['ZAF', 'NAM']
+    })) {
+      expect(series.points.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('returns no series for a valid query the sources do not report', () => {
+    expect(groupIntoSeries(FIXTURE_OBSERVATIONS, {
+      indicators: ['REER_INDEX'],
+      countries: ['NAM']
+    })).toEqual([]);
+  });
+});
+
+describe('FixtureMacroDataProvider series paging', () => {
+  const provider = new FixtureMacroDataProvider();
+
+  const designQuery: ObsQuery = {
+    indicators: ['GDP_GROWTH_REAL', 'CPI_INFLATION_AVG'],
+    countries: ['ZAF', 'NAM'],
+    yearFrom: 2018,
+    yearTo: 2031
+  };
+
+  it('counts series, not rows', async () => {
+    const envelope = await firstValueFrom(provider.series(designQuery));
+
+    expect(envelope.data.length).toBe(4);
+    expect(envelope.meta.totalCount).toBe(4);
+
+    // The same query over /observations counts 56. Same values, different unit
+    // of pagination, exactly as the guide states.
+    const observations = await firstValueFrom(provider.observations(designQuery));
+    expect(observations.meta.totalCount).toBe(56);
+  });
+
+  it('pages series', async () => {
+    const envelope = await firstValueFrom(
+      provider.series({ ...designQuery, pageSize: 2, page: 2 })
+    );
+
+    expect(envelope.meta.page).toBe(2);
+    expect(envelope.meta.pageSize).toBe(2);
+    expect(envelope.meta.totalCount).toBe(4);
+    expect(envelope.data.map((entry) => `${entry.indicator}/${entry.country}`)).toEqual([
+      'GDP_GROWTH_REAL/NAM',
+      'GDP_GROWTH_REAL/ZAF'
+    ]);
+  });
+
+  it('reports the vintages behind the whole result', async () => {
+    const envelope = await firstValueFrom(provider.series(designQuery));
+
+    expect(envelope.meta.vintages.map((ref) => ref.id)).toEqual([14]);
+  });
+
+  it('returns empty data and no vintages for a coverage gap', async () => {
+    const envelope = await firstValueFrom(
+      provider.series({ indicators: ['REER_INDEX'], countries: ['NAM'] })
+    );
+
+    expect(envelope.data).toEqual([]);
+    expect(envelope.meta.totalCount).toBe(0);
+    expect(envelope.meta.vintages).toEqual([]);
+    expect(envelope.meta.attribution.length).toBe(2);
   });
 });

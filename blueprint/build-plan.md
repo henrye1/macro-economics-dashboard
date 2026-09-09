@@ -14,7 +14,7 @@
   to the working query
 - [x] 5. **Observations table** - paginated flat rows with actual and forecast badges and
   honest empty states
-- [ ] 6. **Series view** - grouped series per indicator and country with the
+- [x] 6. **Series view** - grouped series per indicator and country with the
   `lastActualYear` boundary made visible
 - [ ] 7. **Macro API service** - Express passthrough for the five read routes with
   server-side Auth0 token caching and retry

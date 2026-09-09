@@ -12,6 +12,7 @@ import type {
   RevisionsQuery,
   Series,
   SeriesQuery,
+  SourceCode,
   Vintage,
   VintageRef,
   VintagesQuery,
@@ -22,7 +23,6 @@ import {
   FIXTURE_COUNTRIES,
   FIXTURE_INDICATORS,
   FIXTURE_REVISIONS,
-  FIXTURE_SERIES,
   FIXTURE_VINTAGES,
   FIXTURE_VINTAGE_REFS,
 } from './macro-fixtures';
@@ -45,8 +45,11 @@ const DEFAULT_PAGE_SIZE = 500;
  * behaviour: the contract is written down in CONSUMER-GUIDE.md sections 4.2
  * and 4.3.
  *
- * `series()` and `revisions()` still ignore their queries. Nothing consumes
- * them yet, and guessing would invent behaviour the API owns.
+ * `/series` takes the same filters and groups the same rows, so the two result
+ * tabs can never disagree about a value.
+ *
+ * `revisions()` still ignores its query. Nothing consumes it yet, and guessing
+ * would invent behaviour the API owns.
  */
 @Injectable()
 export class FixtureMacroDataProvider implements MacroDataProvider {
@@ -79,8 +82,24 @@ export class FixtureMacroDataProvider implements MacroDataProvider {
     );
   }
 
-  series(_query: SeriesQuery): Observable<Envelope<Series>> {
-    return of(this.envelope([...FIXTURE_SERIES]));
+  series(query: SeriesQuery): Observable<Envelope<Series>> {
+    // Grouped from the same filtered rows the observations route would return.
+    const rows = filterObservations(FIXTURE_OBSERVATIONS, query);
+    const matched = groupRows(rows);
+
+    const pageSize = query.pageSize ?? DEFAULT_PAGE_SIZE;
+    const page = Math.max(1, Math.trunc(query.page ?? 1));
+    const start = (page - 1) * pageSize;
+
+    return of(
+      this.envelope(matched.slice(start, start + pageSize), {
+        page,
+        pageSize,
+        // Series, not rows. This is the one place the two result routes differ.
+        totalCount: matched.length,
+        vintages: vintageRefsFor(rows),
+      }),
+    );
   }
 
   vintages(_query?: VintagesQuery): Observable<Envelope<Vintage>> {
@@ -274,4 +293,134 @@ export function filterObservations(
       a.country.localeCompare(b.country) ||
       a.year - b.year,
   );
+}
+
+/**
+ * The newest non-forecast year per `(indicator, country, source, vintageId)`,
+ * built once from the whole fixture set.
+ *
+ * `lastActualYear` is a property of the vintage, not of the query: a consumer
+ * who asks for 2027 onward still gets `lastActualYear: 2025` and an all-forecast
+ * window. Deriving it from the filtered points would make the boundary follow
+ * the year filter around, which is exactly the thing this tab exists to show.
+ */
+let lastActualYears: Map<string, number> | null = null;
+
+function boundaryKey(indicator: string, country: string, source: SourceCode, vintageId: number) {
+  return `${indicator}|${country}|${source}|${vintageId}`;
+}
+
+function lastActualYearFor(row: Observation): number {
+  if (lastActualYears === null) {
+    lastActualYears = new Map<string, number>();
+
+    for (const candidate of FIXTURE_OBSERVATIONS) {
+      if (candidate.isForecast) {
+        continue;
+      }
+
+      const key = boundaryKey(
+        candidate.indicator,
+        candidate.country,
+        candidate.source,
+        candidate.vintageId,
+      );
+      const held = lastActualYears.get(key);
+
+      if (held === undefined || candidate.year > held) {
+        lastActualYears.set(key, candidate.year);
+      }
+    }
+  }
+
+  const key = boundaryKey(row.indicator, row.country, row.source, row.vintageId);
+  const year = lastActualYears.get(key);
+
+  if (year === undefined) {
+    // A series with no history in any vintage is a fixture bug, not a runtime
+    // condition: every source publishes at least one actual year.
+    throw new Error(`No actual years recorded for ${key}`);
+  }
+
+  return year;
+}
+
+/** Turns one group of rows, already year-ascending, into a `Series`. */
+function toSeries(rows: readonly Observation[]): Series {
+  const first = rows[0];
+  if (first === undefined) {
+    throw new Error('Cannot build a series from no rows');
+  }
+
+  const vintageIds = new Set(rows.map((row) => row.vintageId));
+  if (vintageIds.size !== 1) {
+    // Filtering resolves to one vintage per source before grouping, so this
+    // cannot happen against valid fixtures. Fail loudly rather than pick one and
+    // report a vintage the values did not all come from.
+    throw new Error(
+      `Series ${first.indicator}/${first.country} spans vintages ${[...vintageIds].join(', ')}`,
+    );
+  }
+
+  const indicator = FIXTURE_INDICATORS.find((entry) => entry.code === first.indicator);
+  const vintage = FIXTURE_VINTAGES.find((entry) => entry.id === first.vintageId);
+
+  if (indicator === undefined || vintage === undefined) {
+    throw new Error(`Unknown indicator or vintage for ${first.indicator}/${first.country}`);
+  }
+
+  return {
+    indicator: first.indicator,
+    // `name` and `unit` come from the catalogue, never from the observation row.
+    name: indicator.name,
+    unit: indicator.unit,
+    country: first.country,
+    source: first.source,
+    // The label, not the id. `meta.vintages[].id` carries the id.
+    vintage: vintage.label,
+    lastActualYear: lastActualYearFor(first),
+    points: rows.map(({ year, value, isForecast }) => ({ year, value, isForecast })),
+  };
+}
+
+/**
+ * Groups already-filtered observation rows into series, one per
+ * `(indicator, country, source)`.
+ *
+ * Ordered indicator then country, ascending, matching the observations route.
+ * The live API does not document a series order; confirm it at feature 8.
+ */
+function groupRows(rows: readonly Observation[]): Series[] {
+  const groups = new Map<string, Observation[]>();
+
+  for (const row of rows) {
+    const key = `${row.indicator}|${row.country}|${row.source}`;
+    const held = groups.get(key);
+
+    if (held === undefined) {
+      groups.set(key, [row]);
+    } else {
+      held.push(row);
+    }
+  }
+
+  return [...groups.values()]
+    .map((group) => toSeries(group))
+    .sort(
+      (a, b) => a.indicator.localeCompare(b.indicator) || a.country.localeCompare(b.country),
+    );
+}
+
+/**
+ * Applies the documented `/api/macro/series` filters and groups the result.
+ *
+ * The guide is explicit that `/series` takes the same filters as
+ * `/observations`, so this is the observations filter followed by grouping.
+ * Nothing about the values differs between the two routes.
+ */
+export function groupIntoSeries(
+  observations: readonly Observation[],
+  query: SeriesQuery,
+): Series[] {
+  return groupRows(filterObservations(observations, query));
 }

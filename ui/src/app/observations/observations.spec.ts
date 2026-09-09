@@ -348,3 +348,68 @@ describe('ObservationsPage paging', () => {
     expect(next()?.disabled).toBeTrue();
   });
 });
+
+describe('ObservationsPage query summary', () => {
+  let fixture: ComponentFixture<ObservationsPage>;
+  let store: WorkingQueryStore;
+
+  const summary = () =>
+    (fixture.nativeElement as HTMLElement)
+      .querySelector('app-working-query-card .card-head .meta')
+      ?.textContent?.replace(/\s+/g, ' ')
+      .trim();
+
+  function setUp(provider: unknown = new FixtureMacroDataProvider()): void {
+    TestBed.configureTestingModule({
+      imports: [ObservationsPage],
+      providers: [{ provide: MACRO_DATA, useValue: provider }]
+    });
+
+    store = TestBed.inject(WorkingQueryStore);
+    store.reset();
+    fixture = TestBed.createComponent(ObservationsPage);
+  }
+
+  afterEach(() => {
+    TestBed.resetTestingModule();
+  });
+
+  it('appends the observation count from meta, not from the rendered page', () => {
+    setUp();
+    store.addIndicator('GDP_GROWTH_REAL');
+    store.addIndicator('CPI_INFLATION_AVG');
+    store.addCountry('ZAF');
+    store.addCountry('NAM');
+    store.setYearRange(2018, 2031);
+    fixture.detectChanges();
+
+    // 25 rows are on screen; the count is the whole 56-row result.
+    expect(summary()).toBe('2 indicators × 2 countries · 2018–2031 · 56 observations');
+  });
+
+  it('uses the singular for a one-row result', () => {
+    setUp();
+    store.addIndicator('GDP_GROWTH_REAL');
+    store.addCountry('ZAF');
+    store.setYearRange(2020, 2020);
+    fixture.detectChanges();
+
+    expect(summary()).toBe('1 indicator × 1 country · 2020–2020 · 1 observation');
+  });
+
+  it('says zero observations for a valid query with no data', () => {
+    setUp();
+    store.addIndicator('REER_INDEX');
+    store.addCountry('NAM');
+    fixture.detectChanges();
+
+    expect(summary()).toBe('1 indicator × 1 country · 0 observations');
+  });
+
+  it('omits the count entirely for an invalid query', () => {
+    setUp();
+    fixture.detectChanges();
+
+    expect(summary()).toBe('0 indicators × 0 countries');
+  });
+});

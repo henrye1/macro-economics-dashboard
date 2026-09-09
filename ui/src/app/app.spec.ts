@@ -85,11 +85,10 @@ describe('App shell', () => {
     it('navigates to each placeholder tab and renders its page', async () => {
       const router = TestBed.inject(Router);
 
-      // Overview, Observations and Countries & indicators became real pages at
-      // features 2, 3 and 4 and are asserted separately. These four remain
-      // placeholders.
+      // Overview, Observations, Countries & indicators and Series became real
+      // pages at features 2, 3, 4 and 6 and are asserted separately. These three
+      // remain placeholders.
       const cases: ReadonlyArray<readonly [string, string]> = [
-        ['/series', 'Series'],
         ['/vintages', 'Vintages & revisions'],
         ['/saved-queries', 'Saved queries & export'],
         ['/request-builder', 'Request builder']
@@ -138,6 +137,19 @@ describe('App shell', () => {
       expect(
         Array.from(main?.querySelectorAll('.card-head h2') ?? []).map((h) => h.textContent?.trim())
       ).toEqual(['Countries', 'Indicator catalogue']);
+    });
+
+    it('renders the series view on Series', async () => {
+      const router = TestBed.inject(Router);
+      await router.navigateByUrl('/series');
+
+      const main = shell(fixture).querySelector('.app-main');
+
+      expect(router.url).toBe('/series');
+      expect(main?.querySelector('app-series')).toBeTruthy();
+      expect(
+        Array.from(main?.querySelectorAll('.card-head h2') ?? []).map((h) => h.textContent?.trim())
+      ).toEqual(['Working query', 'Series']);
     });
 
     it('marks the current tab active', async () => {

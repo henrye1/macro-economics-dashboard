@@ -1,0 +1,29 @@
+<!--
+  Present in every state. It names the page, the page size and the vintages the
+  values came from, which is the provenance a consumer is told to record with any
+  result they must reproduce.
+-->
+<div class="card-foot">
+  <span class="paging-state">
+    Page {{ page() }} of {{ pageCount() }} · pageSize {{ pageSize() }} ·
+    vintages {{ vintageLabels() }}
+  </span>
+
+  <span class="paging-controls">
+    <button
+      type="button"
+      class="btn outline-muted"
+      aria-label="Previous page"
+      [disabled]="!canPrev()"
+      (click)="goPrev()"
+    >&#8249; Prev</button>
+
+    <button
+      type="button"
+      class="btn outline-green"
+      aria-label="Next page"
+      [disabled]="!canNext()"
+      (click)="goNext()"
+    >Next &#8250;</button>
+  </span>
+</div>

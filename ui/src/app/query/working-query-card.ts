@@ -35,14 +35,17 @@ export class WorkingQueryCard {
   protected readonly forecasts = FORECASTS;
 
   /**
-   * The number of observations the current result holds, when the host has one.
+   * The result phrase for the current tab, when the host has one - for example
+   * `56 observations` or `4 series`.
    *
-   * Optional and `null` by default, so a host with no result - Saved queries and
-   * the Request builder - mounts `<app-working-query-card />` with no bindings
-   * and gets exactly the summary feature 3 shipped. `0` is a real answer and
-   * renders; `null` means "not known here" and is omitted.
+   * The host formats it, not the card. Observations and Series count different
+   * things and pluralise differently ("series" is its own plural), and features
+   * 10 and 12 will add more, so a per-tab numeric input would mean the card
+   * growing a noun for every consumer. Optional and `null` by default, so a host
+   * with no result mounts `<app-working-query-card />` with no bindings and gets
+   * exactly the summary feature 3 shipped.
    */
-  readonly observationCount = input<number | null>(null);
+  readonly resultSummary = input<string | null>(null);
 
   protected readonly query = this.store.query;
   protected readonly validation = this.store.validation;
@@ -107,8 +110,8 @@ export class WorkingQueryCard {
   );
 
   /**
-   * The design's one-line description of the query, ending in the observation
-   * count when the host knows it.
+   * The design's one-line description of the query, ending in the host's result
+   * phrase when it has one.
    */
   protected readonly summary = computed(() => {
     const query = this.query();
@@ -123,9 +126,9 @@ export class WorkingQueryCard {
       parts.push(`· ${from ?? 'earliest'}–${to ?? 'latest'}`);
     }
 
-    const count = this.observationCount();
-    if (count !== null) {
-      parts.push(`· ${count} ${plural(count, 'observation')}`);
+    const result = this.resultSummary();
+    if (result !== null) {
+      parts.push(`· ${result}`);
     }
 
     return parts.join(' ');
