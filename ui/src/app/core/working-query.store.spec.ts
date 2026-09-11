@@ -330,3 +330,170 @@ describe('WorkingQueryStore no-op mutations', () => {
     expect(store.apiQuery()).toBe(apiQuery);
   });
 });
+
+/**
+ * F-25: the no-op guarantee is a property of the store, not a habit each
+ * mutator has to remember.
+ *
+ * Before this, `patch` and `setPage` compared through a helper, the array
+ * helpers had their own inline check, and `reset` had none. The defect that
+ * produced F-22 was exactly one mutator written without the guarantee the
+ * others had, so these cases cover every mutator rather than the ones that
+ * happened to be wrong.
+ */
+describe('WorkingQueryStore single write path', () => {
+  let store: WorkingQueryStore;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: [WorkingQueryStore] });
+    store = TestBed.inject(WorkingQueryStore);
+    store.reset();
+  });
+
+  afterEach(() => TestBed.resetTestingModule());
+
+  function populate(): void {
+    store.addIndicator('GDP_GROWTH_REAL');
+    store.addCountry('ZAF');
+    store.setYearRange(2018, 2031);
+    store.setSource('IMF_WEO');
+    store.setForecast('forecast');
+    store.setVintage(12);
+  }
+
+  describe('reset', () => {
+    it('keeps the same object when the query is already default', () => {
+      const before = store.query();
+      store.reset();
+
+      expect(store.query()).toBe(before);
+    });
+
+    it('keeps the same object when the query is structurally default but rebuilt', () => {
+      // "add an indicator, remove it, press Reset" leaves a distinct object that
+      // is equal to the default. Before this fix, Reset replaced it and
+      // notified every reader.
+      store.addIndicator('GDP_GROWTH_REAL');
+      store.removeIndicator('GDP_GROWTH_REAL');
+
+      const rebuilt = store.query();
+      expect(rebuilt).not.toBe(DEFAULT_WORKING_QUERY);
+
+      store.reset();
+
+      expect(store.query()).toBe(rebuilt);
+    });
+
+    it('still clears a real query', () => {
+      populate();
+      const before = store.query();
+
+      store.reset();
+
+      expect(store.query()).not.toBe(before);
+      expect(store.query().indicators).toEqual([]);
+      expect(store.query().source).toBe('preferred');
+    });
+  });
+
+  describe('the array helpers', () => {
+    it('does not duplicate an indicator that is already present', () => {
+      store.addIndicator('GDP_GROWTH_REAL');
+      const before = store.query();
+
+      store.addIndicator('GDP_GROWTH_REAL');
+
+      // Both halves matter. The de-duplication rule is why `addTo` keeps its own
+      // membership check: routing a duplicate through the comparison would see a
+      // genuinely different array and let `GDP,GDP` reach the query string.
+      expect(store.query().indicators).toEqual(['GDP_GROWTH_REAL']);
+      expect(store.query()).toBe(before);
+    });
+
+    it('does not duplicate a country that is already present', () => {
+      store.addCountry('ZAF');
+      const before = store.query();
+
+      store.addCountry('ZAF');
+
+      expect(store.query().countries).toEqual(['ZAF']);
+      expect(store.query()).toBe(before);
+    });
+
+    it('keeps the same object when removing a code that is not there', () => {
+      store.addIndicator('GDP_GROWTH_REAL');
+      const before = store.query();
+
+      store.removeIndicator('NOT_PRESENT');
+      expect(store.query()).toBe(before);
+
+      store.removeCountry('ZWE');
+      expect(store.query()).toBe(before);
+    });
+
+    it('still adds and removes a real code', () => {
+      const empty = store.query();
+
+      store.addIndicator('GDP_GROWTH_REAL');
+      const added = store.query();
+      expect(added).not.toBe(empty);
+      expect(added.indicators).toEqual(['GDP_GROWTH_REAL']);
+
+      store.removeIndicator('GDP_GROWTH_REAL');
+      expect(store.query()).not.toBe(added);
+      expect(store.query().indicators).toEqual([]);
+    });
+
+    it('returns to page 1 when a code changes', () => {
+      populate();
+      store.setPage(3);
+      expect(store.query().page).toBe(3);
+
+      store.addIndicator('CPI_INFLATION_AVG');
+
+      expect(store.query().page).toBe(1);
+    });
+  });
+
+  describe('every mutator', () => {
+    it('preserves identity on a no-op', () => {
+      populate();
+      const before = store.query();
+
+      store.setSource('IMF_WEO');
+      store.setForecast('forecast');
+      store.setVintage(12);
+      store.setYearRange(2018, 2031);
+      store.setPage(before.page);
+      store.addIndicator('GDP_GROWTH_REAL');
+      store.addCountry('ZAF');
+      store.removeIndicator('NOPE');
+      store.removeCountry('NOPE');
+
+      expect(store.query()).toBe(before);
+    });
+
+    it('emits a new object for every real change', () => {
+      populate();
+
+      const changes: readonly [string, () => void][] = [
+        ['setSource', () => store.setSource('WB_WDI')],
+        ['setForecast', () => store.setForecast('actual')],
+        ['setVintage', () => store.setVintage('latest')],
+        ['setYearRange', () => store.setYearRange(2000, 2020)],
+        ['setPage', () => store.setPage(5)],
+        ['addIndicator', () => store.addIndicator('CPI_INFLATION_AVG')],
+        ['removeIndicator', () => store.removeIndicator('GDP_GROWTH_REAL')],
+        ['addCountry', () => store.addCountry('NAM')],
+        ['removeCountry', () => store.removeCountry('ZAF')]
+      ];
+
+      for (const [label, apply] of changes) {
+        const before = store.query();
+        apply();
+
+        expect(store.query()).withContext(label).not.toBe(before);
+      }
+    });
+  });
+});

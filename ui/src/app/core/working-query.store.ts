@@ -65,30 +65,38 @@ export class WorkingQueryStore {
 
   /** The one mutation that does not reset paging. */
   setPage(page: number): void {
-    this.state.update((current) =>
-      this.settle(current, { ...current, page: Math.max(1, Math.trunc(page)) })
-    );
+    this.mutate((current) => ({ ...current, page: Math.max(1, Math.trunc(page)) }));
   }
 
   reset(): void {
-    this.state.set(DEFAULT_WORKING_QUERY);
+    this.mutate(() => DEFAULT_WORKING_QUERY);
   }
 
-  /** Adding a code already present is a no-op, so repeated catalogue clicks are safe. */
+  /**
+   * Adding a code already present would append a **duplicate**, so this check is
+   * a de-duplication rule rather than a no-op optimisation. `mutate` cannot
+   * stand in for it: a second `GDP_GROWTH_REAL` genuinely changes the array, so
+   * the guard would correctly report a change and the duplicate would reach the
+   * query string as `indicators=GDP_GROWTH_REAL,GDP_GROWTH_REAL`.
+   */
   private addTo(key: 'indicators' | 'countries', code: string): void {
-    this.state.update((current) =>
+    this.mutate((current) =>
       current[key].includes(code)
         ? current
         : { ...current, [key]: [...current[key], code], page: 1 }
     );
   }
 
+  /**
+   * No membership check needed: filtering for a code that is not there yields an
+   * equal-content array, and `mutate` recognises that as no change.
+   */
   private removeFrom(key: 'indicators' | 'countries', code: string): void {
-    this.state.update((current) =>
-      current[key].includes(code)
-        ? { ...current, [key]: current[key].filter((entry) => entry !== code), page: 1 }
-        : current
-    );
+    this.mutate((current) => ({
+      ...current,
+      [key]: current[key].filter((entry) => entry !== code),
+      page: 1
+    }));
   }
 
   /**
@@ -96,24 +104,28 @@ export class WorkingQueryStore {
    * not leave the user staring at a page that no longer exists.
    */
   private patch(changes: Partial<WorkingQuery>): void {
-    this.state.update((current) => this.settle(current, { ...current, ...changes, page: 1 }));
+    this.mutate((current) => ({ ...current, ...changes, page: 1 }));
   }
 
   /**
-   * Returns `current` when the candidate would not change the query.
+   * The only write to `state`. Every mutator goes through here.
    *
    * Signals compare by identity, so handing back a structurally equal but new
-   * object notifies every reader and costs a full round trip for a query nobody
-   * changed. `addTo` and `removeFrom` have always short-circuited their own
-   * no-ops; this is the same guarantee for the two mutators that rebuild the
-   * whole object.
+   * object notifies every reader and, for a sendable query, costs a full round
+   * trip for a query nobody changed. Keeping the comparison in one place makes
+   * that a property of the store rather than something each method has to
+   * remember: the previous shape had three different guards across four write
+   * paths, and the one with none was how the defect got in.
    *
-   * The candidate is built before the comparison rather than comparing the
-   * incoming changes, because `patch` also forces `page: 1`. Patching an
-   * unchanged filter while on page 3 really is a change, and building first
-   * makes that fall out instead of needing a special case.
+   * `next` builds the candidate before the comparison rather than describing the
+   * change, because `patch` also forces `page: 1`. Patching an unchanged filter
+   * while on page 3 really is a change, and building first makes that fall out
+   * instead of needing a special case.
    */
-  private settle(current: WorkingQuery, candidate: WorkingQuery): WorkingQuery {
-    return sameWorkingQuery(current, candidate) ? current : candidate;
+  private mutate(next: (current: WorkingQuery) => WorkingQuery): void {
+    this.state.update((current) => {
+      const candidate = next(current);
+      return sameWorkingQuery(current, candidate) ? current : candidate;
+    });
   }
 }

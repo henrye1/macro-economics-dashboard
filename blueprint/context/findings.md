@@ -193,7 +193,7 @@ through every key of `DEFAULT_WORKING_QUERY` and asserts each is compared, which
 catches drift within a single compile. No existing assertion was edited: `ui`
 419 tests, up from 418 by exactly the one added.
 
-### F-25 [P3] open - The store has four mutation paths and three different no-op guards
+### F-25 [P3] fixed - The store has four mutation paths and three different no-op guards
 
 **File:** ui/src/app/core/working-query.store.ts:74
 **Found:** 2026-09-11 by /audit (scope: full; lens: quality)
@@ -216,4 +216,23 @@ saved query writes the whole object at once.
 (`settle(current, DEFAULT_WORKING_QUERY)`) and the two array helpers, so the
 guarantee is a property of the store rather than a habit each method has to
 remember. The inline `includes` checks then become redundant and can go.
-**Resolution:**
+**Resolution:** Fixed on 2026-09-11. `settle` became `mutate`, a private method
+taking a `(current) => candidate` function and performing the only write to
+`state` in the file; `patch`, `setPage`, `reset`, `addTo` and `removeFrom` are
+all one-line callers. The structural claim is checkable rather than visual:
+`this.state.update(` and `this.state.set(` now appear once in total, so a future
+mutator cannot bypass the guarantee without deliberately reaching past it.
+
+**One part of this finding was wrong and following it literally would have
+introduced a bug.** It says both inline `includes` checks become redundant. That
+holds for `removeFrom`, whose filter yields an equal-content array that the
+comparison recognises, and the check was removed. It does not hold for `addTo`:
+appending a code already present produces a genuinely different array, so the
+comparison would correctly report a change and `indicators=GDP,GDP` would reach
+the query string. That check is a de-duplication rule rather than a no-op
+optimisation; it stayed, and its comment now says why.
+
+Verified by removing the comparison from `mutate`: 13 specs fail, including one
+pre-existing case that now depends on `mutate` rather than `removeFrom`'s own
+check, which is the consolidation working. No existing assertion was edited.
+`ui` 429 tests, up from 419.
