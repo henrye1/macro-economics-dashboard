@@ -99,6 +99,27 @@ export class SavedQueryStore {
   }
 
   /**
+   * Drops a refused-write message so the next attempt can reach storage.
+   *
+   * Called when the user edits the name, which is the only gesture the design
+   * offers for "try that again". Without it the card latches: `save` sets
+   * `failure`, the page disables Save while `storageProblem()` is set, and the
+   * only write that could clear the flag is the one the flag prevents.
+   *
+   * No usable storage at all is a different thing and stays latched: clearing
+   * it would enable a Save that cannot ever succeed. A read that threw is
+   * cleared, because a browser that refused a read may still accept a write,
+   * and if it does not, `save` sets the message again with a current answer.
+   */
+  clearWriteProblem(): void {
+    if (this.storage === null) {
+      return;
+    }
+
+    this.failure.set(null);
+  }
+
+  /**
    * Everything in storage is untrusted: a user can edit it by hand and a future
    * version can write a different shape. Unreadable values and malformed
    * entries are dropped rather than thrown or half-rendered.

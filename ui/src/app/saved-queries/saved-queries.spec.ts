@@ -335,6 +335,17 @@ describe('SavedQueriesPage', () => {
       expect(el().querySelector('.field input')).not.toBeNull();
     });
 
+    it('stays disabled while typing, because no edit can make it usable', () => {
+      setUp([], null);
+      store.addIndicator('GDP_GROWTH_REAL');
+      fixture.detectChanges();
+
+      type('Anything');
+
+      expect(saveButton()?.disabled).toBeTrue();
+      expect(states().some((text) => text.includes('not allowing'))).toBeTrue();
+    });
+
     it('reports a write that is refused, without losing the page', () => {
       setUp();
       sendableWithResult([12]);
@@ -344,8 +355,48 @@ describe('SavedQueriesPage', () => {
       fixture.detectChanges();
 
       expect(states().some((text) => text.includes('refused to store'))).toBeTrue();
-      // The name survives, so the user can retry rather than retype.
+      // The name survives, so nothing has to be retyped from scratch.
       expect(nameInput()?.value).toBe('Rejected');
+    });
+
+    it('lets the next attempt through once the name is edited', () => {
+      setUp();
+      sendableWithResult([12]);
+      storage.failWrites = true;
+      type('Rejected');
+      saveButton()?.click();
+      fixture.detectChanges();
+      expect(saveButton()?.disabled).toBeTrue();
+
+      // Editing the name is the retry gesture: without it the card latches,
+      // because the write that would clear the flag is the one it prevents.
+      storage.failWrites = false;
+      type('Rejected again');
+
+      expect(saveButton()?.disabled).toBeFalse();
+      saveButton()?.click();
+      fixture.detectChanges();
+
+      expect(rows().length).toBe(1);
+      expect(cells(rows()[0])[0]).toBe('Rejected again');
+      expect(states().some((text) => text.includes('refused to store'))).toBeFalse();
+    });
+
+    it('re-reports a second refusal rather than staying quiet', () => {
+      setUp();
+      sendableWithResult([12]);
+      storage.failWrites = true;
+      type('First');
+      saveButton()?.click();
+      fixture.detectChanges();
+
+      // Still refusing. Clearing on edit must not hide a problem that persists.
+      type('Second');
+      saveButton()?.click();
+      fixture.detectChanges();
+
+      expect(states().some((text) => text.includes('refused to store'))).toBeTrue();
+      expect(el().querySelector('tbody')).toBeNull();
     });
   });
 });

@@ -256,4 +256,37 @@ describe('SavedQueryStore', () => {
       expect(store.saved()).toEqual([]);
     });
   });
+
+  describe('clearWriteProblem', () => {
+    it('drops a refused write, so the next attempt can reach storage', () => {
+      const store = build();
+      storage.failWrites = true;
+      store.save('rejected', query(), []);
+      expect(store.storageProblem()).toContain('refused to store');
+
+      store.clearWriteProblem();
+
+      expect(store.storageProblem()).toBeNull();
+    });
+
+    it('keeps the message when there is no usable storage at all', () => {
+      // Clearing here would enable a Save that cannot ever succeed.
+      const store = build(null);
+
+      store.clearWriteProblem();
+
+      expect(store.storageProblem()).toContain('not allowing');
+    });
+
+    it('does not disturb the saved list', () => {
+      const store = build();
+      store.save('kept', query(), []);
+      storage.failWrites = true;
+      store.save('rejected', query(), []);
+
+      store.clearWriteProblem();
+
+      expect(store.saved().map((held) => held.name)).toEqual(['kept']);
+    });
+  });
 });

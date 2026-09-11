@@ -31,9 +31,18 @@ export class SavedQueriesPage {
   /** The last save's confirmation, cleared by the next edit to the name. */
   protected readonly confirmation = signal<string | null>(null);
 
+  /**
+   * Editing the name is also the retry gesture.
+   *
+   * The design offers no other control, and a refused write otherwise latches
+   * the card: `saveBlockedReason` reads `storageProblem()` first, so the button
+   * stays disabled and the only write that could clear the flag is the one the
+   * flag prevents. Storage that is unusable outright stays reported.
+   */
   protected setName(value: string): void {
     this.name.set(value);
     this.confirmation.set(null);
+    this.saved.clearWriteProblem();
   }
 
   /**

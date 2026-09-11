@@ -20,7 +20,7 @@ hangs for up to five minutes instead of returning the curated `502`. Also
 affects api/src/macro/macro-client.ts:78.
 **Suggested fix:** pass `signal: AbortSignal.timeout(ms)` on both fetches, with a
 shorter budget for the token call than for the upstream read.
-**Resolution:** Still open at 64e6b90, re-confirmed by this pass. Neither
+**Resolution:** Still open, re-confirmed at 1b47282 by the 2026-09-11 full pass. Neither
 `token-provider.ts:47` nor `macro-client.ts:72` passes a `signal`, and the
 shared `inFlight` at `token-provider.ts:93` still hands one stalled promise to
 every waiter. P2, so it does not block.
@@ -41,7 +41,7 @@ request, which is the rate-limit risk the module's own comment says it exists to
 avoid.
 **Suggested fix:** take the stale token as an argument, `invalidate(token)`, and
 clear the cache only when `cached?.token === token`.
-**Resolution:** Still open at 64e6b90, re-confirmed by this pass. `invalidate()` at
+**Resolution:** Still open, re-confirmed at 1b47282 by the 2026-09-11 full pass. `invalidate()` at
 `token-provider.ts:101-103` still clears unconditionally and takes no argument.
 It also leaves `inFlight` untouched, so a late invalidation can discard a token
 a peer refresh has already cached. P2, so it does not block.
@@ -64,7 +64,7 @@ reads as an oversight rather than a deliberate exclusion.
 opaque to us in the same way the query string is, so no new validation is needed,
 or record the omission explicitly in the spec and the overview so feature 8 does
 not plan around it.
-**Resolution:** Still open at 64e6b90, re-confirmed by this pass against the guide: section
+**Resolution:** Still open, re-confirmed at 1b47282 against the guide: section
 4.2 documents `GET /api/macro/indicators/{code}` and the section 8 table lists
 its `404`, while `READ_ROUTES` at `macro.ts:20-26` registers only the five
 collections. The repair commit added neither the route nor an explicit
@@ -84,7 +84,7 @@ is not configured yet.
 **Suggested fix:** if this shows up under real payloads, pipe `response.body`
 through to `res` instead of materialising the text. Not worth doing on
 speculation.
-**Resolution:** Still open at 64e6b90, re-confirmed by this pass, with one correction to the mechanism recorded earlier:
+**Resolution:** Still open, re-confirmed at 1b47282, with one correction to the mechanism recorded earlier:
 the repair replaced `res.send` with `res.end`, so the second copy is now made
 by Node converting the string for the socket rather than by Express's
 1000-byte Buffer threshold. `macro-client.ts:110` still does
@@ -110,7 +110,9 @@ this feature applied to the other two re-queried lists was not applied here.
 member, or record in the component's doc comment that holding the previous
 catalogue during a re-query is deliberate, so the next reader does not have to
 re-derive the question.
-**Resolution:**
+**Resolution:** Still open, re-confirmed at 1b47282.
+`countries-indicators.ts:190` still reads `catalogueState() === null`. P3, so it
+does not block.
 
 ### F-20 [P3] open - A test double registered with useClass trips an Angular DI deprecation that is scheduled to become an error
 
@@ -127,7 +129,11 @@ other double in the suite avoids it by using `useValue` with an already
 constructed instance.
 **Suggested fix:** register it as `useValue: new LiveShapeProvider()`, matching
 the surrounding specs, or add `@Injectable()` to the class.
-**Resolution:**
+**Resolution:** Still open, re-confirmed at 1b47282. `LiveShapeProvider` is still
+registered with `useClass` at `app.spec.ts:345` and `:360`. One correction to the
+finding's scope: `FailingMacroDataProvider` at `:212` has the same shape and the
+same inherited decorator, so the repair should cover both rather than only the
+class the warning happened to name.
 
 ### F-21 [P3] open - The held page count belongs to the previous query after a filter change, not just a paging click
 
@@ -149,86 +155,80 @@ value today; the footer is the only reader.
 than `page`, so a filter change falls back to the no-count state and a paging
 click keeps the hold. Do it with the pager's third behaviour change, not as a
 fourth standalone patch.
+**Resolution:** Still open, re-confirmed at 1b47282. `heldMeta` at
+`result-state.ts:101` survives any request change, not only a paging click. This
+pass adds one detail: `pageCount` divides the held `totalCount` by `pageSize()`,
+which falls back to `store.query().pageSize` while loading, so changing the page
+size mid-flight computes a count from two different queries' numbers. Same defect,
+same repair. P3, so it does not block.
+
+### F-28 [P2] fixed - One refused write disables saving for the rest of the session, with no way back
+
+**File:** ui/src/app/saved-queries/saved-queries.ts:47
+**Found:** 2026-09-11 by /audit (scope: full; lens: quality)
+**Why it matters:** `SavedQueryStore.save` sets `failure` when `setItem` throws,
+and clears it only after a later write succeeds
+(`saved-query.store.ts:93, 97`). But `saveBlockedReason` returns
+`storageProblem()` first, so `canSave` is false and the Save button is
+`[disabled]` at `saved-queries.html:76` from that moment on. The only write that
+could clear the flag is the one the flag prevents, so the page is latched: the
+user cannot retry even after freeing space, and only a reload recovers it,
+because the store re-reads storage in its constructor. `setName` clears the
+confirmation but not the failure.
+
+The spec that covers this path asserts only that the name survives, and its
+comment - "The name survives, so the user can retry rather than retype"
+(`saved-queries.spec.ts:347`) - states a behaviour the code does not have. That
+is the same shape as F-17: a test whose stated intent and assertion disagree.
+**Suggested fix:** clear `failure` when the user edits the name, so the next
+attempt is allowed to reach storage and either succeed or re-set the flag. A
+one-line change in `setName`, plus a spec that fails a write, retypes, succeeds,
+and asserts the entry lands.
+**Resolution:** Fixed on 2026-09-11 as suggested. `SavedQueryStore.clearWriteProblem()`
+drops the message and returns early when `storage === null`, so an unusable
+browser stays latched on purpose; `SavedQueriesPage.setName` calls it beside the
+existing `confirmation.set(null)`, which keeps the store the sole writer of
+`failure`.
+
+Probed by reverting the `setName` call: `lets the next attempt through once the
+name is edited` failed on `Expected true to be false` (the button stayed
+disabled) and `Expected 0 to be 1` (no row landed). Restored and re-run green.
+
+Six specs added, not two. The extra three cover what clearing on edit could
+break rather than what it fixes: a second refusal is re-reported instead of
+being hidden by the edit that preceded it, the saved list is untouched by the
+clear, and the null-storage card stays disabled however much the user types. The
+existing test's misleading comment was corrected rather than kept.
+
+### F-29 [P3] open - The revisions pager holds the previous vintage's page count while a different vintage loads
+
+**File:** ui/src/app/vintages/vintages.ts:158
+**Found:** 2026-09-11 by /audit (scope: full; lens: quality)
+**Why it matters:** `previousTotal` is read from the settled state wherever the
+inner pipe is built, which is correct for a paging click and wrong for a
+selection change. `select()` at `vintages.ts:128-133` sets a new vintage and
+resets `page` to 1, but the new request still inherits the old vintage's
+`totalCount`, so the footer reads "Page 1 of 114" while loading a vintage that
+may have four pages. Strictly better than the collapse F-26 fixed, and stale
+rather than false, but it is the same question F-21 raises about
+`result-state.ts` and neither finding names this file.
+**Suggested fix:** carry `previousTotal` only when the in-flight request differs
+from the settled one by `page` alone, and pass null on a selection change. Do it
+with F-21, not separately: they are one rule applied in two pipelines.
 **Resolution:**
 
-### F-26 [P2] fixed - The revisions pager disappears on every page change, and its count collapses behind it
+### F-30 [P3] open - The service-token pill shows a health dot that is never driven by anything
 
-**File:** ui/src/app/vintages/vintages.html:118
+**File:** ui/src/app/app.html:18
 **Found:** 2026-09-11 by /audit (scope: full; lens: quality)
-**Why it matters:** The revisions table and `app-paging-footer` sit inside the
-final `@else` of a chain whose first branch is `revisionsLoading()`. Clicking
-Next therefore unmounts the pager for the whole round trip: the button vanishes
-from under the pointer, the layout jumps, and the control the user is operating
-is missing until the answer lands. Observations and Series render their footer
-unconditionally for exactly this reason, so this tab is the only one of the three
-that behaves this way.
-
-Behind it is the shape F-13 and F-16 named. `pageCount` at
-`vintages.ts:221` reads `readyRevisions()?.totalCount ?? 0`, and `readyRevisions`
-is null in the loading state, so the count collapses to 1 while `currentPage`
-still reports the page the user asked for. That is invisible today only because
-the pager is unmounted at the same moment. Moving the footer out of the `@else`
-to match the other two tabs, which is the obvious repair for the first half,
-would immediately render `Page 3 of 1` with Next disabled. The two halves have to
-be fixed together.
-
-`createResultState` solved this for the other tabs by carrying the last settled
-`meta` on the loading state. This page has its own pipeline, correctly so, but it
-did not carry that lesson across.
-**Suggested fix:** hold the last settled `totalCount` the way `result-state.ts`
-holds `meta` — a value kept outside the stream, updated when an answer settles,
-read while one is in flight — then render the footer unconditionally like the
-other two result tabs. Add a spec that pages and asserts the footer text
-mid-flight, as `observations.spec.ts` already does.
-**Resolution:** Fixed on 2026-09-11 as suggested. The loading state carries
-`previousTotal`, captured where the inner pipe is built, and a `pagerTotal`
-computed feeds `pageCount`; `app-paging-footer` now sits outside the state chain
-like the other two result tabs. `ListState` is shared with the vintages list,
-which passes `previousTotal: null` because it issues one request and has no pager.
-
-Both halves were probed separately, because they fail in different ways.
-Reinstating the collapse produced
-`Expected 'Page 2 of 1 · pageSize 25 · vintages WDI 2026-03-27' to contain
-'Page 2 of 4'` — the finding's predicted string, from one spec. Moving the footer
-back inside the `@else` failed four specs on a missing element. One correction
-to the done-when: the "Prev stays reachable" case does **not** guard the collapse.
-With `pageCount` at 1 and `page` at 2, `canPrev` is still `page > 1`, so Prev
-stays enabled either way; it failed only in the unmount probe. It is kept as a
-guard against a neighbouring regression, not claimed as evidence for this one.
-
-The specs needed a deferred provider double, which `vintages.spec.ts` did not
-have: `CountingProvider` resolves synchronously, so the in-flight window was
-zero-width. That is the same reason this defect, and F-11, F-13 and F-16 before
-it, reached a green suite.
-
-### F-27 [P3] fixed - The summary strip ignores the Significant only filter it sits beneath
-
-**File:** ui/src/app/vintages/vintages.ts:243
-**Found:** 2026-09-11 by /audit (scope: full; lens: quality)
-**Why it matters:** `appeared` and `disappeared` derive from `views()`, the whole
-page, while the table above them renders `rows()`, the page filtered by the
-`Significant only` toggle. An appeared or disappeared row can never be
-significant, because its change is null, so switching the filter on empties those
-rows from the table while the panels beneath keep listing the same series. The
-reading is then "no significant changes on this page" directly above "series that
-appeared: LENDING_RATE · MUS · 2010–2024", which invites the conclusion that the
-appeared series was filtered out for being insignificant rather than being a
-different kind of thing entirely.
-
-Defensible as designed — the panels summarise the page, not the filtered view,
-and the titles do say "this page" — which is why this is P3 rather than a
-correctness bug. But the two regions currently answer different questions from
-the same toggle with no visible cue.
-**Suggested fix:** either derive the panels from `rows()` so the filter reaches
-them consistently, or leave them on `views()` and say so in the panel titles, for
-example "this page · unfiltered". The second is likely the better product answer
-because appeared and disappeared series are the one thing the significance filter
-can never surface.
-**Resolution:** Fixed on 2026-09-11 with the second option, and the first was
-rejected on the reasoning this finding itself raised: an appeared row's change is
-null, so it can never be significant, and routing the filter through the panels
-would make `Significant only` permanently delete the one category it can never
-surface. The titles now read `Series that appeared · this page, unfiltered` and
-the same for disappeared. A spec asserts both titles and the behaviour the label
-explains: with the filter on, every table row carries a Significant pill while the
-appeared panel still lists its entry.
+**Why it matters:** `<span class="dot"></span>` is styled at `app.scss:73-78`
+with `--accent-bright` and no state binding, so it renders the same green dot
+whether the API is reachable or not. The vintage strip immediately to its left
+does report failure, so the two sit side by side saying different things when
+`/api/macro/vintages` is down. In a console whose subject is provenance, a
+decorative affordance shaped exactly like a status light is the wrong kind of
+wrong. Nothing reads a stale value, so this is presentation only.
+**Suggested fix:** either bind the dot to a real signal - the same request the
+vintage strip already makes is the cheapest honest source - or drop the dot and
+keep the label, which already says what the pill is for.
+**Resolution:**
