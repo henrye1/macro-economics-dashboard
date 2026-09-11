@@ -94,15 +94,36 @@ function vintageHeader(meta: EnvelopeMeta): string {
 }
 
 /**
- * RFC 4180 quoting: wrap in double quotes and double any embedded quote, but
- * only when the field needs it.
+ * Characters that make a spreadsheet read a cell as a formula rather than as
+ * text, when they are the first thing in it.
  *
- * Nothing in `Observation` is user-supplied, but indicator codes and vintage
- * labels come from a service this console does not control, so the rule is
+ * Excel, LibreOffice and Sheets all do this, and RFC 4180 quoting does not stop
+ * it: quoting is a transport rule, not a safety one.
+ */
+const FORMULA_TRIGGERS = ['=', '+', '-', '@', '\t', '\r'];
+
+/**
+ * RFC 4180 quoting, plus a guard against a leading formula character.
+ *
+ * Nothing in `Observation` is user-supplied, but indicator codes and country
+ * codes come from a service this console does not control, so both rules are
  * applied rather than assumed away.
+ *
+ * **The guard is for strings only, and that is the point.** `value` is a number
+ * that is very often negative — real growth is negative somewhere in almost
+ * every series — and guarding on `-` without the type test would write `'-1.1`
+ * into the value column of every export. A number cannot be a formula, so the
+ * type is both the correct test and the one that leaves the data intact.
+ *
+ * The prefix is a real byte: a guarded value reads `'=SUM(A1)` to a parser as
+ * well as to Excel. Making a dangerous value visibly different is the accepted
+ * trade in the OWASP guidance this follows, and it lands only on a string that
+ * actually begins with an operator. Nothing the API sends today does.
  */
 function csvField(value: string | number | boolean): string {
-  const text = String(value);
+  const raw = String(value);
+  const text =
+    typeof value === 'string' && FORMULA_TRIGGERS.includes(raw[0]) ? `'${raw}` : raw;
 
   if (!/[",\r\n]/.test(text)) {
     return text;

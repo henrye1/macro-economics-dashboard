@@ -271,7 +271,7 @@ in each assertion.
 Probed by removing the prefix, which failed five specs across the writer and the
 service, including the one proving JSON stays unmarked. Restored and re-run green.
 
-### F-34 [P3] open - A CSV field beginning with an operator is a live formula when the export is opened in a spreadsheet
+### F-34 [P3] fixed - A CSV field beginning with an operator is a live formula when the export is opened in a spreadsheet
 
 **File:** ui/src/app/core/export/export-csv.ts:88
 **Found:** 2026-09-11 by /audit (scope: full; lens: security)
@@ -290,7 +290,26 @@ hands to another application.
 **Suggested fix:** prefix a field with a single quote when its first character is
 one of `=+-@`. Do it inside `csvField` so every column is covered; `value` is a
 number and never reaches that branch as text.
-**Resolution:**
+**Resolution:** Fixed on 2026-09-11 as suggested, with one correction to that
+last clause. `value` arrives as a number and `csvField` stringifies it, so it
+very much does reach the trigger test as text: real growth is negative somewhere
+in almost every series, and a guard on `-` alone would have written `'-1.1` into
+the value column of every export. The guard is therefore conditioned on
+`typeof value === 'string'`, which is both the correct test and the one that
+leaves the numbers intact.
+
+`FORMULA_TRIGGERS` at `export-csv.ts:103` covers `= + - @` plus tab and carriage
+return, per the OWASP list. The guard runs before the existing quoting test, so a
+value that is both dangerous and comma-bearing gets both treatments.
+
+Nine specs. Probed by removing the `typeof` check, which failed exactly the two
+regression cases that exist for it — the negative value, and the negative year
+and vintage id — while the nine guard cases kept passing. Restored and re-run
+green at 596.
+
+Not covered: the injection itself. Exercising it needs an upstream that returns a
+hostile indicator code, and there is no way to make the real service do that, so
+this is spec-only by necessity rather than by choice.
 
 ### F-35 [P3] unverified - Nothing confirms the live service honours pageSize=5000, and the refusal names our number as if it were the limit
 

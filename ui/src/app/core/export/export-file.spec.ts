@@ -155,6 +155,84 @@ describe('toCsv', () => {
     });
   });
 
+  describe('the formula-injection guard', () => {
+    function indicatorField(indicator: string): string {
+      const csv = toCsv([row({ indicator })], meta(), { pinVintages: false, nowIso: NOW });
+      return parseCsvLine(dataLines(csv)[1])[0];
+    }
+
+    it('prefixes every leading trigger character, so the cell reads as text', () => {
+      for (const trigger of ['=', '+', '@', '\t', '\r']) {
+        expect(indicatorField(`${trigger}SUM(A1)`))
+          .withContext(JSON.stringify(trigger))
+          .toBe(`'${trigger}SUM(A1)`);
+      }
+    });
+
+    it('prefixes a leading minus on a string, which is a formula like the rest', () => {
+      expect(indicatorField('-1+1')).toBe(`'-1+1`);
+    });
+
+    it('leaves a negative VALUE alone, because a number is never a formula', () => {
+      // The regression this guard would otherwise cause. Real growth is negative
+      // somewhere in almost every series, so `'-1.1` would reach the value column
+      // of every export ever downloaded.
+      const csv = toCsv([row({ value: -1.1 })], meta(), { pinVintages: false, nowIso: NOW });
+
+      expect(parseCsvLine(dataLines(csv)[1])[3]).toBe('-1.1');
+      expect(dataLines(csv)[1]).toContain(',-1.1,');
+    });
+
+    it('leaves a negative year and vintage id alone, so the rule is about the type', () => {
+      const csv = toCsv([row({ year: -2024, vintageId: -12 })], meta(), {
+        pinVintages: false,
+        nowIso: NOW
+      });
+      const fields = parseCsvLine(dataLines(csv)[1]);
+
+      expect(fields[2]).toBe('-2024');
+      expect(fields[6]).toBe('-12');
+    });
+
+    it('leaves a boolean alone', () => {
+      const csv = toCsv([row({ isForecast: true })], meta(), {
+        pinVintages: false,
+        nowIso: NOW
+      });
+
+      expect(parseCsvLine(dataLines(csv)[1])[4]).toBe('true');
+    });
+
+    it('leaves an ordinary code untouched, with no stray quote', () => {
+      expect(indicatorField('GDP_GROWTH_REAL')).toBe('GDP_GROWTH_REAL');
+    });
+
+    it('ignores a trigger that is not the first character', () => {
+      // Only a leading one starts a formula, so guarding elsewhere would corrupt
+      // a legitimate value for nothing.
+      expect(indicatorField('GDP-GROWTH=REAL')).toBe('GDP-GROWTH=REAL');
+    });
+
+    it('guards AND quotes a value that is both dangerous and comma-bearing', () => {
+      const csv = toCsv([row({ indicator: '=SUM(A1,A2)' })], meta(), {
+        pinVintages: false,
+        nowIso: NOW
+      });
+
+      expect(dataLines(csv)[1]).toContain(`"'=SUM(A1,A2)"`);
+      expect(parseCsvLine(dataLines(csv)[1])[0]).toBe(`'=SUM(A1,A2)`);
+    });
+
+    it('guards the country code too, not only the indicator', () => {
+      const csv = toCsv([row({ country: '=ZAF' })], meta(), {
+        pinVintages: false,
+        nowIso: NOW
+      });
+
+      expect(parseCsvLine(dataLines(csv)[1])[1]).toBe(`'=ZAF`);
+    });
+  });
+
   describe('the header lines', () => {
     it('always stamps the export with its date', () => {
       const csv = toCsv([], meta(), { pinVintages: false, nowIso: NOW });
