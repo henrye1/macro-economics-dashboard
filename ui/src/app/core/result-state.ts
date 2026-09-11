@@ -3,6 +3,7 @@ import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { type Observable, catchError, map, of, startWith, switchMap, tap } from 'rxjs';
 
 import { macroErrorMessage } from './http/macro-error';
+import { LastResultVintages } from './last-result-vintages';
 import type { Envelope, EnvelopeMeta, ObservationsQuery } from './macro-contracts';
 import { WorkingQueryStore } from './working-query.store';
 
@@ -80,6 +81,7 @@ export function createResultState<T>({
   unavailable
 }: ResultSignalsConfig<T>): ResultSignals<T> {
   const store = inject(WorkingQueryStore);
+  const observedVintages = inject(LastResultVintages);
 
   /** `null` while the query is unsendable, which keeps the request out of flight. */
   const request = computed<ObservationsQuery | null>(() =>
@@ -100,12 +102,23 @@ export function createResultState<T>({
 
   const result = toSignal<ResultStatus<T> | null>(
     toObservable(request).pipe(
-      switchMap((query) =>
-        query === null
+      switchMap((query) => {
+        // Captured where the request is built, not where it settles. Reading
+        // the store in the `tap` would attribute this answer to whatever the
+        // query had become by the time it arrived.
+        const asked = store.query();
+
+        return query === null
           ? of<ResultStatus<T>>({ status: 'invalid' })
           : fetch(query).pipe(
               tap((envelope) => {
                 heldMeta = envelope.meta;
+                // Published from here rather than from the two result pages:
+                // this is the one place they share, and it already holds the
+                // settled envelope. The vintages tab has its own pipeline and
+                // must not publish — its result is a revision list, not the
+                // working query's answer.
+                observedVintages.record(asked, envelope.meta.vintages);
               }),
               map(
                 (envelope): ResultStatus<T> => ({
@@ -125,8 +138,8 @@ export function createResultState<T>({
               // Evaluated when the inner pipe is built, which is exactly when
               // the previous answer is still the held one.
               startWith<ResultStatus<T>>({ status: 'loading', previousMeta: heldMeta })
-            )
-      )
+            );
+      })
     ),
     { initialValue: null }
   );

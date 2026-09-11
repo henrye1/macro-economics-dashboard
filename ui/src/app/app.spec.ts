@@ -86,11 +86,9 @@ describe('App shell', () => {
     it('navigates to each placeholder tab and renders its page', async () => {
       const router = TestBed.inject(Router);
 
-      // Overview, Observations, Countries & indicators, Series and Vintages
-      // became real pages at features 2, 3, 4, 6 and 9 and are asserted
-      // separately. These two remain placeholders.
+      // Every other tab became a real page at features 2, 3, 4, 6, 9 and 10 and
+      // is asserted separately. Only the request builder remains a placeholder.
       const cases: ReadonlyArray<readonly [string, string]> = [
-        ['/saved-queries', 'Saved queries & export'],
         ['/request-builder', 'Request builder']
       ];
 
@@ -101,6 +99,16 @@ describe('App shell', () => {
         expect(router.url).toBe(path);
         expect(main?.querySelector('.page-title')?.textContent?.trim()).toBe(heading);
       }
+    });
+
+    it('renders the Saved queries page in the outlet, no longer a placeholder', async () => {
+      const router = TestBed.inject(Router);
+      await router.navigateByUrl('/saved-queries');
+      const main = shell(fixture).querySelector('.app-main');
+
+      expect(router.url).toBe('/saved-queries');
+      expect(main?.querySelector('.saved-queries h2')?.textContent?.trim()).toBe('Saved queries');
+      expect(main?.querySelector('.page-title')).toBeNull();
     });
 
     it('renders the Vintages page in the outlet, no longer a placeholder', async () => {

@@ -1,0 +1,73 @@
+.saved-queries {
+  margin-top: var(--space-5);
+}
+
+/* Names, scopes and stamps all read better unwrapped; only the state messages
+   are allowed to run long. */
+.saved-queries tbody td {
+  white-space: nowrap;
+}
+
+.card-head .meta {
+  text-align: right;
+}
+
+.name {
+  font-weight: 600;
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: flex-end;
+}
+
+.save-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-4);
+  align-items: end;
+  padding: var(--space-5);
+}
+
+.field {
+  display: block;
+}
+
+.field-label {
+  display: block;
+  color: var(--muted);
+  font-size: 0.875rem;
+  margin-bottom: var(--space-1);
+}
+
+.field input {
+  width: 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--line, #d7dae0);
+  border-radius: 4px;
+  font: inherit;
+}
+
+.btn.save {
+  background: #1f7a44;
+  color: #fff;
+  border: 0;
+}
+
+.btn.save:disabled {
+  background: #cfd4db;
+  color: #767d88;
+  cursor: not-allowed;
+}
+
+/* The state line spans both columns so a long explanation does not squeeze the
+   input. */
+.save-row .state {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.state.muted {
+  color: var(--muted);
+}

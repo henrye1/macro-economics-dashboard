@@ -22,7 +22,7 @@
   ETag passthrough and RFC 7807 error handling
 - [x] 9. **Vintages & revisions** - published vintage list and the change view against the
   preceding vintage
-- [ ] 10. **Saved queries** - name, store, reload and reproduce a query with its pinned
+- [x] 10. **Saved queries** - name, store, reload and reproduce a query with its pinned
   vintage ids
 - [ ] 11. **Export** - CSV, JSON and XLSX download of the current result with optional
   vintage ids in the file header

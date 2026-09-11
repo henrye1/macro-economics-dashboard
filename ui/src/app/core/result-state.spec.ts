@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { Observable, of } from 'rxjs';
 
 import { MacroRequestError } from './http/macro-error';
+import { LastResultVintages } from './last-result-vintages';
 import type { Envelope, Observation, ObservationsQuery } from './macro-contracts';
 import { type ResultSignals, createResultState } from './result-state';
 import { WorkingQueryStore } from './working-query.store';
@@ -77,12 +78,16 @@ class DeferredSource {
 describe('createResultState', () => {
   let store: WorkingQueryStore;
   let source: DeferredSource;
+  let observed: LastResultVintages;
   let state: ResultSignals<Observation>;
 
   function build(): void {
-    TestBed.configureTestingModule({ providers: [WorkingQueryStore, DeferredSource] });
+    TestBed.configureTestingModule({
+      providers: [WorkingQueryStore, DeferredSource, LastResultVintages]
+    });
 
     store = TestBed.inject(WorkingQueryStore);
+    observed = TestBed.inject(LastResultVintages);
     store.reset();
     source = TestBed.inject(DeferredSource);
 
@@ -246,6 +251,48 @@ describe('createResultState', () => {
       flush();
 
       expect(source.calls.length).toBe(before);
+    });
+  });
+
+  describe('publishing the observed vintages', () => {
+    // Feature 10 records these ids on a saved query so a result can be
+    // reproduced exactly, and they have to come from a result the user saw.
+    beforeEach(() => {
+      source.answer = envelope([row(2020)], {
+        vintages: [{ id: 2, source: 'IMF_WEO', label: 'WEO 9.0.0' }]
+      });
+      sendableQuery();
+      flush();
+    });
+
+    it('publishes nothing while the request is in flight', () => {
+      expect(observed.idsFor(store.query())).toEqual([]);
+    });
+
+    it('publishes the ids once the answer settles', () => {
+      source.releaseLatest();
+
+      expect(observed.idsFor(store.query())).toEqual([2]);
+    });
+
+    it('publishes nothing when the request fails', () => {
+      source.failWith = new MacroRequestError(500, null);
+      source.releaseLatest();
+
+      expect(observed.idsFor(store.query())).toEqual([]);
+    });
+
+    it('attributes the answer to the query that was asked, not the current one', () => {
+      // The capture happens where the request is built. Editing the query while
+      // one is in flight must not make the arriving answer look like the new
+      // query's provenance.
+      const asked = store.query();
+      store.setYearRange(1990, 1995);
+      flush();
+      source.releaseLatest();
+
+      expect(observed.idsFor(asked)).toEqual([]);
+      expect(observed.idsFor(store.query())).toEqual([2]);
     });
   });
 

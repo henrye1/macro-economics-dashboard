@@ -1,0 +1,94 @@
+<section class="card saved-queries">
+  <div class="card-head">
+    <h2>Saved queries</h2>
+    <span class="meta">Vintage ids recorded with every save</span>
+  </div>
+
+  @if (storageProblem(); as problem) {
+    <p class="state" role="status">{{ problem }}</p>
+  }
+
+  @if (isEmpty()) {
+    <p class="state" role="status">
+      No saved queries yet. Build a query on Observations or Series, then name it below.
+    </p>
+  } @else {
+    <table class="grid">
+      <caption class="visually-hidden">
+        Saved queries, newest first, with the vintage ids recorded when each was saved.
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col">Name</th>
+          <th scope="col">Scope</th>
+          <th scope="col">Vintage</th>
+          <th scope="col">Saved</th>
+          <th scope="col" class="right">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (entry of entries(); track entryKey(entry)) {
+          <tr>
+            <!-- The name is the user's own text, rendered through interpolation
+                 only, which escapes it. -->
+            <td class="name">{{ entry.name }}</td>
+            <td>{{ scope(entry) }}</td>
+            <td>{{ vintage(entry) }}</td>
+            <td class="stamp">{{ saved_(entry) }}</td>
+            <td class="right actions">
+              <button
+                type="button"
+                class="btn outline-green"
+                (click)="load(entry)"
+              >Load</button>
+              <button
+                type="button"
+                class="btn solid"
+                [disabled]="!canReproduce(entry)"
+                [attr.title]="reproduceReason(entry)"
+                [attr.aria-describedby]="canReproduce(entry) ? null : 'reason-' + entryKey(entry)"
+                (click)="reproduce(entry)"
+              >Reproduce</button>
+
+              @if (reproduceReason(entry); as reason) {
+                <span class="visually-hidden" [id]="'reason-' + entryKey(entry)">{{ reason }}</span>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+
+  <div class="save-row">
+    <label class="field">
+      <span class="field-label">Name this query</span>
+      <input
+        type="text"
+        placeholder="Q1 2026 ECL — ZAF"
+        [value]="name()"
+        (input)="setName($any($event.target).value)"
+      />
+    </label>
+
+    <button
+      type="button"
+      class="btn save"
+      [disabled]="!canSave()"
+      (click)="save()"
+    >Save current query</button>
+
+    <!-- The confirmation comes first: saving clears the name, so the "name the
+         query" hint would otherwise replace the answer to what just happened.
+         Editing the name clears the confirmation and the hint returns. -->
+    @if (confirmation(); as message) {
+      <p class="state" role="status">{{ message }}</p>
+    } @else if (saveBlockedReason(); as reason) {
+      <p class="state" role="status">{{ reason }}</p>
+    } @else if (recordedCount() === 0) {
+      <p class="state muted" role="status">
+        No result has been seen for this query yet, so it would save with no vintage ids.
+      </p>
+    }
+  </div>
+</section>
