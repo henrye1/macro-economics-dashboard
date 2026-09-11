@@ -62,7 +62,7 @@ export function toCsv(
   options: CsvOptions
 ): string {
   const lines: string[] = [
-    `${COMMENT}Cyte Macro Data export · ${options.nowIso.slice(0, 10)}`
+    `${COMMENT}Cyte Macro Data export · ${commentSafe(options.nowIso.slice(0, 10))}`
   ];
 
   if (options.pinVintages) {
@@ -72,7 +72,7 @@ export function toCsv(
   // Always written, pinned or not: the overview requires attribution wherever
   // numbers are rendered, and a file of numbers is no exception.
   for (const line of meta.attribution) {
-    lines.push(`${COMMENT}${line}`);
+    lines.push(`${COMMENT}${commentSafe(line)}`);
   }
 
   lines.push(EXPORT_COLUMNS.join(','));
@@ -90,7 +90,30 @@ function vintageHeader(meta: EnvelopeMeta): string {
     return 'none reported for this result';
   }
 
-  return meta.vintages.map((vintage) => `${vintage.id} ${vintage.label}`).join('; ');
+  return meta.vintages
+    .map((vintage) => `${vintage.id} ${commentSafe(vintage.label)}`)
+    .join('; ');
+}
+
+/**
+ * A value safe to interpolate into a comment line.
+ *
+ * A comment line has no quoting mechanism. A data field with a newline in it is
+ * wrapped in quotes by `csvField` and survives intact, but a break inside a
+ * comment simply ends it: the rest starts a new physical line with no `#`, above
+ * the column header, where a reader finds something it cannot classify. So the
+ * break has to be removed rather than escaped.
+ *
+ * Collapsed to a space rather than stripped, because a line wrapped mid-sentence
+ * would otherwise read as `IMFWorld Economic Outlook`. A CRLF pair and any run of
+ * breaks become one space, and the ends are trimmed so a leading break does not
+ * leave a gap after the `#`.
+ *
+ * Never apply this to a data field: RFC 4180 preserves a newline inside a quoted
+ * value, and that is the correct behaviour there.
+ */
+function commentSafe(value: string): string {
+  return value.replace(/[\r\n]+/g, ' ').trim();
 }
 
 /**

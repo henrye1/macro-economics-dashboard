@@ -236,81 +236,6 @@ counts, and update the two specs to the corrected wording rather than leaving
 them to fail.
 **Resolution:**
 
-### F-33 [P3] fixed - The CSV carries no byte-order mark, so Excel mangles the one character its header always contains
-
-**File:** ui/src/app/core/export/export-csv.ts:46
-**Found:** 2026-09-11 by /audit (scope: full; lens: quality)
-**Why it matters:** The first line is always
-`# Cyte Macro Data export · <date>`, and `·` is not ASCII. The Blob is declared
-`text/csv;charset=utf-8`, but Excel on Windows ignores the MIME type for a file
-opened from disk and falls back to the system codepage unless a UTF-8 BOM is
-present. The stamp line therefore renders as mojibake in the application this
-format exists to feed. Vintage labels and attribution can carry non-ASCII too.
-No data value is affected today, because every `Observation` field is ASCII.
-**Suggested fix:** prefix the CSV contents with a UTF-8 byte-order mark. It costs one
-character, every other reader tolerates it, and it is the only thing that makes
-Excel read the file as UTF-8. JSON needs no BOM and must not get one.
-**Resolution:** Fixed on 2026-09-11 as suggested. `UTF8_BOM` at
-`export-csv.ts:43`, returned ahead of the joined lines by `toCsv`; `toJson` is
-untouched and a spec pins that it still starts with a brace. Written as the
-escape `'\ufeff'` rather than the character itself, which an editor renders as
-nothing and a reviewer cannot see. This ledger entry had the same problem and was
-corrected in the same pass.
-
-The code comment records the cost this finding did not: a reader that does not
-strip the mark sees one invisible character exactly where a `#` comment line
-begins, so a strict `comment='#'` parser could stop treating that first line as
-a comment. Kept anyway, because without the mark Excel is wrong for every export.
-
-Six specs. The suite surfaced that same hazard immediately: `dataLines` filters on
-a leading `#`, the marked first line stopped matching, and two existing header
-cases failed until `lines()` learned to strip the mark. That is the trade-off
-reproduced in miniature, and it is why the strip lives in one helper rather than
-in each assertion.
-
-Probed by removing the prefix, which failed five specs across the writer and the
-service, including the one proving JSON stays unmarked. Restored and re-run green.
-
-### F-34 [P3] fixed - A CSV field beginning with an operator is a live formula when the export is opened in a spreadsheet
-
-**File:** ui/src/app/core/export/export-csv.ts:88
-**Found:** 2026-09-11 by /audit (scope: full; lens: security)
-**Why it matters:** `csvField` implements RFC 4180 quoting correctly, which is a
-transport rule and not a safety one. A field whose text begins with `=`, `+`, `-`
-or `@` is evaluated as a formula by Excel, LibreOffice and Sheets, and quoting
-does not prevent it. The reachable path is `indicator` and `country`, supplied by
-the Core API — outside this console's control and explicitly treated as untrusted
-everywhere else in the codebase, which is why `saved-query.store.ts` structurally
-validates everything it reads back.
-
-Low likelihood: it needs a hostile or compromised upstream, and this is an
-internal console with one known data source. Recorded because the mechanism is
-real, the mitigation is one line, and the export is the only artifact this project
-hands to another application.
-**Suggested fix:** prefix a field with a single quote when its first character is
-one of `=+-@`. Do it inside `csvField` so every column is covered; `value` is a
-number and never reaches that branch as text.
-**Resolution:** Fixed on 2026-09-11 as suggested, with one correction to that
-last clause. `value` arrives as a number and `csvField` stringifies it, so it
-very much does reach the trigger test as text: real growth is negative somewhere
-in almost every series, and a guard on `-` alone would have written `'-1.1` into
-the value column of every export. The guard is therefore conditioned on
-`typeof value === 'string'`, which is both the correct test and the one that
-leaves the numbers intact.
-
-`FORMULA_TRIGGERS` at `export-csv.ts:103` covers `= + - @` plus tab and carriage
-return, per the OWASP list. The guard runs before the existing quoting test, so a
-value that is both dangerous and comma-bearing gets both treatments.
-
-Nine specs. Probed by removing the `typeof` check, which failed exactly the two
-regression cases that exist for it — the negative value, and the negative year
-and vintage id — while the nine guard cases kept passing. Restored and re-run
-green at 596.
-
-Not covered: the injection itself. Exercising it needs an upstream that returns a
-hostile indicator code, and there is no way to make the real service do that, so
-this is spec-only by necessity rather than by choice.
-
 ### F-35 [P3] unverified - Nothing confirms the live service honours pageSize=5000, and the refusal names our number as if it were the limit
 
 **File:** ui/src/app/core/export/export.service.ts:20
@@ -330,3 +255,51 @@ gates nothing.
 and record what `meta.pageSize` comes back as. If it is capped, either page the
 export or word the refusal as the service's limit rather than ours.
 **Resolution:**
+
+### F-36 [P3] fixed - A newline in an attribution line or a vintage label breaks out of the CSV header comments
+
+**File:** ui/src/app/core/export/export-csv.ts:74
+**Found:** 2026-09-11 by /audit (scope: full; lens: security)
+**Why it matters:** Every data field goes through `csvField`, which quotes and
+now guards it. The header comment lines do not: `toCsv` interpolates
+`meta.attribution` straight into `` `${COMMENT}${line}` `` at `:74`, and
+`vintageHeader` at `:92` joins `vintage.label` the same way. Both strings come
+from the Core API.
+
+A newline in either value ends the comment and starts a new physical line with
+no `# ` prefix, above the column header. A reader is then handed a line it
+cannot classify: too few columns to be a row, not marked as a comment, and
+positioned where the header is expected. A carriage return does the same. The
+file stops being well formed, and unlike F-34 no hostile intent is needed —
+a multi-line attribution string is an ordinary thing for an upstream to send.
+
+F-34 deliberately ruled these lines out of scope, and correctly, on the grounds
+that a `# ` prefix means they can never begin with a formula character. That
+reasoning holds for formula injection and says nothing about line injection,
+which is a different failure of the same untrusted text.
+**Suggested fix:** strip or replace CR and LF in every value interpolated into a
+comment line, in one small helper beside `csvField` so both the attribution loop
+and `vintageHeader` use it. Collapsing them to a space keeps the text readable
+and cannot break the line structure.
+**Resolution:** Fixed on 2026-09-11 as suggested. `commentSafe` at
+`export-csv.ts:115` collapses any run of CR and LF to one space and trims the
+ends, applied to each attribution entry, to each `vintage.label` inside
+`vintageHeader`, and to the stamp. The stamp does not need it — it is sliced to
+ten characters first — and goes through anyway so no reader has to work out which
+of the three is the exception.
+
+Collapsed rather than stripped: a line wrapped mid-sentence would otherwise read
+as `IMFWorld Economic Outlook`.
+
+Eight specs. Two of them exist to stop the helper being over-applied: an ordinary
+attribution line must be byte-for-byte unchanged, and a newline inside a *data*
+field must still be quoted and preserved, because RFC 4180 handles that case
+correctly and the comment lines are the only place with no such mechanism.
+
+Probed by reverting `commentSafe` to the identity function, which failed six
+specs including the header-position case this finding is actually about, and left
+those same two passing — the split the probe was designed to show. Restored and
+re-run green at 604.
+
+Not covered: the defect in the wild. It needs an upstream returning a multi-line
+attribution string, and the live service returns single-line values.

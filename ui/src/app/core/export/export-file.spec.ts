@@ -155,6 +155,93 @@ describe('toCsv', () => {
     });
   });
 
+  describe('the header comment lines', () => {
+    function commentLines(csv: string): string[] {
+      const all = lines(csv);
+      return all.slice(0, all.indexOf(EXPORT_COLUMNS.join(',')));
+    }
+
+    it('keeps a broken attribution line as one comment', () => {
+      const csv = toCsv([row()], meta({ attribution: ['Source: IMF\nWorld Economic Outlook'] }), {
+        pinVintages: false,
+        nowIso: NOW
+      });
+
+      expect(commentLines(csv)).toContain('# Source: IMF World Economic Outlook');
+    });
+
+    it('collapses a carriage return the same way', () => {
+      const csv = toCsv([row()], meta({ attribution: ['Source: IMF\rWorld'] }), {
+        pinVintages: false,
+        nowIso: NOW
+      });
+
+      expect(commentLines(csv)).toContain('# Source: IMF World');
+    });
+
+    it('collapses a CRLF pair to one space, not two', () => {
+      const csv = toCsv([row()], meta({ attribution: ['Source: IMF\r\nWorld'] }), {
+        pinVintages: false,
+        nowIso: NOW
+      });
+
+      expect(commentLines(csv)).toContain('# Source: IMF World');
+    });
+
+    it('leaves no stray space from a leading or trailing break', () => {
+      const csv = toCsv([row()], meta({ attribution: ['\nSource: IMF\n'] }), {
+        pinVintages: false,
+        nowIso: NOW
+      });
+
+      expect(commentLines(csv)).toContain('# Source: IMF');
+    });
+
+    it('collapses a break inside a vintage label, keeping the vintages line single', () => {
+      const csv = toCsv(
+        [row()],
+        meta({ vintages: [{ id: 12, source: 'IMF_WEO', label: 'WEO 10.0.0\n2026-04-14' }] }),
+        { pinVintages: true, nowIso: NOW }
+      );
+
+      expect(commentLines(csv)).toContain('# vintages: 12 WEO 10.0.0 2026-04-14');
+    });
+
+    it('leaves an ordinary attribution line byte-for-byte unchanged', () => {
+      const csv = toCsv([row()], meta(), { pinVintages: true, nowIso: NOW });
+
+      expect(commentLines(csv)).toContain('# Source: IMF World Economic Outlook database');
+      expect(commentLines(csv)).toContain(
+        '# Source: World Bank World Development Indicators (CC BY 4.0)'
+      );
+      expect(commentLines(csv)).toContain('# vintages: 12 WEO 10.0.0 2026-04-14; 7 WDI 2026-03-27');
+    });
+
+    it('keeps the column header as the first uncommented line', () => {
+      // The property this is actually about: a break would otherwise put an
+      // unclassifiable line exactly where a reader expects the header.
+      const csv = toCsv(
+        [row()],
+        meta({ attribution: ['One\nTwo', 'Three\r\nFour'] }),
+        { pinVintages: true, nowIso: NOW }
+      );
+
+      expect(dataLines(csv)[0]).toBe(EXPORT_COLUMNS.join(','));
+      expect(commentLines(csv).every((line) => line.startsWith('# '))).toBeTrue();
+    });
+
+    it('does not reach data fields, where a newline is quoted and preserved', () => {
+      // The line this fix must not cross: RFC 4180 keeps a break inside a value,
+      // and that is correct there.
+      const csv = toCsv([row({ indicator: 'two\nlines' })], meta(), {
+        pinVintages: false,
+        nowIso: NOW
+      });
+
+      expect(csv).toContain('"two\nlines"');
+    });
+  });
+
   describe('the formula-injection guard', () => {
     function indicatorField(indicator: string): string {
       const csv = toCsv([row({ indicator })], meta(), { pinVintages: false, nowIso: NOW });
