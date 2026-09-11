@@ -148,7 +148,7 @@ from `ready()`, which is null during a re-query, so a second re-query issued bef
 first settles carries `null` forward and the footer collapses again. P2 either way, so it
 does not block.
 
-### F-16 [P2] open - A second re-query issued before the first settles loses the held meta, and the footer collapses to "Page N of 1"
+### F-16 [P2] fixed - A second re-query issued before the first settles loses the held meta, and the footer collapses to "Page N of 1"
 
 **File:** ui/src/app/observations/observations.ts:76
 **Found:** 2026-09-11 by /audit (scope: current; lens: quality)
@@ -175,8 +175,19 @@ chains the held meta through consecutive loading states. Add one spec per page
 that calls `setPage(2)` then `setPage(3)` without releasing, and asserts the
 footer still reports the real count.
 **Resolution:**
+**Resolution:** Fixed on 2026-09-11 by the shared extraction. The held `meta`
+now lives in the pipeline itself (`heldMeta` in `core/result-state.ts`), updated
+in a `tap` when an answer settles and read when each inner pipe is built, so it
+chains through any number of consecutive in-flight re-queries instead of being
+lost on the second. Worth recording: the literal suggested fix,
+`previousMeta = this.pagerMeta()`, does not compile in the extracted form - it
+reintroduces the circular inference the page code needed an explicit
+`Signal<ResultState | null>` annotation to work around. Holding the value
+outside the stream removes the cycle rather than annotating around it. Verified
+by simulating the defect (clearing the hold after one read): three specs fail
+with `Expected 1 to be 3`.
 
-### F-17 [P2] open - The series tab's half of the F-13 guard cannot fail, so that page's pager repair is unproven
+### F-17 [P2] fixed - The series tab's half of the F-13 guard cannot fail, so that page's pager repair is unproven
 
 **File:** ui/src/app/series/series.spec.ts:498
 **Found:** 2026-09-11 by /audit (scope: current; lens: tests)
@@ -198,8 +209,15 @@ the count assertion can fail, or drop the `of ' + settledCount` assertion and
 state plainly that the count is not exercised on this tab. Do not leave an
 assertion that the defect satisfies.
 **Resolution:**
+**Resolution:** Fixed on 2026-09-11. The degenerate
+`toContain('of ' + settledCount)` is gone, replaced by a comment stating plainly
+that the page count is not exercisable on this tab and naming where it is
+covered instead: `core/result-state.spec.ts` drives the shared machine with a
+61-row answer, and the observations tab has 56 rows. The page-number assertion
+in the same spec was always a genuine guard and remains; reinstating the F-13
+defect still fails it.
 
-### F-18 [P2] open - Observations and Series carry a verbatim copy of the same result state machine, and every repair has had to be made twice
+### F-18 [P2] fixed - Observations and Series carry a verbatim copy of the same result state machine, and every repair has had to be made twice
 
 **File:** ui/src/app/series/series.ts:13
 **Found:** 2026-09-11 by /audit (scope: current; lens: quality)
@@ -221,6 +239,17 @@ state signal plus the pager computeds, and have both pages supply only the
 provider call and their wording. Do it before feature 11 or 12 adds a third
 consumer, not during one.
 **Resolution:**
+**Resolution:** Fixed on 2026-09-11. `ui/src/app/core/result-state.ts` now owns
+the union, the pipeline, and the `loading`/`invalid`/`unavailable`/`settled`/
+`items`/`totalCount`/`page`/`pageSize`/`pageCount`/`vintageLabels` signals plus
+`prev`/`next`. Both pages call `createResultState<T>({ fetch, unavailable })` and
+keep only what is genuinely theirs: `rows`/`rowRange` on observations,
+`total`/`views` on series, and each tab's own `resultSummary` wording. The two
+pages lost 279 lines and gained 58; the extracted module is 198, so total
+production lines are roughly level while the duplicated logic goes from two
+copies to one owner. No template changed and no existing spec was rewritten
+except F-17's. F-16 was then repaired once, in the shared code, which is the
+whole point.
 
 ### F-19 [P3] open - The indicator catalogue still holds the previous filter's result for a whole round trip, which is the defect F-11 fixed on the other two lists
 

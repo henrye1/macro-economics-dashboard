@@ -490,22 +490,24 @@ describe('SeriesPage loading state across a re-query', () => {
     provider.release?.();
     fixture.detectChanges();
 
-    const settled = strip();
-    expect(settled).toContain('Page 1 of');
-    // The fixtures group into 4 series, under one page of 25, so unlike the
-    // observations tab the page *count* cannot be exercised here. The page
-    // *number* is the half of F-13 this tab can prove.
-    const settledCount = settled.replace(/^Page \d+ of (\d+).*$/, '$1');
+    expect(strip()).toContain('Page 1 of');
 
     store.setPage(2);
     fixture.detectChanges();
 
-    const loading = strip();
     // The page the user asked for, not a literal 1.
-    expect(loading).toContain('Page 2 of');
-    // The count last known to be real, carried rather than collapsed.
-    expect(loading).toContain('of ' + settledCount);
+    expect(strip()).toContain('Page 2 of');
   });
+
+  // F-17: the page *count* is deliberately not asserted on this tab. The
+  // fixtures group into 4 series, well under one page of 25, so the settled
+  // count is 1 and `toContain('of 1')` is also what the collapsed, defective
+  // footer produces: the assertion could not fail. The count is covered
+  // directly in `core/result-state.spec.ts`, which drives the shared machine
+  // with a 61-row answer, and on the observations tab, which has 56 rows.
+  // Leaving a passing assertion here would have read as coverage it never
+  // provided.
+
 
   it('leaves Prev reachable while a re-query is in flight', () => {
     // Both controls were disabled by accident: PagingFooter derives them from
