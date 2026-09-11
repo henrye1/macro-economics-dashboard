@@ -429,23 +429,16 @@ describe('exportFilename', () => {
 });
 
 describe('EXPORT_FORMATS', () => {
-  it('declares all three the design offers', () => {
-    expect(EXPORT_FORMATS.map((spec) => spec.format)).toEqual(['csv', 'json', 'xlsx']);
+  it('declares exactly the two formats the card offers', () => {
+    // XLSX was dropped from the plan on 2026-09-11; the reference PNG still
+    // shows it, the plan and overview record why it is gone.
+    expect(EXPORT_FORMATS.map((spec) => spec.format)).toEqual(['csv', 'json']);
   });
 
-  it('marks xlsx unavailable with a reason, rather than omitting it', () => {
-    const xlsx = exportFormatSpec('xlsx');
-
-    expect(xlsx.available).toBeFalse();
-    expect(xlsx.unavailableReason).toContain('later feature');
-    // Declared in full now, so 11b only flips the flag and supplies a writer.
-    expect(xlsx.extension).toBe('xlsx');
-    expect(xlsx.mimeType).toContain('spreadsheetml');
-  });
-
-  it('gives every available format a reason of null', () => {
-    for (const spec of EXPORT_FORMATS.filter((candidate) => candidate.available)) {
-      expect(spec.unavailableReason).withContext(spec.format).toBeNull();
-    }
+  it('gives each one the extension and MIME type its file needs', () => {
+    expect(exportFormatSpec('csv').extension).toBe('csv');
+    expect(exportFormatSpec('csv').mimeType).toBe('text/csv;charset=utf-8');
+    expect(exportFormatSpec('json').extension).toBe('json');
+    expect(exportFormatSpec('json').mimeType).toBe('application/json');
   });
 });

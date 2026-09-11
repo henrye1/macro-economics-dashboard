@@ -41,10 +41,6 @@ export class ExportCard {
   protected readonly message = signal<string | null>(null);
 
   protected selectFormat(spec: ExportFormatSpec): void {
-    if (!spec.available) {
-      return;
-    }
-
     this.format.set(spec.format);
     this.message.set(null);
   }

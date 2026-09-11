@@ -11,16 +11,9 @@
           type="button"
           class="btn format"
           [class.on]="isSelected(spec)"
-          [disabled]="!spec.available"
           [attr.aria-pressed]="isSelected(spec)"
-          [attr.title]="spec.unavailableReason"
-          [attr.aria-describedby]="spec.available ? null : 'format-reason-' + spec.format"
           (click)="selectFormat(spec)"
         >{{ spec.label }}</button>
-
-        @if (spec.unavailableReason; as reason) {
-          <span class="visually-hidden" [id]="'format-reason-' + spec.format">{{ reason }}</span>
-        }
       }
     </fieldset>
 

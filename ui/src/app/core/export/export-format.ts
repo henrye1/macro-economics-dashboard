@@ -1,13 +1,13 @@
 /**
- * The three formats the design's Export card offers.
+ * The formats the Export card offers.
  *
- * `xlsx` is declared here in full — label, extension, MIME type — even though
- * this feature cannot write one. Feature 11b flips `available` and supplies the
- * writer; nothing else about the card has to change. Declaring it now also
- * keeps the design's third button on screen rather than pretending the format
- * was never promised.
+ * The design shows a third, XLSX, and it was dropped from the build plan on
+ * 2026-09-11: writing one needs a spreadsheet dependency, and the UTF-8
+ * byte-order mark `export-csv.ts` writes makes the CSV open correctly in Excel,
+ * which was that format's main reason to exist. The reference PNG still shows
+ * the button; the build plan and the overview record why it is gone.
  */
-export type ExportFormat = 'csv' | 'json' | 'xlsx';
+export type ExportFormat = 'csv' | 'json';
 
 export interface ExportFormatSpec {
   readonly format: ExportFormat;
@@ -16,10 +16,6 @@ export interface ExportFormatSpec {
   /** Without the dot. */
   readonly extension: string;
   readonly mimeType: string;
-  /** False while the format is promised but not yet buildable. */
-  readonly available: boolean;
-  /** Why it cannot be chosen. Null when it can. */
-  readonly unavailableReason: string | null;
 }
 
 export const EXPORT_FORMATS: readonly ExportFormatSpec[] = [
@@ -27,25 +23,13 @@ export const EXPORT_FORMATS: readonly ExportFormatSpec[] = [
     format: 'csv',
     label: 'CSV',
     extension: 'csv',
-    mimeType: 'text/csv;charset=utf-8',
-    available: true,
-    unavailableReason: null
+    mimeType: 'text/csv;charset=utf-8'
   },
   {
     format: 'json',
     label: 'JSON',
     extension: 'json',
-    mimeType: 'application/json',
-    available: true,
-    unavailableReason: null
-  },
-  {
-    format: 'xlsx',
-    label: 'XLSX',
-    extension: 'xlsx',
-    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    available: false,
-    unavailableReason: 'XLSX export needs a spreadsheet writer and lands in a later feature.'
+    mimeType: 'application/json'
   }
 ];
 

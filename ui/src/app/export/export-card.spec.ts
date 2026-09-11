@@ -133,12 +133,8 @@ describe('ExportCard', () => {
   }
 
   describe('the format control', () => {
-    it('offers all three the design shows', () => {
-      expect(formatButtons().map((button) => button.textContent?.trim())).toEqual([
-        'CSV',
-        'JSON',
-        'XLSX'
-      ]);
+    it('offers exactly the two formats that can be written', () => {
+      expect(formatButtons().map((button) => button.textContent?.trim())).toEqual(['CSV', 'JSON']);
     });
 
     it('starts on CSV, and the button names it', () => {
@@ -155,29 +151,6 @@ describe('ExportCard', () => {
       expect(downloadButton()?.textContent?.trim()).toBe('Download JSON');
     });
 
-    it('disables XLSX and says why, rather than hiding the promised format', () => {
-      const xlsx = formatButton('XLSX');
-
-      expect(xlsx?.disabled).toBeTrue();
-      expect(xlsx?.getAttribute('title')).toContain('later feature');
-    });
-
-    it('names the XLSX reason to assistive technology, not only in a tooltip', () => {
-      const describedBy = formatButton('XLSX')?.getAttribute('aria-describedby');
-
-      expect(describedBy).toBeTruthy();
-      expect(el().querySelector(`#${CSS.escape(describedBy as string)}`)?.textContent).toContain(
-        'later feature'
-      );
-    });
-
-    it('stays on the current format when the disabled one is clicked', () => {
-      formatButton('XLSX')?.click();
-      fixture.detectChanges();
-
-      expect(formatButton('CSV')?.getAttribute('aria-pressed')).toBe('true');
-      expect(downloadButton()?.textContent?.trim()).toBe('Download CSV');
-    });
   });
 
   describe('the pin checkbox', () => {

@@ -1,6 +1,6 @@
 # Cyte Macro Data Console - Project Overview
 
-<!-- blueprint:source-hash 9e74c404f824e6d9f329f1daea7c2fe2c44743708ae72169f89ef78a45882678 -->
+<!-- blueprint:source-hash 7f00c7a0f31a670ce09da51b6d1451070a8b9368fdfe83f8bd79a3370622657c -->
 
 > A browsable console over the Cyte Core API `/api/macro` service, built to make
 > vintages, absent data and ETags tangible to anyone integrating.
@@ -51,7 +51,7 @@ ETag and vintage-pinning habits actually get taught.
 8. **Live data wiring** - swap the fixture provider for the real service, including ETag passthrough and RFC 7807 error handling.
 9. **Vintages and revisions** - published vintage list and the change view against the preceding vintage.
 10. **Saved queries** - name, store, reload and reproduce a query with its pinned vintage ids.
-11. **Export** - CSV, JSON and XLSX download of the current result, with optional vintage ids in the file header.
+11. **Export** - CSV and JSON download of the current result, with optional vintage ids in the file header. XLSX was dropped on 2026-09-11: it needs a spreadsheet dependency, and the CSV's UTF-8 byte-order mark makes it open correctly in Excel.
 12. **Request builder** - live URL and curl for the working query, the real response envelope and headers, and the status code reference.
 13. **Deployment readiness** - configure both Render services, env vars, health check and CORS, and verify the production build (run via `/release render`).
 
@@ -82,7 +82,8 @@ drift-prone thing in the project; check them against a real response at feature 
 `Envelope<T>`
 
 - `data` (T[]) - the payload; an empty array is a valid `200`, never an error
-- `meta.page` (number, 1-based), `meta.pageSize` (number, default 500, max 5000), `meta.totalCount` (number)
+- `meta.page` and `meta.pageSize` (number **or null**, 1-based; default 500, max 5000) - null on the routes that do not paginate, observed at feature 8 on `/countries` and `/vintages`
+- `meta.totalCount` (number) - always present, which is why counts read it and never `page`
 - `meta.vintages` (vintage refs) - `{ id, source, label }`, the values recorded for reproducibility
 - `meta.attribution` (string[]) - rendered verbatim in the footer
 
@@ -106,7 +107,7 @@ drift-prone thing in the project; check them against a real response at feature 
 
 `Series`
 
-- `indicator`, `name`, `unit`, `country`, `source`, `vintage` (label string)
+- `indicator`, `name`, `unit`, `scale` (string or null), `country`, `source`, `vintage` (label string)
 - `lastActualYear` (number) - the history and forecast boundary
 - `points` - `{ year: number, value: number, isForecast: boolean }[]`
 
@@ -117,7 +118,7 @@ drift-prone thing in the project; check them against a real response at feature 
 `Revision` (from `/vintages/{id}/revisions`)
 
 - previous versus new value per (indicator, country, year), plus appeared and disappeared series
-- significance flag, default threshold above 10 percent relative or 0.5 absolute
+- **no significance flag on the wire.** Feature 8 sampled 500 live rows and none carried one, so the console derives it: above 10 percent relative or 0.5 absolute, and says so on screen because the threshold is its own choice
 
 `SourceCode` is `'IMF_WEO' | 'WB_WDI'`. The query `source` param also accepts
 `'preferred'`, the default, where WEO wins wherever it exists because it extends
@@ -224,7 +225,7 @@ Seven tabs, in the design's display order:
 - `/series` (`references/3-series.png`) - one series per indicator and country, history and forecast boundary at `lastActualYear` shown clearly (feature 6)
 - `/observations` (`references/4-observations.png`) - the working query builder over a paginated flat table (features 3 and 5)
 - `/vintages` (`references/5-vintages-and-revisions.png`) - published vintages newest first; select one to see what it changed against its predecessor, including appeared and disappeared series (feature 9)
-- `/saved-queries` (`references/6-saved-queries-and-export.png`) - name and store the working query with its vintage ids, reload or reproduce it, export as CSV, JSON or XLSX (features 10 and 11)
+- `/saved-queries` (`references/6-saved-queries-and-export.png`) - name and store the working query with its vintage ids, reload or reproduce it, export as CSV or JSON (features 10 and 11)
 - `/request-builder` (`references/7-request-builder.png`) - live URL and curl for the working query, a send button showing the real response envelope and headers, and the status code reference (feature 12)
 
 Tab display order differs from build order; both are intentional.
@@ -294,9 +295,11 @@ teach the wrong habit.
 
 ## Open questions
 
-> **Core API host and Auth0 tenant are unnamed.** `CORE_API_BASE_URL`, the Auth0
-> domain and the audience are env var names only. Feature 7 needs real values, and
-> feature 8 cannot be verified against live data without them.
+> **Core API host and Auth0 tenant are unnamed in the plans.** `CORE_API_BASE_URL`,
+> the Auth0 domain and the audience appear as env var names only. Real values exist
+> locally in a git-ignored `api/.env` and features 7 and 8 used them, but nothing
+> generated from the plans may name the host: the request builder therefore renders
+> `https://<core-api-host>`, exactly as `CONSUMER-GUIDE.md` does.
 
 > **OpenAPI document URL is unknown.** Feature 17 is blocked until the Scalar
 > document's URL and credentials exist. Until then contract types are hand-written
@@ -305,7 +308,9 @@ teach the wrong habit.
 > **Angular build-time config mechanism undecided.** See the Deployment TODO on
 > `API_BASE_URL`.
 
-> **No test runner for `api/`.** `AGENTS.md` declares no `Test` command, so the
-> test gate is off. Most assertable logic in this project (query-string building,
-> the curl block, CSV and XLSX shaping, revision diffing) is exactly the kind the
-> scope rule says to test. Consider `/tests` before feature 3.
+> **No `Verify` command and no browser harness.** `AGENTS.md` now declares a `Test`
+> command for both packages, so the unit gate is on. What is still missing is a
+> single `Verify` command (`/ci`) and any browser coverage (`/browser-tests`).
+> Every double in the suite resolves synchronously, so the window between a request
+> and its answer is zero-width, and file-level behaviour - what a browser writes and
+> a spreadsheet opens - cannot be checked here at all.

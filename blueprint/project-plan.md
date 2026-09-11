@@ -61,7 +61,7 @@ Seven tabs, matching the designs:
 5. **Vintages & revisions** — published vintages newest first; select one to see what it
    changed against its predecessor, including appeared and disappeared series.
 6. **Saved queries & export** — name and store the working query with its vintage ids;
-   reload or reproduce it; export the current result as CSV, JSON or XLSX.
+   reload or reproduce it; export the current result as CSV or JSON.
 7. **Request builder** — the live URL and curl for the working query, a send button showing
    the real response envelope and headers, and the status code reference.
 

@@ -76,15 +76,6 @@ export class ExportService {
   readonly busy = this.inFlight.asReadonly();
 
   async download(format: ExportFormat, pinVintages: boolean): Promise<ExportOutcome> {
-    // Loud rather than silent. Without this an unavailable format would fall
-    // through to the CSV branch below and hand the user spreadsheet bytes that
-    // are really a CSV. The card disables the control, so this is unreachable
-    // from the UI and exists for the next caller.
-    const spec = exportFormatSpec(format);
-    if (!spec.available) {
-      throw new Error(`${spec.label} export is not available yet.`);
-    }
-
     // No request for an unsendable query, matching how the result tabs decline
     // to ask rather than collecting a documented 400.
     if (!this.store.validation().valid) {

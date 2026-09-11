@@ -300,13 +300,4 @@ describe('ExportService', () => {
     });
   });
 
-  it('refuses a format it cannot write, loudly rather than as the wrong bytes', async () => {
-    sendable();
-
-    // Unreachable from the card, which disables the control. Without the guard
-    // this would have produced CSV bytes under an .xlsx name.
-    await expectAsync(service.download('xlsx', false)).toBeRejectedWithError(/not available yet/);
-    expect(macro.calls.length).toBe(0);
-    expect(saved).toEqual([]);
-  });
 });
