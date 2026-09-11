@@ -1,0 +1,185 @@
+<section class="card vintages">
+  <div class="card-head">
+    <h2>Published vintages</h2>
+
+    @if (vintagesLoading()) {
+      <span class="meta" role="status">Loading vintages…</span>
+    } @else if (vintagesUnavailable()) {
+      <span class="meta" role="status">{{ vintagesMessage() }}</span>
+    } @else if (noVintages()) {
+      <span class="meta" role="status">No vintages have been published yet.</span>
+    } @else {
+      <span class="meta">Newest first · click a row for its revisions</span>
+    }
+  </div>
+
+  @if (!vintagesLoading() && !vintagesUnavailable() && !noVintages()) {
+    <table class="grid">
+      <caption class="visually-hidden">
+        Published vintages, newest first. Select one to see what it changed.
+      </caption>
+      <thead>
+        <tr>
+          <th scope="col" class="num">id</th>
+          <th scope="col">Label</th>
+          <th scope="col">Source</th>
+          <th scope="col">sourceVersion</th>
+          <th scope="col">retrievedAtUtc</th>
+          <th scope="col" class="right">isLatest</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (vintage of vintages(); track vintage.id) {
+          <tr
+            class="vintage-row"
+            [class.selected]="isSelected(vintage)"
+            [attr.aria-selected]="isSelected(vintage)"
+          >
+            <td class="num">
+              <button
+                type="button"
+                class="linklike"
+                [attr.aria-pressed]="isSelected(vintage)"
+                (click)="select(vintage)"
+              >{{ vintage.id }}</button>
+            </td>
+            <td>{{ vintage.label }}</td>
+            <td>{{ vintage.source }}</td>
+            <td>{{ vintage.sourceVersion }}</td>
+            <!-- Rendered verbatim: the value carries no zone designator, so
+                 parsing it as a Date would silently read it as local time. -->
+            <td class="stamp">{{ vintage.retrievedAtUtc }}</td>
+            <td class="right">
+              @if (vintage.isLatest) {
+                <span class="pill latest">Latest</span>
+              } @else {
+                <span class="pill superseded">Superseded</span>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</section>
+
+<section class="card revisions">
+  <div class="card-head dark">
+    @if (selected(); as vintage) {
+      <h2>Revisions · {{ vintage.label }}</h2>
+      @if (predecessor(); as against) {
+        <span class="meta">vs {{ against.label }}</span>
+      } @else {
+        <span class="meta">no earlier {{ vintage.source }} vintage to compare against</span>
+      }
+    } @else {
+      <h2>Revisions</h2>
+    }
+  </div>
+
+  @if (nothingSelected()) {
+    <p class="state" role="status">Select a vintage above to see what it changed.</p>
+  } @else {
+    <div class="revisions-controls">
+      <!-- The threshold is stated because the flag is derived in this console,
+           not sent by the service. -->
+      <p class="note">{{ significanceNote }}</p>
+      <button
+        type="button"
+        class="btn outline-green"
+        [class.on]="significantOnly()"
+        [attr.aria-pressed]="significantOnly()"
+        (click)="toggleSignificantOnly()"
+      >Significant only</button>
+    </div>
+
+    @if (revisionsLoading()) {
+      <p class="state" role="status">Loading revisions…</p>
+    } @else if (revisionsUnavailable()) {
+      <p class="state" role="status">{{ revisionsMessage() }}</p>
+    } @else if (unchanged()) {
+      <p class="state" role="status">This vintage changed no values against its predecessor.</p>
+    } @else if (filteredToNothing()) {
+      <p class="state" role="status">
+        No change on this page clears the threshold. Turn the filter off to see them all.
+      </p>
+    } @else {
+      <table class="grid">
+        <caption class="visually-hidden">
+          One row per indicator, country and year that changed, with the derived difference.
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Indicator</th>
+            <th scope="col">Country</th>
+            <th scope="col" class="num">Year</th>
+            <th scope="col" class="num">Previous</th>
+            <th scope="col" class="num">New</th>
+            <th scope="col" class="num">Change</th>
+            <th scope="col" class="right">Flagged</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (view of rows(); track rowKey(view)) {
+            <tr>
+              <td class="code">{{ view.revision.indicator }}</td>
+              <td>{{ view.revision.country }}</td>
+              <td class="num">{{ view.revision.year }}</td>
+              <td class="num">{{ value(view.revision.previousValue) }}</td>
+              <td class="num strong">{{ value(view.revision.newValue) }}</td>
+              <td class="num change" [class]="changeClass(view)">{{ change(view) }}</td>
+              <td class="right">
+                @if (view.significant) {
+                  <span class="pill significant">Significant</span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+
+      <app-paging-footer
+        [page]="currentPage()"
+        [pageCount]="pageCount()"
+        [pageSize]="pageSize"
+        [vintageLabels]="pagerVintage()"
+        (prev)="prev()"
+        (next)="next()"
+      />
+    }
+
+    @if (!revisionsLoading() && !revisionsUnavailable() && !unchanged()) {
+      <div class="summary">
+        <div class="summary-panel">
+          <!-- Scoped to the page on screen, and labelled as such: the service
+               pages revisions, so the whole result is not in hand here. -->
+          <p class="summary-title">Series that appeared · this page</p>
+          @if (appearedShown().length === 0) {
+            <p class="summary-none">None</p>
+          } @else {
+            @for (entry of appearedShown(); track span(entry)) {
+              <p class="summary-entry appeared">{{ span(entry) }}</p>
+            }
+            @if (appearedOverflow() > 0) {
+              <p class="summary-more">+{{ appearedOverflow() }} more on this page</p>
+            }
+          }
+        </div>
+
+        <div class="summary-panel">
+          <p class="summary-title">Series that disappeared · this page</p>
+          @if (disappearedShown().length === 0) {
+            <p class="summary-none">None</p>
+          } @else {
+            @for (entry of disappearedShown(); track span(entry)) {
+              <p class="summary-entry disappeared">{{ span(entry) }}</p>
+            }
+            @if (disappearedOverflow() > 0) {
+              <p class="summary-more">+{{ disappearedOverflow() }} more on this page</p>
+            }
+          }
+        </div>
+      </div>
+    }
+  }
+</section>

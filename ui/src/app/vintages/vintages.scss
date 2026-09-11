@@ -1,0 +1,131 @@
+.vintages,
+.revisions {
+  margin-top: var(--space-5);
+}
+
+/* Ids, codes, ISO3s and timestamps all read better unwrapped; only the
+   head-right state message and the summary entries may run long. */
+.vintages tbody td,
+.revisions tbody td {
+  white-space: nowrap;
+}
+
+.card-head .meta {
+  text-align: right;
+}
+
+/* The selected vintage is the subject of everything below it, so the link is
+   emphasised rather than merely tinted: tint alone would carry the state in
+   colour only. */
+.vintage-row.selected .linklike {
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.linklike {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--brand);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.linklike:hover {
+  text-decoration: underline;
+}
+
+.pill.latest {
+  background: var(--brand-tint, #e3ecfd);
+  color: var(--brand, #1b3fae);
+}
+
+.pill.superseded {
+  background: #eceef2;
+  color: #5b6472;
+}
+
+.pill.significant {
+  background: #fdf3dd;
+  color: #8a6212;
+}
+
+.revisions-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+}
+
+.revisions-controls .note {
+  margin: 0;
+  color: var(--muted);
+}
+
+.btn.on {
+  background: var(--brand, #1b3fae);
+  color: #fff;
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  padding: var(--space-5);
+}
+
+.summary-panel {
+  background: #f6f7f9;
+  border-radius: 6px;
+  padding: var(--space-4);
+}
+
+.summary-title {
+  margin: 0 0 var(--space-2);
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.summary-entry,
+.summary-none,
+.summary-more {
+  margin: 0 0 var(--space-1);
+  font-weight: 600;
+}
+
+.summary-entry.appeared {
+  color: #1f7a44;
+}
+
+.summary-entry.disappeared,
+.summary-none {
+  color: #b3261e;
+}
+
+/* "None" is the good outcome for disappeared and the dull one for appeared, so
+   it stays neutral rather than borrowing either signal colour. */
+.summary-none {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.summary-more {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.change.up {
+  color: #1f7a44;
+}
+
+.change.down {
+  color: #b3261e;
+}
+
+@media (max-width: 720px) {
+  .summary {
+    grid-template-columns: 1fr;
+  }
+}

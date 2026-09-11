@@ -229,4 +229,33 @@ export const FIXTURE_INDICATORS: readonly Indicator[] = [
   },
 ];
 
-export const FIXTURE_REVISIONS: readonly Revision[] = [];
+/**
+ * Revisions for the vintages tab, shaped like the live route.
+ *
+ * Chosen to exercise every branch the derivations have: both significance
+ * thresholds and both boundaries, a `previousValue` of zero, a series the
+ * vintage added and one it dropped. The real service returns thousands of rows
+ * for a vintage; this is the smallest set that makes every state reachable.
+ */
+export const FIXTURE_REVISIONS: readonly Revision[] = [
+  // Significant by the absolute rule, negative.
+  { indicator: 'GDP_PER_CAPITA_USD', country: 'ZAF', year: 2023, previousValue: 7036, newValue: 6857 },
+  { indicator: 'GDP_PER_CAPITA_USD', country: 'NAM', year: 2023, previousValue: 8927, newValue: 8735 },
+  // Significant by the absolute rule, positive.
+  { indicator: 'GDP_PER_CAPITA_USD', country: 'KEN', year: 2023, previousValue: 6290, newValue: 6379 },
+  { indicator: 'UNEMPLOYMENT_RATE', country: 'KEN', year: 2023, previousValue: 18.9, newValue: 19.5 },
+  // Significant by the relative rule alone: 0.03 absolute, 20 percent.
+  { indicator: 'CPI_INFLATION_AVG', country: 'BWA', year: 2024, previousValue: 0.15, newValue: 0.18 },
+  // Under both bars: 0.4 absolute and 2 percent.
+  { indicator: 'GDP_GROWTH_REAL', country: 'ZAF', year: 2024, previousValue: 20, newValue: 20.4 },
+  // Exactly on both bars, so neither "more than" rule fires.
+  { indicator: 'GDP_GROWTH_REAL', country: 'NAM', year: 2024, previousValue: 5, newValue: 5.5 },
+  // A previous value of zero: the relative test must not divide.
+  { indicator: 'CURRENT_ACCOUNT_GDP', country: 'BWA', year: 2022, previousValue: 0, newValue: 0.2 },
+  // A series the vintage added, spanning several years.
+  { indicator: 'LENDING_RATE', country: 'MUS', year: 2010, previousValue: null, newValue: 8.4 },
+  { indicator: 'LENDING_RATE', country: 'MUS', year: 2017, previousValue: null, newValue: 7.9 },
+  { indicator: 'LENDING_RATE', country: 'MUS', year: 2024, previousValue: null, newValue: 7.1 },
+  // A series the vintage dropped, over a single year.
+  { indicator: 'REER_INDEX', country: 'ZMB', year: 2021, previousValue: 103.2, newValue: null },
+];

@@ -20,7 +20,7 @@
   server-side Auth0 token caching and retry
 - [x] 8. **Live data wiring** - swap the fixture provider for the real service, including
   ETag passthrough and RFC 7807 error handling
-- [ ] 9. **Vintages & revisions** - published vintage list and the change view against the
+- [x] 9. **Vintages & revisions** - published vintage list and the change view against the
   preceding vintage
 - [ ] 10. **Saved queries** - name, store, reload and reproduce a query with its pinned
   vintage ids

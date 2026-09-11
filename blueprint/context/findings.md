@@ -151,66 +151,51 @@ click keeps the hold. Do it with the pager's third behaviour change, not as a
 fourth standalone patch.
 **Resolution:**
 
-### F-22 [P3] fixed - A no-op query mutation re-issues the request, and feature 10 will make that reachable
+### F-24 [P3] open - sameWorkingQuery is not exhaustive by construction, so a new query field would be silently ignored
 
-**File:** ui/src/app/core/working-query.store.ts:95
-**Found:** 2026-09-11 by /audit (scope: full; lens: performance)
-**Why it matters:** `patch()` always spreads into a new object, so
-`setSource('preferred')` on a query already set to `preferred` produces a new
-`WorkingQuery` identity. `apiQuery` recomputes, `request` returns a fresh object,
-`toObservable` emits, and a full HTTP round trip is issued for a query that did
-not change. `setPage` has the same shape. `addTo` and `removeFrom` are already
-guarded and return `current` unchanged on a no-op, which is what makes the gap
-in `patch` look accidental rather than considered.
-
-Not reachable from the UI today, which is why this is `unverified` in substance
-and P3 in severity: every caller is a `<select>` or number `(change)` handler,
-and those fire only on a real change. Feature 10 changes that. Reloading a saved
-query means writing a whole `WorkingQuery` back through these setters, and
-reloading the query you are already looking at is the ordinary case.
-**Suggested fix:** compare before updating in `patch` and `setPage`, returning
-`current` when nothing changed, exactly as `addTo` already does. Cheaper than
-adding equality to the `apiQuery` computed, and it keeps the guarantee in the
-one place that owns mutation.
-**Resolution:** Fixed on 2026-09-11 as suggested. `sameWorkingQuery` in
-`core/working-query.ts` compares all nine fields, with the two arrays by content
-and order, and a private `settle()` in the store returns `current` when the
-built candidate matches. Both mutators build the candidate before comparing,
-because `patch` also forces `page: 1`: re-selecting the current source while on
-page 3 is a real change, and a spec pins that. Verified by removing the
-comparison: nine specs fail, eight on reference identity and one on the round
-trip itself. Also covered: clamped (`setPage(0)`) and truncated
-(`setPage(3.7)`) values that resolve to the current page are no-ops too. `ui`
-353 tests, up from 317.
-
-### F-23 [P3] fixed - The shared result API is named with an Observable convention but returns only Signals
-
-**File:** ui/src/app/core/result-state.ts:36
+**File:** ui/src/app/core/working-query.ts:92
 **Found:** 2026-09-11 by /audit (scope: full; lens: quality)
-**Why it matters:** The exported interface is `ResultState$<T>`. In Angular and
-RxJS code a `$` suffix means an Observable, and every member of this interface is
-a `Signal` or a plain function. The codebase has no other `$`-suffixed symbol, so
-the convention is being introduced by this one name and introduced incorrectly.
-It is also never written at a call site: both pages infer it, and a sweep for the
-identifier outside its own file returns nothing, so the misleading name survives
-precisely because nothing has to read it yet. Features 9 to 12 are the ones that
-will read it.
-**Suggested fix:** rename to `ResultState` (the private union it collides with
-can become `ResultStatus` or move inline) or `ResultSignals`. Rename only; there
-is no behaviour here.
-**Resolution:** Fixed on 2026-09-11. `ResultState$` is now `ResultSignals`, the
-private union `ResultState` is `ResultStatus`, and `ResultStateConfig` is
-`ResultSignalsConfig`. `createResultState` and the file name are unchanged: the
-function was never misnamed.
+**Why it matters:** The comparison lists all nine fields of `WorkingQuery` by
+hand. Adding a tenth field compiles cleanly: `DEFAULT_WORKING_QUERY` fails
+typecheck until the field is given a default, which is the safety net people will
+notice, but `sameWorkingQuery` does not, and neither does anything else. The
+store would then treat a mutation of that field as a no-op and refuse it
+outright. That is strictly worse than the wasted request F-22 removed: a swallowed
+mutation is a control that does nothing, and the suite would stay green because
+no spec can know about a field that does not exist yet.
 
-**One claim in this finding was wrong, and the correction matters.** It stated
-that a sweep for the identifier outside its own file returned nothing. The sweep
-was run as `grep "ResultState$"`, where the unescaped `$` anchors to end of line,
-so it matched nothing anywhere and the zero result was meaningless rather than
-informative. `result-state.spec.ts` imports the name and annotates `let state`
-with it, so the misleading name already had two readers. The finding's conclusion
-holds and is slightly strengthened; only its evidence was bad.
+Its own doc comment already warns a reader to keep the list in step, which is an
+admission that nothing enforces it. Feature 10 is the likely trigger: a saved
+query wants an identifier or a name on the working query, and both are fields a
+user can change.
+**Suggested fix:** make the key list checkable by the compiler, for example
+`const COMPARED = { indicators: true, ... } satisfies Record<keyof WorkingQuery, true>`
+and iterate it, or destructure the parameter so an unhandled field is an unused
+binding. Either turns the next added field into a compile error instead of a
+silently dead control.
+**Resolution:**
 
-Changed files are exactly `result-state.ts` and `result-state.spec.ts`, and the
-spec's entire diff is the two lines that name the type. `ui`: 317 tests pass,
-build clean, both typechecks clean.
+### F-25 [P3] open - The store has four mutation paths and three different no-op guards
+
+**File:** ui/src/app/core/working-query.store.ts:74
+**Found:** 2026-09-11 by /audit (scope: full; lens: quality)
+**Why it matters:** After the F-22 repair the store guards no-op mutations three
+different ways. `patch` and `setPage` compare through `settle`. `addTo` and
+`removeFrom` keep their own inline `includes` check, which is equivalent but
+separate. `reset()` at line 74 has no guard at all: it assigns
+`DEFAULT_WORKING_QUERY` by reference, so resetting a query that is structurally
+default but a different object, which is what "add an indicator, remove it,
+press Reset" produces, mints a new identity and notifies every reader.
+
+Nothing breaks today. That reset case ends with an empty `indicators`, so
+`validation()` is invalid, `request` is null and no HTTP goes out; the cost is
+recomputation, not a round trip. The concern is structural rather than current:
+F-22 existed because one mutator was written without the guarantee the others
+had, and the repair left the surface in the same shape it was in when that
+happened. Feature 10 adds the mutator most likely to repeat it, because loading a
+saved query writes the whole object at once.
+**Suggested fix:** route every mutation through `settle`, including `reset`
+(`settle(current, DEFAULT_WORKING_QUERY)`) and the two array helpers, so the
+guarantee is a property of the store rather than a habit each method has to
+remember. The inline `includes` checks then become redundant and can go.
+**Resolution:**
