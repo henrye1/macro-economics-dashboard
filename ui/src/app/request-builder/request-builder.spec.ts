@@ -224,6 +224,74 @@ describe('RequestBuilderPage', () => {
       expect(text()).toContain('Press Send request to see the response envelope.');
     });
 
+    it('drops the previous answer when the query changes', async () => {
+      // The working-query card is on this page, so the request can change
+      // without the endpoint moving. The answer described the old one.
+      sendable();
+      await send((request) => request.flush(ENVELOPE));
+      expect(statusPill()?.textContent?.trim()).toBe('200');
+
+      store.addCountry('NAM');
+      fixture.detectChanges();
+
+      expect(statusPill()?.textContent?.trim()).toBe('Not sent');
+      expect(el().querySelector('.body')).toBeNull();
+    });
+
+    it('drops it for a year change too, not only for a code', async () => {
+      sendable();
+      await send((request) => request.flush(ENVELOPE));
+
+      store.setYearRange(2018, 2030);
+      fixture.detectChanges();
+
+      expect(statusPill()?.textContent?.trim()).toBe('Not sent');
+    });
+
+    it('clears the copy confirmation with it, since the curl changed too', async () => {
+      sendable();
+      copyButton()?.click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(states().some((line) => line.includes('curl copied'))).toBeTrue();
+
+      store.addCountry('NAM');
+      fixture.detectChanges();
+
+      expect(states().some((line) => line.includes('curl copied'))).toBeFalse();
+    });
+
+    it('leaves a settled answer alone when the current endpoint is re-selected', async () => {
+      sendable();
+      await send((request) => request.flush(ENVELOPE));
+
+      endpointButton('GET /api/macro/series')?.click();
+      fixture.detectChanges();
+
+      // Signals compare with Object.is, so setting the same value notifies
+      // nothing and the effect does not run.
+      expect(statusPill()?.textContent?.trim()).toBe('200');
+    });
+
+    it('discards an answer that arrives after the query changed', async () => {
+      // The in-flight window this repair could otherwise have opened: the effect
+      // clears the card, then the late assignment puts the stale answer back.
+      sendable();
+      sendButton()?.click();
+      fixture.detectChanges();
+      const inFlight = http.expectOne((candidate) => candidate.url === '/api/macro/series');
+
+      store.addCountry('NAM');
+      fixture.detectChanges();
+
+      inFlight.flush(ENVELOPE, { status: 200, statusText: 'OK', headers: ALL_HEADERS });
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(statusPill()?.textContent?.trim()).toBe('Not sent');
+      expect(el().querySelector('.body')).toBeNull();
+    });
+
     it('drops the previous answer when the endpoint changes', async () => {
       sendable();
       await send((request) => request.flush(ENVELOPE));

@@ -256,50 +256,88 @@ and record what `meta.pageSize` comes back as. If it is capped, either page the
 export or word the refusal as the service's limit rather than ours.
 **Resolution:**
 
-### F-36 [P3] fixed - A newline in an attribution line or a vintage label breaks out of the CSV header comments
+### F-37 [P2] open - The curl's ETag line depends on a signal it does not read, through a bare statement
 
-**File:** ui/src/app/core/export/export-csv.ts:74
-**Found:** 2026-09-11 by /audit (scope: full; lens: security)
-**Why it matters:** Every data field goes through `csvField`, which quotes and
-now guards it. The header comment lines do not: `toCsv` interpolates
-`meta.attribution` straight into `` `${COMMENT}${line}` `` at `:74`, and
-`vintageHeader` at `:92` joins `vintage.label` the same way. Both strings come
-from the Core API.
+**File:** ui/src/app/request-builder/request-builder.ts:101
+**Found:** 2026-09-11 by /audit (scope: full; lens: quality)
+**Why it matters:** `heldEtag` opens with a bare `this.result();` whose only
+purpose is to register a dependency. It exists because
+`RequestSendService.held` is a plain field rather than a signal, so nothing in
+the computed would otherwise re-run when a send stores a new validator.
 
-A newline in either value ends the comment and starts a new physical line with
-no `# ` prefix, above the column header. A reader is then handed a line it
-cannot classify: too few columns to be a row, not marked as a comment, and
-positioned where the header is expected. A carriage return does the same. The
-file stops being well formed, and unlike F-34 no hostile intent is needed —
-a multi-line attribution string is an ordinary thing for an upstream to send.
+It works today only because `send()` assigns a freshly built object every time,
+so the `result` signal's identity always changes. Nothing enforces that. Add an
+`equal` comparator to the signal, or dedupe two identical `304` outcomes, and the
+`If-None-Match` line silently stops appearing — or worse, keeps showing a
+validator that has since been dropped. A statement evaluated purely for its
+effect on dependency tracking is the kind of line that survives a refactor and
+then quietly stops working, and the comment above it explains what it does
+without saying what breaks if it goes.
+**Suggested fix:** hold the validator in a signal inside `RequestSendService`.
+`heldEtag(endpoint, query)` then reads it, the card's computed tracks it for
+real, and the bare statement and its comment both disappear.
+**Resolution:**
 
-F-34 deliberately ruled these lines out of scope, and correctly, on the grounds
-that a `# ` prefix means they can never begin with a formula character. That
-reasoning holds for formula injection and says nothing about line injection,
-which is a different failure of the same untrusted text.
-**Suggested fix:** strip or replace CR and LF in every value interpolated into a
-comment line, in one small helper beside `csvField` so both the attribution loop
-and `vintageHeader` use it. Collapsing them to a space keeps the text readable
-and cannot break the line structure.
-**Resolution:** Fixed on 2026-09-11 as suggested. `commentSafe` at
-`export-csv.ts:115` collapses any run of CR and LF to one space and trims the
-ends, applied to each attribution entry, to each `vintage.label` inside
-`vintageHeader`, and to the stamp. The stamp does not need it — it is sliced to
-ten characters first — and goes through anyway so no reader has to work out which
-of the three is the exception.
+### F-38 [P2] fixed - The Response card keeps describing a request the URL block no longer shows
 
-Collapsed rather than stripped: a line wrapped mid-sentence would otherwise read
-as `IMFWorld Economic Outlook`.
+**File:** ui/src/app/request-builder/request-builder.ts:76
+**Found:** 2026-09-11 by /audit (scope: full; lens: quality)
+**Why it matters:** `selectEndpoint` clears `result` and `copied`, with the
+comment "the previous answer described a different request". That reasoning is
+right and is applied to only half the ways a request changes: the working-query
+card sits directly above on the same page, so editing an indicator, a country or
+a year changes the URL, the curl and the request key while the Response card goes
+on showing the previous status, its three headers and its body.
 
-Eight specs. Two of them exist to stop the helper being over-applied: an ordinary
-attribution line must be byte-for-byte unchanged, and a newline inside a *data*
-field must still be quoted and preserved, because RFC 4180 handles that case
-correctly and the comment lines are the only place with no such mechanism.
+The result is two regions of one screen answering different questions with no
+cue: the URL reads one query, the response beneath it answered another. On the
+export card the same staleness is unreachable because the query is edited on a
+different tab and the component is destroyed in between; here both live on one
+screen. `copied` has the same gap — "curl copied." can outlive the curl it
+described.
 
-Probed by reverting `commentSafe` to the identity function, which failed six
-specs including the header-position case this finding is actually about, and left
-those same two passing — the split the probe was designed to show. Restored and
-re-run green at 604.
+This is the family F-13, F-16, F-21 and F-29 belong to: an answer outliving the
+question. It is the first instance where the question is editable in the same
+viewport.
+**Suggested fix:** clear `result` and `copied` when the request key changes, not
+only when the endpoint does. An `effect` on `proxyUrl()` covers both causes in
+one place, and `selectEndpoint`'s two manual resets can then go.
+**Resolution:** Fixed on 2026-09-11 as suggested. `clearOnRequestChange` reads
+`proxyUrl()` and clears both signals; `selectEndpoint` is reduced to a single
+`set`, its early return removed because signals compare with `Object.is` and
+re-selecting the current endpoint notifies nothing.
 
-Not covered: the defect in the wild. It needs an upstream returning a multi-line
-attribution string, and the live service returns single-line values.
+The larger half was the window the effect opens. Without a guard the sequence is:
+edit the query mid-flight, the effect clears the card, the await resolves, and the
+old query's answer is written straight back into a card whose URL now shows a
+different request — the same defect, re-entered through the repair. `send` now
+captures `proxyUrl()` before awaiting and assigns only when it still matches, the
+shape `result-state.ts` uses for `asked`.
+
+Five specs, using `HttpTestingController` to hold a request open so that window is
+real. Probed by removing the comparison, which failed exactly the late-answer case
+and left the other four passing. Restored and re-run green at 658.
+
+Not covered: F-37 and F-39, both in this file and both still open. The effect sits
+next to `heldEtag`'s phantom `this.result()` dependency without touching it.
+
+### F-39 [P3] open - A held validator outlives the card that could explain it
+
+**File:** ui/src/app/core/request/request-send.service.ts:56
+**Found:** 2026-09-11 by /audit (scope: full; lens: quality)
+**Why it matters:** `RequestSendService` is `providedIn: 'root'` and the page is
+not, so navigating away from the request builder and back destroys the component
+while the held `{ requestKey, etag }` survives. The status pill then reads
+`Not sent` — correct, this component has sent nothing — while the curl beneath it
+carries an `If-None-Match` line, which only exists because something *was* sent.
+A reader has no way to tell where that validator came from.
+
+Defensible as designed: the validator genuinely is still current, and sending it
+is what produces the `304` the tab teaches. That is why this is P3 rather than a
+correctness bug. But the two regions disagree about whether a request has
+happened, and nothing on screen reconciles them.
+**Suggested fix:** either note beside the curl that the validator came from an
+earlier send in this session, or clear the hold when the page is destroyed. The
+first keeps the `304` demonstration working across a tab change; the second is
+simpler and gives it up.
+**Resolution:**

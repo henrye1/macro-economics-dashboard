@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 
 import { REQUEST_CLIPBOARD } from '../core/request/request-clipboard';
 import { RequestSendService, type SendResult } from '../core/request/request-send.service';
@@ -69,14 +69,10 @@ export class RequestBuilderPage {
   protected readonly copied = signal<string | null>(null);
 
   protected selectEndpoint(spec: RequestEndpointSpec): void {
-    if (this.endpoint() === spec.endpoint) {
-      return;
-    }
-
+    // Setting the same value does not notify — signals compare with `Object.is`
+    // — so re-selecting the current endpoint leaves a settled answer alone
+    // without needing a guard here.
     this.endpoint.set(spec.endpoint);
-    // The previous answer described a different request.
-    this.result.set(null);
-    this.copied.set(null);
   }
 
   protected isSelected(spec: RequestEndpointSpec): boolean {
@@ -95,6 +91,20 @@ export class RequestBuilderPage {
 
   protected readonly consumerUrl = computed(() => consumerUrl(this.endpoint(), this.query()));
   protected readonly proxyUrl = computed(() => proxyUrl(this.endpoint(), this.query()));
+
+  /**
+   * The previous answer described a different request, so it goes.
+   *
+   * Keyed on the URL rather than the endpoint because the URL *is* the request:
+   * the working-query card sits directly above on this page, so an indicator, a
+   * country or a year moves it just as surely as the endpoint select does. The
+   * copy confirmation goes with it, since the curl it named has changed too.
+   */
+  private readonly clearOnRequestChange = effect(() => {
+    this.proxyUrl();
+    this.result.set(null);
+    this.copied.set(null);
+  });
 
   /** The validator that would ride along, or null when none belongs to this request. */
   protected readonly heldEtag = computed(() => {
@@ -119,7 +129,18 @@ export class RequestBuilderPage {
     }
 
     this.copied.set(null);
-    this.result.set(await this.sender.send(this.endpoint(), this.query()));
+
+    // The in-flight window. Editing the query while this is out there fires the
+    // effect above, which clears the card — and then this line would put the old
+    // query's answer straight back, into a card whose URL block now shows a
+    // different request. Captured before the await, compared after, exactly as
+    // `result-state.ts` captures the query it asked for.
+    const asked = this.proxyUrl();
+    const outcome = await this.sender.send(this.endpoint(), this.query());
+
+    if (this.proxyUrl() === asked) {
+      this.result.set(outcome);
+    }
   }
 
   protected readonly sent = computed(() => this.result() !== null);
