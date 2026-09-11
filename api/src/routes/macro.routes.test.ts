@@ -310,12 +310,23 @@ describe('/api/macro', () => {
     });
   });
 
-  it('runs with no injected deps at all, on the real configuration', async () => {
-    // Exercises the production wiring: the real config has no credentials in
-    // this repository, so the macro routes must say so and health must not care.
-    const request = await serve();
+  it('answers 503 on the macro routes when no credentials are configured', async () => {
+    // Injected, not ambient. This used to read the real config and assert that
+    // "the real config has no credentials in this repository", which stopped
+    // being true once `api/.env` was populated for feature 8: the route then
+    // relayed a live authenticated request and returned 200, so the suite went
+    // red and made an Auth0 grant plus an upstream read on every run.
+    const request = await serve({ macroConfigured: false });
 
     expect((await request('/api/macro/countries')).status).toBe(503);
+  });
+
+  it('boots on the real configuration and serves health', async () => {
+    // Still zero injection, which is the part worth smoke-testing: the
+    // production wiring constructs. Only `/api/health` is asserted, because it
+    // is the one route that reaches no upstream either way.
+    const request = await serve();
+
     expect((await request('/api/health')).status).toBe(200);
   });
 

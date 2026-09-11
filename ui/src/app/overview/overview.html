@@ -31,7 +31,7 @@
 
       <section class="card stats-card">
         @if (unavailable()) {
-          <p class="stats-unavailable">Counts unavailable</p>
+          <p class="stats-unavailable" role="status">{{ unavailableMessage() }}</p>
         } @else {
           <dl class="stats" [attr.aria-busy]="loading()">
             <div class="stat">

@@ -35,7 +35,7 @@ export const FIXTURE_VINTAGES: readonly Vintage[] = [
     label: 'WEO 10.0.0 2026-04-14',
     source: 'IMF_WEO',
     sourceVersion: '2026-04',
-    retrievedAtUtc: '2026-04-16T02:14:07Z',
+    retrievedAtUtc: '2026-04-16T02:14:07.5083586',
     isLatest: true,
   },
   {
@@ -43,7 +43,7 @@ export const FIXTURE_VINTAGES: readonly Vintage[] = [
     label: 'WDI 2026-03-27',
     source: 'WB_WDI',
     sourceVersion: '2026-03-27',
-    retrievedAtUtc: '2026-03-29T02:11:52Z',
+    retrievedAtUtc: '2026-03-29T02:11:52.4471203',
     isLatest: true,
   },
   {
@@ -51,7 +51,7 @@ export const FIXTURE_VINTAGES: readonly Vintage[] = [
     label: 'WEO 9.0.0 2025-10-08',
     source: 'IMF_WEO',
     sourceVersion: '2025-10',
-    retrievedAtUtc: '2025-10-09T02:12:44Z',
+    retrievedAtUtc: '2025-10-09T02:12:44.1180922',
     isLatest: false,
   },
   {
@@ -59,7 +59,7 @@ export const FIXTURE_VINTAGES: readonly Vintage[] = [
     label: 'WDI 2025-09-19',
     source: 'WB_WDI',
     sourceVersion: '2025-09-19',
-    retrievedAtUtc: '2025-09-21T02:10:38Z',
+    retrievedAtUtc: '2025-09-21T02:10:38.9052614',
     isLatest: false,
   },
   {
@@ -67,7 +67,7 @@ export const FIXTURE_VINTAGES: readonly Vintage[] = [
     label: 'WEO 8.0.0 2025-04-15',
     source: 'IMF_WEO',
     sourceVersion: '2025-04',
-    retrievedAtUtc: '2025-04-17T02:13:19Z',
+    retrievedAtUtc: '2025-04-17T02:13:19.3341097',
     isLatest: false,
   },
 ];

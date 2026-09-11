@@ -9,7 +9,7 @@
     } @else if (invalid()) {
       <span class="meta" role="status">Fix the query above to see series.</span>
     } @else if (unavailable()) {
-      <span class="meta" role="status">Series are unavailable.</span>
+      <span class="meta" role="status">{{ unavailableMessage() }}</span>
     } @else if (empty()) {
       <span class="meta" role="status">
         No series — the query was valid, the source just does not report this combination

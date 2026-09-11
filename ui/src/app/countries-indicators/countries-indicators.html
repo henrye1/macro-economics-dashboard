@@ -22,9 +22,7 @@
     @if (countriesLoading()) {
       <p class="state" role="status">Loading countries…</p>
     } @else if (countriesUnavailable()) {
-      <p class="state" role="status">
-        The country list is unavailable. The indicator catalogue is unaffected.
-      </p>
+      <p class="state" role="status">{{ countriesUnavailableMessage() }}</p>
     } @else if (countries().length === 0) {
       <p class="state" role="status">No country matches that search.</p>
     } @else {
@@ -96,9 +94,7 @@
     @if (catalogueLoading()) {
       <p class="state" role="status">Loading the catalogue…</p>
     } @else if (catalogueUnavailable()) {
-      <p class="state" role="status">
-        The indicator catalogue is unavailable. The country list is unaffected.
-      </p>
+      <p class="state" role="status">{{ catalogueUnavailableMessage() }}</p>
     } @else if (indicators().length === 0) {
       <p class="state" role="status">
         @if (filtered()) {

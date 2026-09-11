@@ -9,7 +9,7 @@
     } @else if (invalid()) {
       <span class="meta" role="status">Fix the query above to see rows.</span>
     } @else if (unavailable()) {
-      <span class="meta" role="status">Observations are unavailable.</span>
+      <span class="meta" role="status">{{ unavailableMessage() }}</span>
     } @else if (empty()) {
       <span class="meta" role="status">
         No rows — the query was valid, the source just does not report this combination

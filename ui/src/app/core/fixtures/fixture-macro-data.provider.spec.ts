@@ -1,10 +1,12 @@
-import { firstValueFrom } from 'rxjs';
+import { type Observable, firstValueFrom } from 'rxjs';
 
+import type { Envelope } from '../macro-contracts';
 import {
   FIXTURE_ATTRIBUTION,
   FIXTURE_COUNTRIES,
   FIXTURE_INDICATORS,
-  FIXTURE_VINTAGES
+  FIXTURE_VINTAGES,
+  FIXTURE_VINTAGE_REFS
 } from './macro-fixtures';
 import {
   FixtureMacroDataProvider,
@@ -26,13 +28,19 @@ describe('FixtureMacroDataProvider', () => {
     const envelope = await firstValueFrom(provider.countries());
 
     expect(envelope.data.length).toBe(FIXTURE_COUNTRIES.length);
-    expect(envelope.meta.page).toBe(1);
+    // `page` is null on this route, not 1: reconciled against the live service
+    // at feature 8, where `/countries` is unpaginated. Per-route meta has its
+    // own describe block below.
+    expect(envelope.meta.page).toBeNull();
     expect(envelope.meta.totalCount).toBe(FIXTURE_COUNTRIES.length);
     expect(envelope.meta.attribution).toEqual([...FIXTURE_ATTRIBUTION]);
   });
 
   it('reports the latest vintage per source in meta.vintages', async () => {
-    const envelope = await firstValueFrom(provider.vintages());
+    // Asked of `/countries`, not `/vintages`. The vintages route reports no
+    // provenance of its own, because its result IS the vintage list; the
+    // country list is genuinely derived from both latest vintages.
+    const envelope = await firstValueFrom(provider.countries());
     const refs = envelope.meta.vintages;
 
     expect(refs.length).toBe(2);
@@ -528,5 +536,111 @@ describe('FixtureMacroDataProvider series paging', () => {
     expect(envelope.meta.totalCount).toBe(0);
     expect(envelope.meta.vintages).toEqual([]);
     expect(envelope.meta.attribution.length).toBe(2);
+  });
+});
+
+/**
+ * Feature 8 (F-09, F-12): the double must model the meta shape the live service
+ * actually sends, per route.
+ *
+ * This is the divergence that hid the header-strip bug: every fixture-backed
+ * spec passed while the real `/vintages` answered `meta.vintages: []` and the
+ * strip rendered blank. `blueprint/context/current-feature.md` commits features
+ * 9 to 13 to this double, so a wrong shape here is a trap they inherit.
+ */
+describe('FixtureMacroDataProvider observed meta shape', () => {
+  let provider: FixtureMacroDataProvider;
+
+  beforeEach(() => {
+    provider = new FixtureMacroDataProvider();
+  });
+
+  function metaOf<T>(source: Observable<Envelope<T>>): Envelope<T>['meta'] {
+    let meta: Envelope<T>['meta'] | undefined;
+    source.subscribe((envelope) => {
+      meta = envelope.meta;
+    });
+    if (meta === undefined) {
+      throw new Error('the fixture provider did not emit synchronously');
+    }
+    return meta;
+  }
+
+  it('reports /countries as unpaginated but vintage-derived', () => {
+    const meta = metaOf(provider.countries());
+
+    expect(meta.page).toBeNull();
+    expect(meta.pageSize).toBeNull();
+    expect(meta.totalCount).toBe(FIXTURE_COUNTRIES.length);
+    // The country list IS derived from both latest vintages, so unlike
+    // /vintages it does report provenance.
+    expect(meta.vintages.length).toBeGreaterThan(0);
+  });
+
+  it('reports /vintages as unpaginated with no provenance of its own', () => {
+    const meta = metaOf(provider.vintages());
+
+    expect(meta.page).toBeNull();
+    expect(meta.pageSize).toBeNull();
+    // This route's result IS the vintage list; `meta.vintages` is empty.
+    expect(meta.vintages).toEqual([]);
+  });
+
+  it('reports /indicators as paginated with no provenance', () => {
+    const meta = metaOf(provider.indicators());
+
+    expect(meta.page).toBe(1);
+    expect(typeof meta.pageSize).toBe('number');
+    // The catalogue is not vintage-derived.
+    expect(meta.vintages).toEqual([]);
+  });
+
+  it('keeps /observations and /series paginated with real provenance', () => {
+    for (const meta of [
+      metaOf(provider.observations({ indicators: ['GDP_GROWTH_REAL'] })),
+      metaOf(provider.series({ indicators: ['GDP_GROWTH_REAL'] }))
+    ]) {
+      expect(typeof meta.page).toBe('number');
+      expect(typeof meta.pageSize).toBe('number');
+      expect(meta.vintages.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('reports only the asked-about vintage as the provenance of its revisions', () => {
+    const latest = FIXTURE_VINTAGE_REFS[0];
+    const meta = metaOf(provider.revisions(latest.id));
+
+    expect(meta.vintages.map((ref) => ref.id)).toEqual([latest.id]);
+  });
+
+  it('reports a superseded vintage too, which is every real revisions query', () => {
+    // The live probe behind this reconciliation was `/vintages/12/revisions`.
+    // Resolving only the latest refs reported nothing for exactly the inputs
+    // this route exists to serve.
+    const historical = FIXTURE_VINTAGES.find((vintage) => !vintage.isLatest);
+    if (historical === undefined) {
+      throw new Error('fixtures carry no superseded vintage to test with');
+    }
+
+    const meta = metaOf(provider.revisions(historical.id));
+
+    expect(meta.vintages.map((ref) => ref.id)).toEqual([historical.id]);
+    expect(meta.vintages[0].label).toBe(historical.label);
+  });
+
+  it('emits no provenance for a vintage id that does not exist', () => {
+    const meta = metaOf(provider.revisions(-1));
+
+    expect(meta.vintages).toEqual([]);
+  });
+
+  it('carries retrievedAtUtc in the observed wire format, with no zone designator', () => {
+    // Observed live: "2026-09-08T01:00:31.5083586". A `Z` here would let a
+    // consumer parse it correctly in tests and wrongly in production.
+    for (const vintage of FIXTURE_VINTAGES) {
+      expect(vintage.retrievedAtUtc)
+        .withContext(`vintage ${vintage.id}`)
+        .toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+$/);
+    }
   });
 });

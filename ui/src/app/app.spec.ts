@@ -1,8 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
-import { Observable, throwError } from 'rxjs';
+import { Observable, of, throwError } from 'rxjs';
 
 import { App } from './app';
+import { MacroRequestError } from './core/http/macro-error';
 import { routes } from './app.routes';
 import { FixtureMacroDataProvider } from './core/fixtures/fixture-macro-data.provider';
 import { FIXTURE_ATTRIBUTION } from './core/fixtures/macro-fixtures';
@@ -200,9 +201,12 @@ describe('App shell', () => {
 
     it('shows the vintage strip as unavailable instead of breaking the shell', () => {
       const element = shell(fixture);
+      const strip = element.querySelector('.vintage-strip .value');
 
-      expect(element.querySelector('.vintage-strip .value')?.textContent?.trim())
-        .toBe('Unavailable');
+      expect(strip?.textContent?.trim()).toBe('Unavailable');
+      // F-10: the strip is an error slot like the other five, so it announces
+      // itself. It was the only one without a role.
+      expect(strip?.getAttribute('role')).toBe('status');
     });
 
     it('keeps navigation usable', async () => {
@@ -226,5 +230,124 @@ describe('App shell', () => {
     const provider: MacroDataProvider = TestBed.inject(MACRO_DATA);
 
     expect(provider).toBeInstanceOf(FixtureMacroDataProvider);
+  });
+});
+
+/**
+ * Feature 8: the service's own explanation reaches the header strip.
+ *
+ * The no-detail fallback is already covered above by `FailingMacroDataProvider`,
+ * which throws a plain `Error` and still renders "Unavailable".
+ */
+describe('App shell when the service explains the failure', () => {
+  class ExplainingProvider extends FixtureMacroDataProvider {
+    override vintages(): Observable<Envelope<Vintage>> {
+      return throwError(() => new MacroRequestError(400, 'Unknown indicator code(s): NOPE.'));
+    }
+  }
+
+  class SilentProvider extends FixtureMacroDataProvider {
+    override vintages(): Observable<Envelope<Vintage>> {
+      return throwError(() => new MacroRequestError(500, null));
+    }
+  }
+
+  async function stripFor(provider: unknown): Promise<Element | null> {
+    await TestBed.configureTestingModule({
+      imports: [App],
+      providers: [provideRouter(routes), { provide: MACRO_DATA, useValue: provider }]
+    }).compileComponents();
+
+    return shell(TestBed.createComponent(App)).querySelector('.vintage-strip .value');
+  }
+
+  it('shows the problem detail instead of the generic wording', async () => {
+    const strip = await stripFor(new ExplainingProvider());
+
+    expect(strip?.textContent?.trim()).toBe('Unknown indicator code(s): NOPE.');
+  });
+
+  it('falls back to the generic wording when the error carries no detail', async () => {
+    const strip = await stripFor(new SilentProvider());
+
+    expect(strip?.textContent?.trim()).toBe('Unavailable');
+  });
+});
+
+/**
+ * Feature 8 regression: the live `/vintages` route answers `meta.vintages: []`,
+ * because that array reports the provenance of a result and this route's result
+ * IS the vintage list. Reading `meta` here left the header strip blank against
+ * the real service while every fixture-backed spec still passed.
+ */
+describe('App shell vintage strip against the live envelope shape', () => {
+  class LiveShapeProvider extends FixtureMacroDataProvider {
+    override vintages(): Observable<Envelope<Vintage>> {
+      return of({
+        data: [
+          {
+            id: 12,
+            source: 'WB_WDI',
+            label: 'WDI 2026-07-13 #11',
+            sourceVersion: '2026-07-13',
+            retrievedAtUtc: '2026-09-08T01:00:31.5083586',
+            isLatest: true
+          },
+          {
+            id: 11,
+            source: 'WB_WDI',
+            label: 'WDI 2026-07-13 #10',
+            sourceVersion: '2026-07-13',
+            retrievedAtUtc: '2026-09-07T01:00:31.5083586',
+            isLatest: false
+          },
+          {
+            id: 2,
+            source: 'IMF_WEO',
+            label: 'WEO 9.0.0 2026-07-31',
+            sourceVersion: '9.0.0',
+            retrievedAtUtc: '2026-08-01T01:00:31.5083586',
+            isLatest: true
+          }
+        ],
+        meta: {
+          // Exactly as observed: nullable paging and an empty vintages array.
+          page: null,
+          pageSize: null,
+          totalCount: 3,
+          vintages: [],
+          attribution: ['Source: IMF World Economic Outlook database']
+        }
+      } satisfies Envelope<Vintage>);
+    }
+  }
+
+  it('lists the isLatest labels from data even though meta.vintages is empty', async () => {
+    await TestBed.configureTestingModule({
+      imports: [App],
+      providers: [provideRouter(routes), { provide: MACRO_DATA, useClass: LiveShapeProvider }]
+    }).compileComponents();
+
+    const strip = shell(TestBed.createComponent(App)).querySelector('.vintage-strip .value');
+    const text = strip?.textContent?.trim() ?? '';
+
+    expect(text).toContain('WDI 2026-07-13 #11');
+    expect(text).toContain('WEO 9.0.0 2026-07-31');
+    // Superseded vintages are not "latest".
+    expect(text).not.toContain('#10');
+  });
+
+  it('still renders the attribution footer from meta', async () => {
+    await TestBed.configureTestingModule({
+      imports: [App],
+      providers: [provideRouter(routes), { provide: MACRO_DATA, useClass: LiveShapeProvider }]
+    }).compileComponents();
+
+    const footer = shell(TestBed.createComponent(App)).querySelector('.attribution');
+    const lines = Array.from(footer?.querySelectorAll('div') ?? []).map(
+      (line) => line.textContent?.trim() ?? ''
+    );
+
+    expect(lines).toContain('Source: IMF World Economic Outlook database');
   });
 });

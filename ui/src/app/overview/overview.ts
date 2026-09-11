@@ -3,6 +3,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { catchError, combineLatest, map, of } from 'rxjs';
 
+import { macroErrorMessage } from '../core/http/macro-error';
 import { MACRO_DATA } from '../core/macro-data.provider';
 
 interface Counts {
@@ -11,7 +12,12 @@ interface Counts {
   vintages: number;
 }
 
-type CountsState = { status: 'ready'; counts: Counts } | { status: 'unavailable' };
+type CountsState =
+  | { status: 'ready'; counts: Counts }
+  | { status: 'unavailable'; message: string };
+
+/** Shown when the service failed without explaining itself. */
+const COUNTS_UNAVAILABLE = 'Counts unavailable';
 
 @Component({
   selector: 'app-overview',
@@ -45,13 +51,28 @@ export class OverviewPage {
           vintages: vintages.meta.totalCount
         }
       })),
-      catchError(() => of<CountsState>({ status: 'unavailable' }))
+      catchError((error: unknown) =>
+        of<CountsState>({
+          status: 'unavailable',
+          message: macroErrorMessage(error, COUNTS_UNAVAILABLE)
+        })
+      )
     ),
     { initialValue: null }
   );
 
   protected readonly loading = computed(() => this.state() === null);
   protected readonly unavailable = computed(() => this.state()?.status === 'unavailable');
+
+  /**
+   * Any one of the three requests failing puts the card in this state, so the
+   * detail shown is the first failure's explanation. `combineLatest` errors on
+   * the first error, which is the one worth reporting.
+   */
+  protected readonly unavailableMessage = computed(() => {
+    const state = this.state();
+    return state?.status === 'unavailable' ? state.message : COUNTS_UNAVAILABLE;
+  });
 
   protected readonly counts = computed(() => {
     const state = this.state();

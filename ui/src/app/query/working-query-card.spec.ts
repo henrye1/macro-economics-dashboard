@@ -3,6 +3,7 @@ import { Observable, throwError } from 'rxjs';
 
 import { FixtureMacroDataProvider } from '../core/fixtures/fixture-macro-data.provider';
 import type { Country, Envelope } from '../core/macro-contracts';
+import { MacroRequestError } from '../core/http/macro-error';
 import { MACRO_DATA } from '../core/macro-data.provider';
 import { DEFAULT_WORKING_QUERY } from '../core/working-query';
 import { WorkingQueryStore } from '../core/working-query.store';
@@ -319,5 +320,39 @@ describe('WorkingQueryCard result summary', () => {
     fixture.detectChanges();
 
     expect(summary()).toBe('1 indicator × 1 country · 2018–2031 · 56 observations');
+  });
+});
+
+/** Feature 8: the service's own explanation reaches the options notice. */
+describe('WorkingQueryCard when the service explains the failure', () => {
+  class ExplainingProvider extends FixtureMacroDataProvider {
+    override countries(): Observable<Envelope<Country>> {
+      return throwError(() => new MacroRequestError(400, 'Unknown indicator code(s): NOPE.'));
+    }
+  }
+
+  class SilentProvider extends FixtureMacroDataProvider {
+    override countries(): Observable<Envelope<Country>> {
+      return throwError(() => new MacroRequestError(0, null));
+    }
+  }
+
+  function notice(provider: FixtureMacroDataProvider): Element | null {
+    const { fixture } = build(provider);
+    fixture.detectChanges();
+    return (fixture.nativeElement as HTMLElement).querySelector('.options-unavailable');
+  }
+
+  it('shows the problem detail instead of the generic wording', () => {
+    const element = notice(new ExplainingProvider());
+
+    expect(element?.textContent?.trim()).toBe('Unknown indicator code(s): NOPE.');
+    expect(element?.getAttribute('role')).toBe('status');
+  });
+
+  it('falls back to the generic wording when the error carries no detail', () => {
+    expect(notice(new SilentProvider())?.textContent?.trim()).toBe(
+      'Indicator, country and vintage lists are unavailable. The query below is still editable.'
+    );
   });
 });

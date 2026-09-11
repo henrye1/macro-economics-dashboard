@@ -3,6 +3,7 @@ import { Observable, throwError } from 'rxjs';
 
 import { FixtureMacroDataProvider } from '../core/fixtures/fixture-macro-data.provider';
 import type { Envelope, Series } from '../core/macro-contracts';
+import { MacroRequestError } from '../core/http/macro-error';
 import { MACRO_DATA, type MacroDataProvider } from '../core/macro-data.provider';
 import { WorkingQueryStore } from '../core/working-query.store';
 import { SeriesPage } from './series';
@@ -335,5 +336,199 @@ describe('SeriesPage query summary', () => {
     fixture.detectChanges();
 
     expect(summary()).toBe('0 indicators × 0 countries');
+  });
+});
+
+/** Feature 8: the service's own explanation reaches the series head. */
+describe('SeriesPage when the service explains the failure', () => {
+  class ExplainingSeries extends FixtureMacroDataProvider {
+    override series(): Observable<Envelope<Series>> {
+      return throwError(() => new MacroRequestError(400, 'Unknown indicator code(s): NOPE.'));
+    }
+  }
+
+  class SilentSeries extends FixtureMacroDataProvider {
+    override series(): Observable<Envelope<Series>> {
+      return throwError(() => new MacroRequestError(500, null));
+    }
+  }
+
+  function headMetaFor(provider: FixtureMacroDataProvider): Element | null {
+    TestBed.configureTestingModule({
+      imports: [SeriesPage],
+      providers: [{ provide: MACRO_DATA, useValue: provider }]
+    });
+    const store = TestBed.inject(WorkingQueryStore);
+    store.reset();
+    // A sendable query, or the page reports `invalid` and never reaches the
+    // request at all.
+    store.addIndicator('GDP_GROWTH_REAL');
+    store.addCountry('ZAF');
+    const fixture = TestBed.createComponent(SeriesPage);
+    fixture.detectChanges();
+
+    return (fixture.nativeElement as HTMLElement).querySelector('.series-head .card-head .meta');
+  }
+
+  afterEach(() => TestBed.resetTestingModule());
+
+  it('shows the problem detail instead of the generic wording', () => {
+    const element = headMetaFor(new ExplainingSeries());
+
+    expect(element?.textContent?.trim()).toBe('Unknown indicator code(s): NOPE.');
+    expect(element?.getAttribute('role')).toBe('status');
+  });
+
+  it('falls back to the generic wording when the error carries no detail', () => {
+    const element = headMetaFor(new SilentSeries());
+
+    expect(element?.textContent?.trim()).toBe('Series are unavailable.');
+    expect(element?.getAttribute('role')).toBe('status');
+  });
+});
+
+/**
+ * Feature 8 (F-11): `loading` must track the in-flight request, not only the
+ * first one.
+ *
+ * This needs an asynchronous double. Under `FixtureMacroDataProvider` the
+ * window is zero, because `of()` resolves synchronously, which is exactly why
+ * no earlier spec caught it and why the header could keep asserting a previous
+ * result for a whole round trip once requests became real.
+ */
+describe('SeriesPage loading state across a re-query', () => {
+  class DeferredProvider extends FixtureMacroDataProvider {
+    /** Resolves the pending request with the fixture answer. */
+    release: (() => void) | null = null;
+    calls = 0;
+
+    override series(
+      ...args: Parameters<MacroDataProvider['series']>
+    ): Observable<Envelope<Series>> {
+      this.calls += 1;
+      const answer = super.series(...args);
+
+      return new Observable<Envelope<Series>>((subscriber) => {
+        this.release = () => {
+          answer.subscribe((value) => {
+            subscriber.next(value);
+            subscriber.complete();
+          });
+        };
+      });
+    }
+  }
+
+  let fixture: ComponentFixture<SeriesPage>;
+  let store: WorkingQueryStore;
+  let provider: DeferredProvider;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [SeriesPage],
+      providers: [{ provide: MACRO_DATA, useValue: (provider = new DeferredProvider()) }]
+    });
+
+    store = TestBed.inject(WorkingQueryStore);
+    store.reset();
+    store.addIndicator('GDP_GROWTH_REAL');
+    store.addCountry('ZAF');
+    fixture = TestBed.createComponent(SeriesPage);
+  });
+
+  afterEach(() => TestBed.resetTestingModule());
+
+  const head = () =>
+    (fixture.nativeElement as HTMLElement)
+      .querySelector('.series-head .card-head .meta')
+      ?.textContent?.trim() ?? '';
+
+  it('reports loading while the first request is in flight', () => {
+    fixture.detectChanges();
+
+    expect(head()).toBe('Loading series…');
+  });
+
+  it('returns to loading on a re-query instead of holding the previous result', () => {
+    fixture.detectChanges();
+    provider.release?.();
+    fixture.detectChanges();
+
+    // The first answer has landed.
+    const settled = head();
+    expect(settled).not.toBe('Loading series…');
+    expect(provider.calls).toBe(1);
+
+    // A paging click issues a second request. Before F-11 the head kept
+    // asserting `settled`, describing a query that was no longer on screen.
+    store.setPage(2);
+    fixture.detectChanges();
+
+    expect(provider.calls).toBe(2);
+    expect(head()).toBe('Loading series…');
+  });
+
+
+  const strip = () =>
+    (fixture.nativeElement as HTMLElement)
+      .querySelector('.paging-state')
+      ?.textContent?.replace(/\s+/g, ' ')
+      .trim() ?? '';
+
+  const prevButton = () =>
+    (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
+      'button[aria-label="Previous page"]'
+    );
+
+  it('keeps reporting the asked-for page and a real count while a re-query is in flight', () => {
+    // F-13: `page` fell back to a literal 1 and `pageCount` collapsed to 1
+    // whenever no result was settled, so a click from page 1 to page 2 made the
+    // footer read "Page 1 of 1" with both controls disabled for the whole round
+    // trip, then snap to the truth. It stated a page that was never asked for
+    // and a count that was never true.
+    fixture.detectChanges();
+    provider.release?.();
+    fixture.detectChanges();
+
+    const settled = strip();
+    expect(settled).toContain('Page 1 of');
+    // The fixtures group into 4 series, under one page of 25, so unlike the
+    // observations tab the page *count* cannot be exercised here. The page
+    // *number* is the half of F-13 this tab can prove.
+    const settledCount = settled.replace(/^Page \d+ of (\d+).*$/, '$1');
+
+    store.setPage(2);
+    fixture.detectChanges();
+
+    const loading = strip();
+    // The page the user asked for, not a literal 1.
+    expect(loading).toContain('Page 2 of');
+    // The count last known to be real, carried rather than collapsed.
+    expect(loading).toContain('of ' + settledCount);
+  });
+
+  it('leaves Prev reachable while a re-query is in flight', () => {
+    // Both controls were disabled by accident: PagingFooter derives them from
+    // page and pageCount, and both had collapsed to 1.
+    fixture.detectChanges();
+    provider.release?.();
+    fixture.detectChanges();
+
+    store.setPage(2);
+    fixture.detectChanges();
+
+    expect(prevButton()?.disabled).toBeFalse();
+  });
+
+  it('shows no series cards while a re-query is in flight', () => {
+    fixture.detectChanges();
+    provider.release?.();
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).querySelectorAll('.series-card').length).toBeGreaterThan(0);
+
+    store.setPage(2);
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).querySelectorAll('.series-card').length).toBe(0);
   });
 });

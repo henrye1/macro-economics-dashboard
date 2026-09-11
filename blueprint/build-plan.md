@@ -18,7 +18,7 @@
   `lastActualYear` boundary made visible
 - [x] 7. **Macro API service** - Express passthrough for the five read routes with
   server-side Auth0 token caching and retry
-- [ ] 8. **Live data wiring** - swap the fixture provider for the real service, including
+- [x] 8. **Live data wiring** - swap the fixture provider for the real service, including
   ETag passthrough and RFC 7807 error handling
 - [ ] 9. **Vintages & revisions** - published vintage list and the change view against the
   preceding vintage

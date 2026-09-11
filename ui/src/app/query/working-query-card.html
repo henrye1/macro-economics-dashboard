@@ -5,9 +5,7 @@
   </div>
 
   @if (optionsUnavailable()) {
-    <p class="options-unavailable" role="status">
-      Indicator, country and vintage lists are unavailable. The query below is still editable.
-    </p>
+    <p class="options-unavailable" role="status">{{ optionsUnavailableMessage() }}</p>
   }
 
   <div class="query-row">

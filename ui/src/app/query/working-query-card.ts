@@ -2,6 +2,7 @@ import { Component, computed, inject, input } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { catchError, combineLatest, map, of } from 'rxjs';
 
+import { macroErrorMessage } from '../core/http/macro-error';
 import type { ForecastFilter, SourceFilter } from '../core/macro-contracts';
 import { MACRO_DATA } from '../core/macro-data.provider';
 import { WorkingQueryStore } from '../core/working-query.store';
@@ -12,7 +13,13 @@ interface Options {
   vintages: readonly { value: string; label: string }[];
 }
 
-type OptionsState = { status: 'ready'; options: Options } | { status: 'unavailable' };
+type OptionsState =
+  | { status: 'ready'; options: Options }
+  | { status: 'unavailable'; message: string };
+
+/** Shown when the option lists failed without the service explaining itself. */
+const OPTIONS_UNAVAILABLE =
+  'Indicator, country and vintage lists are unavailable. The query below is still editable.';
 
 const SOURCES: readonly SourceFilter[] = ['preferred', 'IMF_WEO', 'WB_WDI'];
 const FORECASTS: readonly ForecastFilter[] = ['all', 'actual', 'forecast'];
@@ -67,7 +74,12 @@ export class WorkingQueryCard {
           }))
         }
       })),
-      catchError(() => of<OptionsState>({ status: 'unavailable' }))
+      catchError((error: unknown) =>
+        of<OptionsState>({
+          status: 'unavailable',
+          message: macroErrorMessage(error, OPTIONS_UNAVAILABLE)
+        })
+      )
     ),
     { initialValue: null }
   );
@@ -76,6 +88,11 @@ export class WorkingQueryCard {
   protected readonly optionsUnavailable = computed(
     () => this.optionsState()?.status === 'unavailable'
   );
+
+  protected readonly optionsUnavailableMessage = computed(() => {
+    const state = this.optionsState();
+    return state?.status === 'unavailable' ? state.message : OPTIONS_UNAVAILABLE;
+  });
 
   /** Only codes not already chosen, so the add-select never offers a duplicate. */
   protected readonly indicatorOptions = computed(() => {

@@ -6,9 +6,9 @@
     <div class="vintage-strip">
       <div class="label">Latest vintages</div>
       @if (loading()) {
-        <div class="value muted">Loading&hellip;</div>
+        <div class="value muted" role="status">Loading&hellip;</div>
       } @else if (unavailable()) {
-        <div class="value muted">Unavailable</div>
+        <div class="value muted" role="status">{{ unavailableMessage() }}</div>
       } @else {
         <div class="value">{{ vintageLabels().join(' · ') }}</div>
       }

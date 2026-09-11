@@ -2,9 +2,12 @@
  * Types for the Core API `/api/macro` contract.
  *
  * Hand-written from CONSUMER-GUIDE.md for v1; feature 17 replaces them with
- * types generated from the Core API OpenAPI document. They must match the
- * service exactly, so check them against a real response when feature 8 wires
- * live data. Two shapes are called out inline as unconfirmed.
+ * types generated from the Core API OpenAPI document.
+ *
+ * Reconciled against the live service at feature 8. Four corrections came out
+ * of that: `meta.page` and `meta.pageSize` are nullable, `Series` carries
+ * `scale`, `Revision` has no `significant`, and `Vintage.source` is real. Each
+ * is annotated below with the response that justified it.
  */
 
 export type SourceCode = 'IMF_WEO' | 'WB_WDI';
@@ -24,8 +27,18 @@ export interface VintageRef {
 }
 
 export interface EnvelopeMeta {
-  page: number;
-  pageSize: number;
+  /**
+   * `null` on the routes that do not paginate.
+   *
+   * Observed at feature 8: `/countries` and `/vintages` answer
+   * `page: null, pageSize: null` and ignore a `pageSize` parameter entirely
+   * (`/countries?pageSize=2` returned all 214 rows). `/indicators`,
+   * `/observations`, `/series` and `/vintages/{id}/revisions` all return real
+   * numbers. `totalCount` is always a number, which is why the counts on the
+   * overview read it and never `page`.
+   */
+  page: number | null;
+  pageSize: number | null;
   totalCount: number;
   /** Record these ids alongside any result that must be reproducible. */
   vintages: VintageRef[];
@@ -88,6 +101,8 @@ export interface Series {
   indicator: string;
   name: string;
   unit: string;
+  /** Observed at feature 8: `/series` returns this alongside `unit`. */
+  scale: string | null;
   country: string;
   source: SourceCode;
   /** Vintage label, not the id. `meta.vintages[].id` carries the id. */
@@ -101,13 +116,17 @@ export interface Vintage {
   id: number;
   label: string;
   /**
-   * `source` is not in the consumer guide's field list for this route, but the
-   * design at blueprint/references/5-vintages-and-revisions.png shows a Source
-   * column, and `/vintages?source=` filters by it. Confirm at feature 8.
+   * Confirmed at feature 8: `/vintages` does return `source`, even though the
+   * consumer guide omits it from this route's field list. The design's Source
+   * column was right.
    */
   source: SourceCode;
   sourceVersion: string;
-  /** ISO-8601 UTC instant. */
+  /**
+   * UTC instant, but observed with no zone designator and sub-millisecond
+   * precision: `"2026-09-08T01:00:31.5083586"`. `new Date(...)` therefore reads
+   * it as local time. Parse it as UTC explicitly wherever it is rendered.
+   */
   retrievedAtUtc: string;
   isLatest: boolean;
 }
@@ -115,11 +134,17 @@ export interface Vintage {
 /**
  * One changed value between a vintage and its predecessor.
  *
- * Field names are unconfirmed: the guide describes "previous vs new value per
- * (indicator, country, year)" without naming the properties. Confirm at
- * feature 8. `significant` is server-side, flagged at more than 10% relative or
- * 0.5 absolute, so it is read rather than recomputed. The change delta is
- * derived in the UI from these two values.
+ * Confirmed at feature 8 against `/vintages/12/revisions`: `previousValue` and
+ * `newValue` are the real property names, and both are nullable (a row added by
+ * a vintage has `previousValue: null`; 500 sampled rows were all of that shape).
+ *
+ * **`significant` does not exist.** The guide describes a server-side
+ * significance flag at more than 10% relative or 0.5 absolute, but no observed
+ * row carried the field: 500 rows returned exactly
+ * `indicator, country, year, previousValue, newValue`. Feature 9 owns revisions
+ * rendering and must decide whether to derive significance in the UI or ask for
+ * the field upstream; typing it here would promise data the service does not
+ * send. Nothing consumes `Revision` yet, so removing it breaks no caller.
  *
  * The appeared, disappeared and last-actual-year-moved summary the design shows
  * below this table has no documented shape yet, so it is deliberately not typed
@@ -131,7 +156,6 @@ export interface Revision {
   year: number;
   previousValue: number | null;
   newValue: number | null;
-  significant: boolean;
 }
 
 /** RFC 7807 `application/problem+json`. `detail` carries the human explanation. */

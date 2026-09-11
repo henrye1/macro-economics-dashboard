@@ -3,10 +3,15 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
 
-import type { EnvelopeMeta } from './core/macro-contracts';
+import { macroErrorMessage } from './core/http/macro-error';
 import { MACRO_DATA } from './core/macro-data.provider';
 
-type ShellState = { ok: true; meta: EnvelopeMeta } | { ok: false };
+type ShellState =
+  | { ok: true; labels: readonly string[]; attribution: readonly string[] }
+  | { ok: false; message: string };
+
+/** Shown when the service failed without explaining itself. */
+const STRIP_UNAVAILABLE = 'Unavailable';
 
 @Component({
   selector: 'app-root',
@@ -36,8 +41,18 @@ export class App {
    */
   private readonly shell = toSignal<ShellState | null>(
     this.macro.vintages().pipe(
-      map((envelope): ShellState => ({ ok: true, meta: envelope.meta })),
-      catchError(() => of<ShellState>({ ok: false }))
+      map((envelope): ShellState => ({
+        ok: true,
+        // From `data`, not `meta.vintages`. Observed live at feature 8:
+        // `/vintages` answers `meta.vintages: []`, because that array reports
+        // the provenance of a *result* and this route's result IS the vintage
+        // list. Reading `meta` here left the strip blank.
+        labels: envelope.data.filter((vintage) => vintage.isLatest).map((v) => v.label),
+        attribution: envelope.meta.attribution
+      })),
+      catchError((error: unknown) =>
+        of<ShellState>({ ok: false, message: macroErrorMessage(error, STRIP_UNAVAILABLE) })
+      )
     ),
     { initialValue: null }
   );
@@ -45,13 +60,22 @@ export class App {
   protected readonly loading = computed(() => this.shell() === null);
   protected readonly unavailable = computed(() => this.shell()?.ok === false);
 
+  /**
+   * The service's own explanation when it gave one, so a bad request is
+   * diagnosable from the header strip instead of a flat "Unavailable".
+   */
+  protected readonly unavailableMessage = computed(() => {
+    const state = this.shell();
+    return state?.ok === false ? state.message : STRIP_UNAVAILABLE;
+  });
+
   protected readonly vintageLabels = computed(() => {
     const state = this.shell();
-    return state?.ok ? state.meta.vintages.map((vintage) => vintage.label) : [];
+    return state?.ok ? state.labels : [];
   });
 
   protected readonly attribution = computed(() => {
     const state = this.shell();
-    return state?.ok ? state.meta.attribution : [];
+    return state?.ok ? state.attribution : [];
   });
 }

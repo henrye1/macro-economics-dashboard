@@ -2,6 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { catchError, debounceTime, distinctUntilChanged, map, of, switchMap } from 'rxjs';
 
+import { macroErrorMessage } from '../core/http/macro-error';
 import type { Country, Indicator, SourceCode } from '../core/macro-contracts';
 import { MACRO_DATA } from '../core/macro-data.provider';
 import { WorkingQueryStore } from '../core/working-query.store';
@@ -11,7 +12,17 @@ export const CATALOGUE_SEARCH_DEBOUNCE_MS = 250;
 /** One page is plenty for the curated catalogue; see the spec's pagination note. */
 const CATALOGUE_PAGE_SIZE = 500;
 
-type Loaded<T> = { status: 'ready'; value: T } | { status: 'unavailable' };
+type Loaded<T> = { status: 'ready'; value: T } | { status: 'unavailable'; message: string };
+
+/**
+ * Shown when a request failed without explaining itself. Each half of this tab
+ * keeps its own wording, because the point of the two messages is that one list
+ * failing leaves the other usable.
+ */
+const COUNTRIES_UNAVAILABLE =
+  'The country list is unavailable. The indicator catalogue is unaffected.';
+const CATALOGUE_UNAVAILABLE =
+  'The indicator catalogue is unavailable. The country list is unaffected.';
 
 interface CatalogueResult {
   indicators: readonly Indicator[];
@@ -75,7 +86,12 @@ export class CountriesIndicatorsPage {
         status: 'ready',
         value: envelope.data
       })),
-      catchError(() => of<Loaded<readonly Country[]>>({ status: 'unavailable' }))
+      catchError((error: unknown) =>
+        of<Loaded<readonly Country[]>>({
+          status: 'unavailable',
+          message: macroErrorMessage(error, COUNTRIES_UNAVAILABLE)
+        })
+      )
     ),
     { initialValue: null }
   );
@@ -84,6 +100,11 @@ export class CountriesIndicatorsPage {
   protected readonly countriesUnavailable = computed(
     () => this.countriesState()?.status === 'unavailable'
   );
+
+  protected readonly countriesUnavailableMessage = computed(() => {
+    const state = this.countriesState();
+    return state?.status === 'unavailable' ? state.message : COUNTRIES_UNAVAILABLE;
+  });
 
   protected readonly countries = computed(() => {
     const state = this.countriesState();
@@ -110,7 +131,14 @@ export class CountriesIndicatorsPage {
         status: 'ready',
         value: envelope.data
       })),
-      catchError(() => of<Loaded<readonly Indicator[]>>({ status: 'unavailable' }))
+      // Feeds the category options only; it has no error slot of its own, so
+      // the catalogue's wording is the right fallback for the same request.
+      catchError((error: unknown) =>
+        of<Loaded<readonly Indicator[]>>({
+          status: 'unavailable',
+          message: macroErrorMessage(error, CATALOGUE_UNAVAILABLE)
+        })
+      )
     ),
     { initialValue: null }
   );
@@ -147,7 +175,12 @@ export class CountriesIndicatorsPage {
               status: 'ready',
               value: { indicators: envelope.data, total: envelope.meta.totalCount }
             })),
-            catchError(() => of<Loaded<CatalogueResult>>({ status: 'unavailable' }))
+            catchError((error: unknown) =>
+              of<Loaded<CatalogueResult>>({
+                status: 'unavailable',
+                message: macroErrorMessage(error, CATALOGUE_UNAVAILABLE)
+              })
+            )
           )
       )
     ),
@@ -158,6 +191,11 @@ export class CountriesIndicatorsPage {
   protected readonly catalogueUnavailable = computed(
     () => this.catalogueState()?.status === 'unavailable'
   );
+
+  protected readonly catalogueUnavailableMessage = computed(() => {
+    const state = this.catalogueState();
+    return state?.status === 'unavailable' ? state.message : CATALOGUE_UNAVAILABLE;
+  });
 
   protected readonly indicators = computed(() => {
     const state = this.catalogueState();

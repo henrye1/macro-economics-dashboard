@@ -11,6 +11,7 @@ import type {
   IndicatorsQuery,
   Vintage
 } from '../core/macro-contracts';
+import { MacroRequestError } from '../core/http/macro-error';
 import { MACRO_DATA } from '../core/macro-data.provider';
 import { OverviewPage } from './overview';
 
@@ -210,5 +211,37 @@ describe('OverviewPage', () => {
 
       expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('—');
     });
+  });
+});
+
+/** Feature 8: the service's own explanation reaches the stats card. */
+describe('OverviewPage when the service explains the failure', () => {
+  class ExplainingProvider extends FixtureMacroDataProvider {
+    override vintages(): Observable<Envelope<Vintage>> {
+      return throwError(() => new MacroRequestError(400, 'Unknown indicator code(s): NOPE.'));
+    }
+  }
+
+  class SilentProvider extends FixtureMacroDataProvider {
+    override vintages(): Observable<Envelope<Vintage>> {
+      return throwError(() => new MacroRequestError(500, null));
+    }
+  }
+
+  function slot(provider: FixtureMacroDataProvider): Element | null {
+    const fixture = build(provider);
+    fixture.detectChanges();
+    return (fixture.nativeElement as HTMLElement).querySelector('.stats-unavailable');
+  }
+
+  it('shows the problem detail instead of the generic wording', () => {
+    const element = slot(new ExplainingProvider());
+
+    expect(element?.textContent?.trim()).toBe('Unknown indicator code(s): NOPE.');
+    expect(element?.getAttribute('role')).toBe('status');
+  });
+
+  it('falls back to the generic wording when the error carries no detail', () => {
+    expect(slot(new SilentProvider())?.textContent?.trim()).toBe('Counts unavailable');
   });
 });

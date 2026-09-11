@@ -31,6 +31,13 @@ import { FIXTURE_OBSERVATIONS } from './observation-fixtures';
 const DEFAULT_PAGE_SIZE = 500;
 
 /**
+ * The meta shape of the routes that do not paginate, observed live at feature 8:
+ * `/countries` and `/vintages` answer `page: null, pageSize: null` and ignore a
+ * `pageSize` parameter entirely.
+ */
+const UNPAGINATED = { page: null, pageSize: null } as const;
+
+/**
  * Fixture-backed provider. Replaced by the real HTTP client in feature 8.
  *
  * Emissions are synchronous, so a consumer's loading state is implemented but
@@ -54,11 +61,15 @@ const DEFAULT_PAGE_SIZE = 500;
 @Injectable()
 export class FixtureMacroDataProvider implements MacroDataProvider {
   countries(): Observable<Envelope<Country>> {
-    return of(this.envelope([...FIXTURE_COUNTRIES]));
+    // Unpaginated, but `meta.vintages` IS populated here: the country list is
+    // derived from both latest vintages, so it reports them as its provenance.
+    return of(this.envelope([...FIXTURE_COUNTRIES], { ...UNPAGINATED }));
   }
 
   indicators(query?: IndicatorsQuery): Observable<Envelope<Indicator>> {
-    return of(this.envelope(filterIndicators(FIXTURE_INDICATORS, query)));
+    // Paginated, but the catalogue is not vintage-derived, so it reports no
+    // provenance. Observed live: `meta.vintages: []`.
+    return of(this.envelope(filterIndicators(FIXTURE_INDICATORS, query), { vintages: [] }));
   }
 
   observations(query: ObservationsQuery): Observable<Envelope<Observation>> {
@@ -103,11 +114,27 @@ export class FixtureMacroDataProvider implements MacroDataProvider {
   }
 
   vintages(_query?: VintagesQuery): Observable<Envelope<Vintage>> {
-    return of(this.envelope([...FIXTURE_VINTAGES]));
+    // Unpaginated, and `meta.vintages` is empty because this route's *result*
+    // is the vintage list. Reading `meta` here instead of `data` is what left
+    // the header strip blank against the real service, so the double has to
+    // reproduce it or the next feature inherits the same trap.
+    return of(this.envelope([...FIXTURE_VINTAGES], { ...UNPAGINATED, vintages: [] }));
   }
 
-  revisions(_vintageId: number, _query?: RevisionsQuery): Observable<Envelope<Revision>> {
-    return of(this.envelope([...FIXTURE_REVISIONS]));
+  revisions(vintageId: number, _query?: RevisionsQuery): Observable<Envelope<Revision>> {
+    // Provenance is the one vintage that was asked about, resolved from every
+    // published vintage rather than only the latest two. A revisions query is
+    // about a superseded vintage by definition, so filtering the "latest" refs
+    // would report nothing for every input this route exists to serve.
+    const asked = FIXTURE_VINTAGES.find((vintage) => vintage.id === vintageId);
+
+    return of(
+      this.envelope([...FIXTURE_REVISIONS], {
+        vintages: asked === undefined
+          ? []
+          : [{ id: asked.id, source: asked.source, label: asked.label }],
+      }),
+    );
   }
 
   private envelope<T>(data: T[], meta?: Partial<Envelope<T>['meta']>): Envelope<T> {
@@ -371,9 +398,11 @@ function toSeries(rows: readonly Observation[]): Series {
 
   return {
     indicator: first.indicator,
-    // `name` and `unit` come from the catalogue, never from the observation row.
+    // `name`, `unit` and `scale` come from the catalogue, never from the
+    // observation row.
     name: indicator.name,
     unit: indicator.unit,
+    scale: indicator.scale,
     country: first.country,
     source: first.source,
     // The label, not the id. `meta.vintages[].id` carries the id.

@@ -4,6 +4,7 @@ import { Observable, throwError } from 'rxjs';
 import { FixtureMacroDataProvider } from '../core/fixtures/fixture-macro-data.provider';
 import { FIXTURE_COUNTRIES, FIXTURE_INDICATORS } from '../core/fixtures/macro-fixtures';
 import type { Country, Envelope, Indicator } from '../core/macro-contracts';
+import { MacroRequestError } from '../core/http/macro-error';
 import { MACRO_DATA } from '../core/macro-data.provider';
 import { WorkingQueryStore } from '../core/working-query.store';
 import {
@@ -389,5 +390,61 @@ describe('CountriesIndicatorsPage', () => {
 
       expect(el(fixture).querySelector('tbody .remove')).toBeNull();
     });
+  });
+});
+
+/** Feature 8: each half of the tab shows the service's own explanation. */
+describe('CountriesIndicatorsPage when the service explains the failure', () => {
+  class ExplainingCountries extends FixtureMacroDataProvider {
+    override countries(): Observable<Envelope<Country>> {
+      return throwError(() => new MacroRequestError(400, 'Unknown indicator code(s): NOPE.'));
+    }
+  }
+
+  class ExplainingIndicators extends FixtureMacroDataProvider {
+    override indicators(): Observable<Envelope<Indicator>> {
+      return throwError(() => new MacroRequestError(400, 'Unknown indicator code(s): NOPE.'));
+    }
+  }
+
+  class SilentCountries extends FixtureMacroDataProvider {
+    override countries(): Observable<Envelope<Country>> {
+      return throwError(() => new MacroRequestError(0, null));
+    }
+  }
+
+  function slot(provider: FixtureMacroDataProvider, area: string): Element | null {
+    TestBed.configureTestingModule({
+      imports: [CountriesIndicatorsPage],
+      providers: [{ provide: MACRO_DATA, useValue: provider }]
+    });
+    TestBed.inject(WorkingQueryStore).reset();
+
+    const fixture = TestBed.createComponent(CountriesIndicatorsPage);
+    fixture.detectChanges();
+
+    return (fixture.nativeElement as HTMLElement).querySelector(area + ' .state');
+  }
+
+  afterEach(() => TestBed.resetTestingModule());
+
+  it('shows the detail in the country list slot', () => {
+    const element = slot(new ExplainingCountries(), '.countries');
+
+    expect(element?.textContent?.trim()).toBe('Unknown indicator code(s): NOPE.');
+    expect(element?.getAttribute('role')).toBe('status');
+  });
+
+  it('shows the detail in the catalogue slot', () => {
+    const element = slot(new ExplainingIndicators(), '.catalogue');
+
+    expect(element?.textContent?.trim()).toBe('Unknown indicator code(s): NOPE.');
+    expect(element?.getAttribute('role')).toBe('status');
+  });
+
+  it('falls back to the tab wording when the error carries no detail', () => {
+    expect(slot(new SilentCountries(), '.countries')?.textContent?.trim()).toBe(
+      'The country list is unavailable. The indicator catalogue is unaffected.'
+    );
   });
 });

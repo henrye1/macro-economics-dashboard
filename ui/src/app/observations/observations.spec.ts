@@ -3,6 +3,7 @@ import { Observable, throwError } from 'rxjs';
 
 import { FixtureMacroDataProvider } from '../core/fixtures/fixture-macro-data.provider';
 import type { Envelope, Observation } from '../core/macro-contracts';
+import { MacroRequestError } from '../core/http/macro-error';
 import { MACRO_DATA, type MacroDataProvider } from '../core/macro-data.provider';
 import { WorkingQueryStore } from '../core/working-query.store';
 import { ObservationsPage } from './observations';
@@ -411,5 +412,203 @@ describe('ObservationsPage query summary', () => {
     fixture.detectChanges();
 
     expect(summary()).toBe('0 indicators × 0 countries');
+  });
+});
+
+/** Feature 8: the service's own explanation reaches the observations head. */
+describe('ObservationsPage when the service explains the failure', () => {
+  class ExplainingObservations extends FixtureMacroDataProvider {
+    override observations(): Observable<Envelope<Observation>> {
+      return throwError(() => new MacroRequestError(400, 'Unknown indicator code(s): NOPE.'));
+    }
+  }
+
+  class SilentObservations extends FixtureMacroDataProvider {
+    override observations(): Observable<Envelope<Observation>> {
+      return throwError(() => new MacroRequestError(500, null));
+    }
+  }
+
+  function headMetaFor(provider: FixtureMacroDataProvider): Element | null {
+    TestBed.configureTestingModule({
+      imports: [ObservationsPage],
+      providers: [{ provide: MACRO_DATA, useValue: provider }]
+    });
+    const store = TestBed.inject(WorkingQueryStore);
+    store.reset();
+    // A sendable query, or the page reports `invalid` and never reaches the
+    // request at all.
+    store.addIndicator('GDP_GROWTH_REAL');
+    store.addCountry('ZAF');
+    const fixture = TestBed.createComponent(ObservationsPage);
+    fixture.detectChanges();
+
+    return (fixture.nativeElement as HTMLElement).querySelector('.observations .card-head .meta');
+  }
+
+  afterEach(() => TestBed.resetTestingModule());
+
+  it('shows the problem detail instead of the generic wording', () => {
+    const element = headMetaFor(new ExplainingObservations());
+
+    expect(element?.textContent?.trim()).toBe('Unknown indicator code(s): NOPE.');
+    expect(element?.getAttribute('role')).toBe('status');
+  });
+
+  it('falls back to the generic wording when the error carries no detail', () => {
+    const element = headMetaFor(new SilentObservations());
+
+    expect(element?.textContent?.trim()).toBe('Observations are unavailable.');
+    expect(element?.getAttribute('role')).toBe('status');
+  });
+});
+
+/**
+ * Feature 8 (F-11): `loading` must track the in-flight request, not only the
+ * first one.
+ *
+ * This needs an asynchronous double. Under `FixtureMacroDataProvider` the
+ * window is zero, because `of()` resolves synchronously, which is exactly why
+ * no earlier spec caught it and why the header could keep asserting a previous
+ * result for a whole round trip once requests became real.
+ */
+describe('ObservationsPage loading state across a re-query', () => {
+  class DeferredProvider extends FixtureMacroDataProvider {
+    /** Resolves the pending request with the fixture answer. */
+    release: (() => void) | null = null;
+    calls = 0;
+
+    override observations(
+      ...args: Parameters<MacroDataProvider['observations']>
+    ): Observable<Envelope<Observation>> {
+      this.calls += 1;
+      const answer = super.observations(...args);
+
+      return new Observable<Envelope<Observation>>((subscriber) => {
+        this.release = () => {
+          answer.subscribe((value) => {
+            subscriber.next(value);
+            subscriber.complete();
+          });
+        };
+      });
+    }
+  }
+
+  let fixture: ComponentFixture<ObservationsPage>;
+  let store: WorkingQueryStore;
+  let provider: DeferredProvider;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [ObservationsPage],
+      providers: [{ provide: MACRO_DATA, useValue: (provider = new DeferredProvider()) }]
+    });
+
+    store = TestBed.inject(WorkingQueryStore);
+    store.reset();
+    // The design query: 56 rows at pageSize 25, so paging is real and a page
+    // count of 1 would be a visible lie rather than a coincidence.
+    store.addIndicator('GDP_GROWTH_REAL');
+    store.addIndicator('CPI_INFLATION_AVG');
+    store.addCountry('ZAF');
+    store.addCountry('NAM');
+    store.setYearRange(2018, 2031);
+    fixture = TestBed.createComponent(ObservationsPage);
+  });
+
+  afterEach(() => TestBed.resetTestingModule());
+
+  const head = () =>
+    (fixture.nativeElement as HTMLElement)
+      .querySelector('.observations .card-head .meta')
+      ?.textContent?.trim() ?? '';
+
+  it('reports loading while the first request is in flight', () => {
+    fixture.detectChanges();
+
+    expect(head()).toBe('Loading observations…');
+  });
+
+  it('returns to loading on a re-query instead of holding the previous result', () => {
+    fixture.detectChanges();
+    provider.release?.();
+    fixture.detectChanges();
+
+    // The first answer has landed.
+    const settled = head();
+    expect(settled).not.toBe('Loading observations…');
+    expect(provider.calls).toBe(1);
+
+    // A paging click issues a second request. Before F-11 the head kept
+    // asserting `settled`, describing a query that was no longer on screen.
+    store.setPage(2);
+    fixture.detectChanges();
+
+    expect(provider.calls).toBe(2);
+    expect(head()).toBe('Loading observations…');
+  });
+
+
+  const strip = () =>
+    (fixture.nativeElement as HTMLElement)
+      .querySelector('.paging-state')
+      ?.textContent?.replace(/\s+/g, ' ')
+      .trim() ?? '';
+
+  const prevButton = () =>
+    (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
+      'button[aria-label="Previous page"]'
+    );
+
+  it('keeps reporting the asked-for page and a real count while a re-query is in flight', () => {
+    // F-13: `page` fell back to a literal 1 and `pageCount` collapsed to 1
+    // whenever no result was settled, so a click from page 1 to page 2 made the
+    // footer read "Page 1 of 1" with both controls disabled for the whole round
+    // trip, then snap to the truth. It stated a page that was never asked for
+    // and a count that was never true.
+    fixture.detectChanges();
+    provider.release?.();
+    fixture.detectChanges();
+
+    const settled = strip();
+    const settledCount = settled.replace(/^Page \d+ of (\d+).*$/, '$1');
+    expect(settled).toContain('Page 1 of');
+    expect(Number(settledCount)).toBeGreaterThan(1);
+
+    store.setPage(2);
+    fixture.detectChanges();
+
+    const loading = strip();
+    // The page the user asked for, not 1.
+    expect(loading).toContain('Page 2 of');
+    // The count last known to be real, not 1.
+    expect(loading).toContain('of ' + settledCount);
+    expect(loading).not.toContain('Page 1 of 1');
+  });
+
+  it('leaves Prev reachable while a re-query is in flight', () => {
+    // Both controls were disabled by accident: PagingFooter derives them from
+    // page and pageCount, and both had collapsed to 1.
+    fixture.detectChanges();
+    provider.release?.();
+    fixture.detectChanges();
+
+    store.setPage(2);
+    fixture.detectChanges();
+
+    expect(prevButton()?.disabled).toBeFalse();
+  });
+
+  it('shows no rows while a re-query is in flight', () => {
+    fixture.detectChanges();
+    provider.release?.();
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).querySelectorAll('.observations tbody tr').length).toBeGreaterThan(0);
+
+    store.setPage(2);
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).querySelectorAll('.observations tbody tr').length).toBe(0);
   });
 });

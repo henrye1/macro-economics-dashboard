@@ -4,7 +4,7 @@ import { provideHttpClient, withFetch } from '@angular/common/http';
 
 import { routes } from './app.routes';
 import { MACRO_DATA } from './core/macro-data.provider';
-import { FixtureMacroDataProvider } from './core/fixtures/fixture-macro-data.provider';
+import { HttpMacroDataProvider } from './core/http/http-macro-data.provider';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -12,7 +12,8 @@ export const appConfig: ApplicationConfig = {
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes, withInMemoryScrolling({ scrollPositionRestoration: 'top' })),
     provideHttpClient(withFetch()),
-    // Feature 8 swaps this one line for the real HTTP-backed provider.
-    { provide: MACRO_DATA, useClass: FixtureMacroDataProvider },
+    // The real service. `FixtureMacroDataProvider` stays in the tree as the
+    // test double every page spec uses; nothing but this line chose it.
+    { provide: MACRO_DATA, useClass: HttpMacroDataProvider },
   ]
 };
