@@ -1,0 +1,82 @@
+<section class="card export">
+  <div class="card-head">
+    <h2>Export</h2>
+  </div>
+
+  <div class="export-body">
+    <fieldset class="formats">
+      <legend class="field-label">Format</legend>
+      @for (spec of formats; track spec.format) {
+        <button
+          type="button"
+          class="btn format"
+          [class.on]="isSelected(spec)"
+          [disabled]="!spec.available"
+          [attr.aria-pressed]="isSelected(spec)"
+          [attr.title]="spec.unavailableReason"
+          [attr.aria-describedby]="spec.available ? null : 'format-reason-' + spec.format"
+          (click)="selectFormat(spec)"
+        >{{ spec.label }}</button>
+
+        @if (spec.unavailableReason; as reason) {
+          <span class="visually-hidden" [id]="'format-reason-' + spec.format">{{ reason }}</span>
+        }
+      }
+    </fieldset>
+
+    <label class="pin" [class.locked]="pinLocked()">
+      <input
+        type="checkbox"
+        [checked]="pinChecked()"
+        [disabled]="pinLocked()"
+        [attr.aria-describedby]="pinLocked() ? 'pin-locked-reason' : 'pin-note'"
+        (change)="togglePin()"
+      />
+      <span class="pin-text">
+        <span class="pin-title">Pin vintage ids in the export</span>
+        @if (pinLocked()) {
+          <span class="pin-note" id="pin-locked-reason">{{ pinLockedReason }}</span>
+        } @else {
+          <span class="pin-note" id="pin-note">
+            Writes the vintage ids and labels into the file header so the pull can be
+            reproduced exactly.
+          </span>
+        }
+      </span>
+    </label>
+
+    <p class="scope">{{ scopeLine() }}</p>
+
+    @if (rowCount() === null) {
+      <p class="scope-hint" role="status">
+        Run this query on Observations to see the row count. The download itself always
+        fetches the whole result.
+      </p>
+    }
+
+    <button
+      type="button"
+      class="btn download"
+      [disabled]="!canDownload()"
+      [attr.title]="blockedReason()"
+      (click)="download()"
+    >{{ busy() ? 'Preparing…' : buttonLabel() }}</button>
+
+    @if (message(); as text) {
+      <p class="state" role="status">{{ text }}</p>
+    } @else if (blockedReason(); as reason) {
+      <p class="state muted" role="status">{{ reason }}</p>
+    }
+  </div>
+</section>
+
+<section class="card habit">
+  <div class="habit-body">
+    <p class="habit-title">Integration habit</p>
+    <p>
+      If your output must be reproducible — IFRS 9 reporting, audit, backtests — record the
+      vintage ids from <strong>meta.vintages</strong> alongside your results, and re-query
+      with those ids pinned.
+    </p>
+  </div>
+</section>

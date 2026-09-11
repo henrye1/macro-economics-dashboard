@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 
-import { LastResultVintages } from './last-result-vintages';
-import type { VintageRef } from './macro-contracts';
+import { LastResultMeta } from './last-result-meta';
+import type { EnvelopeMeta, VintageRef } from './macro-contracts';
 import { DEFAULT_WORKING_QUERY, type WorkingQuery } from './working-query';
 
 function query(overrides: Partial<WorkingQuery> = {}): WorkingQuery {
@@ -11,12 +11,24 @@ function query(overrides: Partial<WorkingQuery> = {}): WorkingQuery {
 const WEO: VintageRef = { id: 2, source: 'IMF_WEO', label: 'WEO 9.0.0' };
 const WDI: VintageRef = { id: 12, source: 'WB_WDI', label: 'WDI 2026-07-13' };
 
-describe('LastResultVintages', () => {
-  let service: LastResultVintages;
+/** The envelope meta a settled result would have carried. */
+function meta(vintages: readonly VintageRef[], overrides: Partial<EnvelopeMeta> = {}): EnvelopeMeta {
+  return {
+    page: 1,
+    pageSize: 25,
+    totalCount: 56,
+    vintages: [...vintages],
+    attribution: ['Source: IMF World Economic Outlook database'],
+    ...overrides
+  };
+}
+
+describe('LastResultMeta', () => {
+  let service: LastResultMeta;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({ providers: [LastResultVintages] });
-    service = TestBed.inject(LastResultVintages);
+    TestBed.configureTestingModule({ providers: [LastResultMeta] });
+    service = TestBed.inject(LastResultMeta);
   });
 
   afterEach(() => TestBed.resetTestingModule());
@@ -27,27 +39,27 @@ describe('LastResultVintages', () => {
 
   it('reports the ids recorded for that query', () => {
     const asked = query();
-    service.record(asked, [WEO]);
+    service.record(asked, meta([WEO]));
 
     expect(service.idsFor(asked)).toEqual([2]);
   });
 
   it('reports every id when a result drew on more than one vintage', () => {
     const asked = query();
-    service.record(asked, [WEO, WDI]);
+    service.record(asked, meta([WEO, WDI]));
 
     expect(service.idsFor(asked)).toEqual([2, 12]);
   });
 
   it('reports an empty list when the result carried no vintages', () => {
     const asked = query();
-    service.record(asked, []);
+    service.record(asked, meta([]));
 
     expect(service.idsFor(asked)).toEqual([]);
   });
 
   it('matches by value, so a query rebuilt from equal parts still matches', () => {
-    service.record(query(), [WEO]);
+    service.record(query(), meta([WEO]));
 
     const rebuilt = query({ indicators: ['GDP_GROWTH_REAL'] });
     expect(rebuilt).not.toBe(query());
@@ -59,14 +71,14 @@ describe('LastResultVintages', () => {
       // The point of storing the query with the ids: editing a filter and
       // saving before the new answer lands must not stamp the entry with the
       // previous query's provenance.
-      service.record(query({ yearFrom: 2018 }), [WEO]);
+      service.record(query({ yearFrom: 2018 }), meta([WEO]));
 
       expect(service.idsFor(query({ yearFrom: 2000 }))).toEqual([]);
     });
 
     it('refuses on any field, not only the obvious ones', () => {
       const asked = query({ yearFrom: 2018, yearTo: 2031 });
-      service.record(asked, [WEO]);
+      service.record(asked, meta([WEO]));
 
       const changes: readonly Partial<WorkingQuery>[] = [
         { indicators: ['CPI_INFLATION_AVG'] },
@@ -89,7 +101,7 @@ describe('LastResultVintages', () => {
 
     it('reports the ids again when the query returns to the recorded one', () => {
       const asked = query({ yearFrom: 2018 });
-      service.record(asked, [WEO]);
+      service.record(asked, meta([WEO]));
 
       expect(service.idsFor(query({ yearFrom: 2000 }))).toEqual([]);
       expect(service.idsFor(asked)).toEqual([2]);
@@ -100,8 +112,8 @@ describe('LastResultVintages', () => {
     const first = query({ yearFrom: 2018 });
     const second = query({ yearFrom: 2000 });
 
-    service.record(first, [WEO]);
-    service.record(second, [WDI]);
+    service.record(first, meta([WEO]));
+    service.record(second, meta([WDI]));
 
     expect(service.idsFor(second)).toEqual([12]);
     expect(service.idsFor(first)).toEqual([]);
@@ -111,9 +123,44 @@ describe('LastResultVintages', () => {
     const asked = query();
     const refs: VintageRef[] = [WEO];
 
-    service.record(asked, refs);
+    service.record(asked, meta(refs));
     refs.push(WDI);
 
     expect(service.idsFor(asked)).toEqual([2]);
+  });
+
+  describe('metaFor', () => {
+    it('reports null before any result has settled', () => {
+      expect(service.metaFor(query())).toBeNull();
+    });
+
+    it('reports the whole meta for the query that produced it', () => {
+      const asked = query();
+      service.record(asked, meta([WEO], { totalCount: 143 }));
+
+      expect(service.metaFor(asked)?.totalCount).toBe(143);
+      expect(service.metaFor(asked)?.attribution.length).toBe(1);
+    });
+
+    it('refuses the meta once the query has changed, exactly as idsFor does', () => {
+      // The row count on the Export card is a claim about a specific query.
+      // Reporting the previous result's total would be the same lie as
+      // reporting its vintage ids.
+      service.record(query({ yearFrom: 2018 }), meta([WEO], { totalCount: 143 }));
+
+      expect(service.metaFor(query({ yearFrom: 2000 }))).toBeNull();
+    });
+
+    it('copies the meta it was handed, so a later mutation cannot reach it', () => {
+      const asked = query();
+      const handed = meta([WEO]);
+
+      service.record(asked, handed);
+      handed.vintages.push(WDI);
+      handed.totalCount = 9999;
+
+      expect(service.metaFor(asked)?.vintages.length).toBe(1);
+      expect(service.metaFor(asked)?.totalCount).toBe(56);
+    });
   });
 });

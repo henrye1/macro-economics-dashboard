@@ -3,7 +3,7 @@ import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { type Observable, catchError, map, of, startWith, switchMap, tap } from 'rxjs';
 
 import { macroErrorMessage } from './http/macro-error';
-import { LastResultVintages } from './last-result-vintages';
+import { LastResultMeta } from './last-result-meta';
 import type { Envelope, EnvelopeMeta, ObservationsQuery } from './macro-contracts';
 import { WorkingQueryStore } from './working-query.store';
 
@@ -81,7 +81,7 @@ export function createResultState<T>({
   unavailable
 }: ResultSignalsConfig<T>): ResultSignals<T> {
   const store = inject(WorkingQueryStore);
-  const observedVintages = inject(LastResultVintages);
+  const lastResult = inject(LastResultMeta);
 
   /** `null` while the query is unsendable, which keeps the request out of flight. */
   const request = computed<ObservationsQuery | null>(() =>
@@ -118,7 +118,7 @@ export function createResultState<T>({
                 // settled envelope. The vintages tab has its own pipeline and
                 // must not publish — its result is a revision list, not the
                 // working query's answer.
-                observedVintages.record(asked, envelope.meta.vintages);
+                lastResult.record(asked, envelope.meta);
               }),
               map(
                 (envelope): ResultStatus<T> => ({

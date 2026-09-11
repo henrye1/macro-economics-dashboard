@@ -1,3 +1,18 @@
+/* The design puts Saved queries beside a narrower Export column, and stacks
+   them when there is no room for both. */
+.saved-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 22rem);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+@media (max-width: 60rem) {
+  .saved-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .saved-queries {
   margin-top: var(--space-5);
 }

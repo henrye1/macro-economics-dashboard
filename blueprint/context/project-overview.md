@@ -1,6 +1,6 @@
 # Cyte Macro Data Console - Project Overview
 
-<!-- blueprint:source-hash 9ec6ff8f3dcecc440f2f867f2cb45c96a7a60afbb0d0657428d8fda23e70c85c -->
+<!-- blueprint:source-hash 9e74c404f824e6d9f329f1daea7c2fe2c44743708ae72169f89ef78a45882678 -->
 
 > A browsable console over the Cyte Core API `/api/macro` service, built to make
 > vintages, absent data and ETags tangible to anyone integrating.

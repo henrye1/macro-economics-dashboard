@@ -1,0 +1,121 @@
+.export-body,
+.habit-body {
+  padding: var(--space-5);
+}
+
+.habit {
+  margin-top: var(--space-5);
+}
+
+.habit-title {
+  font-weight: 600;
+  margin: 0 0 var(--space-3);
+}
+
+.habit-body p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* ---------- format ---------- */
+
+.formats {
+  border: 0;
+  padding: 0;
+  margin: 0 0 var(--space-4);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.field-label {
+  display: block;
+  width: 100%;
+  color: var(--muted);
+  font-size: 0.875rem;
+  margin-bottom: var(--space-2);
+  padding: 0;
+}
+
+.btn.format.on {
+  background: var(--navy, #14226b);
+  border-color: var(--navy, #14226b);
+  color: #fff;
+}
+
+.btn.format:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---------- pin ---------- */
+
+.pin {
+  display: flex;
+  gap: var(--space-3);
+  align-items: start;
+  background: var(--surface-alt, #f4f6f9);
+  border-radius: 4px;
+  padding: var(--space-4);
+}
+
+.pin.locked {
+  opacity: 0.75;
+}
+
+.pin-text {
+  display: block;
+}
+
+.pin-title {
+  display: block;
+  font-weight: 600;
+}
+
+.pin-note {
+  display: block;
+  color: var(--muted);
+  font-size: 0.875rem;
+  margin-top: var(--space-1);
+  line-height: 1.4;
+}
+
+/* ---------- scope and action ---------- */
+
+.scope {
+  color: var(--muted);
+  margin: var(--space-4) 0 0;
+}
+
+.scope-hint {
+  color: var(--muted);
+  font-size: 0.875rem;
+  margin: var(--space-1) 0 0;
+  line-height: 1.4;
+}
+
+.btn.download {
+  display: block;
+  width: 100%;
+  margin-top: var(--space-4);
+  background: #1f7a44;
+  color: #fff;
+  border: 0;
+  padding: var(--space-4);
+  font-weight: 600;
+}
+
+.btn.download:disabled {
+  background: #cfd4db;
+  color: #767d88;
+  cursor: not-allowed;
+}
+
+.state {
+  margin: var(--space-3) 0 0;
+}
+
+.state.muted {
+  color: var(--muted);
+}

@@ -1,6 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { LastResultVintages } from '../core/last-result-vintages';
+import { FixtureMacroDataProvider } from '../core/fixtures/fixture-macro-data.provider';
+import { LastResultMeta } from '../core/last-result-meta';
+import { MACRO_DATA } from '../core/macro-data.provider';
+import type { EnvelopeMeta } from '../core/macro-contracts';
 import type { SavedQuery } from '../core/saved-query';
 import {
   SAVED_QUERIES_KEY,
@@ -53,7 +56,7 @@ describe('SavedQueriesPage', () => {
   let fixture: ComponentFixture<SavedQueriesPage>;
   let storage: FakeStorage;
   let store: WorkingQueryStore;
-  let observed: LastResultVintages;
+  let observed: LastResultMeta;
 
   function setUp(seed: SavedQuery[] = [], storageValue: SavedQueryStorage | null = storage): void {
     if (seed.length > 0 && storageValue !== null) {
@@ -63,17 +66,21 @@ describe('SavedQueriesPage', () => {
     TestBed.configureTestingModule({
       imports: [SavedQueriesPage],
       providers: [
+        // The page hosts the Export card, which reaches the provider through
+        // ExportService. `useValue` rather than `useClass`: F-20 records the DI
+        // deprecation an inherited @Injectable trips.
+        { provide: MACRO_DATA, useValue: new FixtureMacroDataProvider() },
         { provide: SAVED_QUERY_STORAGE, useValue: storageValue },
         { provide: SAVED_QUERY_CLOCK, useValue: () => '2026-06-01T00:00:00.000Z' },
         SavedQueryStore,
         WorkingQueryStore,
-        LastResultVintages
+        LastResultMeta
       ]
     });
 
     store = TestBed.inject(WorkingQueryStore);
     store.reset();
-    observed = TestBed.inject(LastResultVintages);
+    observed = TestBed.inject(LastResultMeta);
     fixture = TestBed.createComponent(SavedQueriesPage);
     fixture.detectChanges();
   }
@@ -104,13 +111,21 @@ describe('SavedQueriesPage', () => {
     fixture.detectChanges();
   }
 
+  /** The settled meta a result would have carried for the given vintage ids. */
+  function meta(ids: readonly number[]): EnvelopeMeta {
+    return {
+      page: 1,
+      pageSize: 25,
+      totalCount: 56,
+      vintages: ids.map((id) => ({ id, source: 'IMF_WEO' as const, label: `V${id}` })),
+      attribution: []
+    };
+  }
+
   /** A sendable query whose result has been seen, so saving records ids. */
   function sendableWithResult(ids: number[] = [12]): void {
     store.addIndicator('GDP_GROWTH_REAL');
-    observed.record(
-      store.query(),
-      ids.map((id) => ({ id, source: 'IMF_WEO' as const, label: `V${id}` }))
-    );
+    observed.record(store.query(), meta(ids));
     fixture.detectChanges();
   }
 
@@ -313,7 +328,7 @@ describe('SavedQueriesPage', () => {
       fixture.detectChanges();
 
       store.addCountry('ZAF');
-      observed.record(store.query(), [{ id: 2, source: 'IMF_WEO', label: 'V2' }]);
+      observed.record(store.query(), meta([2]));
       fixture.detectChanges();
       type('Same name');
       saveButton()?.click();

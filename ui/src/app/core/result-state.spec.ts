@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { Observable, of } from 'rxjs';
 
 import { MacroRequestError } from './http/macro-error';
-import { LastResultVintages } from './last-result-vintages';
+import { LastResultMeta } from './last-result-meta';
 import type { Envelope, Observation, ObservationsQuery } from './macro-contracts';
 import { type ResultSignals, createResultState } from './result-state';
 import { WorkingQueryStore } from './working-query.store';
@@ -78,16 +78,16 @@ class DeferredSource {
 describe('createResultState', () => {
   let store: WorkingQueryStore;
   let source: DeferredSource;
-  let observed: LastResultVintages;
+  let observed: LastResultMeta;
   let state: ResultSignals<Observation>;
 
   function build(): void {
     TestBed.configureTestingModule({
-      providers: [WorkingQueryStore, DeferredSource, LastResultVintages]
+      providers: [WorkingQueryStore, DeferredSource, LastResultMeta]
     });
 
     store = TestBed.inject(WorkingQueryStore);
-    observed = TestBed.inject(LastResultVintages);
+    observed = TestBed.inject(LastResultMeta);
     store.reset();
     source = TestBed.inject(DeferredSource);
 

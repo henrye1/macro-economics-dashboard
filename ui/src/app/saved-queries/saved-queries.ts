@@ -1,6 +1,8 @@
 import { Component, computed, inject, signal } from '@angular/core';
 
-import { LastResultVintages } from '../core/last-result-vintages';
+import { ExportCard } from '../export/export-card';
+
+import { LastResultMeta } from '../core/last-result-meta';
 import {
   type SavedQuery,
   reproduceBlockedReason,
@@ -14,13 +16,14 @@ import { WorkingQueryStore } from '../core/working-query.store';
 
 @Component({
   selector: 'app-saved-queries',
+  imports: [ExportCard],
   templateUrl: './saved-queries.html',
   styleUrl: './saved-queries.scss'
 })
 export class SavedQueriesPage {
   private readonly store = inject(WorkingQueryStore);
   private readonly saved = inject(SavedQueryStore);
-  private readonly observedVintages = inject(LastResultVintages);
+  private readonly lastResult = inject(LastResultMeta);
 
   protected readonly entries = this.saved.saved;
   protected readonly isEmpty = this.saved.isEmpty;
@@ -75,7 +78,7 @@ export class SavedQueriesPage {
    * to claim.
    */
   private readonly idsForCurrent = computed(() =>
-    this.observedVintages.idsFor(this.store.query())
+    this.lastResult.idsFor(this.store.query())
   );
 
   protected readonly recordedCount = computed(() => this.idsForCurrent().length);
