@@ -1,0 +1,196 @@
+/* Request on the left, Response and the code table on the right, stacking when
+   there is no room for both. */
+.builder-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+  margin-top: var(--space-5);
+}
+
+@media (max-width: 70rem) {
+  .builder-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.request-body,
+.response-body {
+  padding: var(--space-5);
+}
+
+.codes {
+  margin-top: var(--space-5);
+}
+
+/* ---------- endpoint ---------- */
+
+.endpoints {
+  border: 0;
+  padding: 0;
+  margin: 0 0 var(--space-4);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.field-label {
+  display: block;
+  width: 100%;
+  color: var(--muted);
+  font-size: 0.875rem;
+  margin-bottom: var(--space-2);
+  padding: 0;
+}
+
+.btn.endpoint {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 0.875rem;
+}
+
+.btn.endpoint.on {
+  background: var(--navy, #14226b);
+  border-color: var(--navy, #14226b);
+  color: #fff;
+}
+
+/* ---------- URL and curl ---------- */
+
+.url,
+.curl,
+.body {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  margin: 0;
+  padding: var(--space-4);
+  border-radius: 4px;
+  /* The URL is long and has no spaces; wrapping beats a scrollbar. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.url {
+  background: var(--navy, #14226b);
+  color: #fff;
+}
+
+.curl,
+.body {
+  background: var(--surface-alt, #f4f6f9);
+  border: 1px solid var(--line, #d7dae0);
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+}
+
+.btn.send {
+  background: #1f7a44;
+  color: #fff;
+  border: 0;
+  padding-inline: var(--space-5);
+}
+
+.btn.send:disabled {
+  background: #cfd4db;
+  color: #767d88;
+  cursor: not-allowed;
+}
+
+.note {
+  color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  margin: var(--space-4) 0 0;
+}
+
+.note.proxy {
+  border-top: 1px solid var(--line, #d7dae0);
+  padding-top: var(--space-4);
+}
+
+.note code {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 0.8125rem;
+}
+
+/* ---------- response ---------- */
+
+.card-head .meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.pill.status {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-weight: 600;
+}
+
+.pill.status.idle {
+  background: var(--surface-alt, #e9edf3);
+  color: var(--muted);
+}
+
+.pill.status.good {
+  background: #d8f0e1;
+  color: #14532d;
+}
+
+.pill.status.cached {
+  background: #fdeccd;
+  color: #7a4b00;
+}
+
+.pill.status.bad {
+  background: #fbdcdc;
+  color: #7a1414;
+}
+
+.elapsed {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.headers {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--space-2) var(--space-4);
+  margin: 0 0 var(--space-4);
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 0.8125rem;
+}
+
+.headers dt {
+  color: var(--navy, #14226b);
+  font-weight: 600;
+}
+
+.headers dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.body {
+  max-height: 24rem;
+  overflow: auto;
+}
+
+.body-note {
+  color: var(--muted);
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 0.8125rem;
+  margin: 0;
+  padding: var(--space-4);
+  background: var(--surface-alt, #f4f6f9);
+  border-radius: 4px;
+}
+
+.code-cell {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-weight: 600;
+  color: var(--navy, #14226b);
+}

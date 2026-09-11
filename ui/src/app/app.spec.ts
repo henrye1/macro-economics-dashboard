@@ -1,4 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { Router, provideRouter } from '@angular/router';
 import { Observable, of, throwError } from 'rxjs';
 
@@ -31,6 +33,10 @@ describe('App shell', () => {
         imports: [App],
         providers: [
           provideRouter(routes),
+          // The request builder reaches HttpClient directly, so the shell needs
+          // it wherever a route can reach that page.
+          provideHttpClient(),
+          provideHttpClientTesting(),
           { provide: MACRO_DATA, useClass: FixtureMacroDataProvider }
         ]
       }).compileComponents();
@@ -83,22 +89,38 @@ describe('App shell', () => {
       ]);
     });
 
-    it('navigates to each placeholder tab and renders its page', async () => {
+    it('has no placeholder tabs left', async () => {
+      // Every tab became a real page across features 2, 3, 4, 6, 9, 10 and 12.
+      // A `.page-title` is the placeholder marker, so finding one anywhere means
+      // a tab was left behind.
       const router = TestBed.inject(Router);
-
-      // Every other tab became a real page at features 2, 3, 4, 6, 9 and 10 and
-      // is asserted separately. Only the request builder remains a placeholder.
-      const cases: ReadonlyArray<readonly [string, string]> = [
-        ['/request-builder', 'Request builder']
+      const paths = [
+        '/overview',
+        '/countries-indicators',
+        '/series',
+        '/observations',
+        '/vintages',
+        '/saved-queries',
+        '/request-builder'
       ];
 
-      for (const [path, heading] of cases) {
+      for (const path of paths) {
         await router.navigateByUrl(path);
         const main = shell(fixture).querySelector('.app-main');
 
-        expect(router.url).toBe(path);
-        expect(main?.querySelector('.page-title')?.textContent?.trim()).toBe(heading);
+        expect(router.url).withContext(path).toBe(path);
+        expect(main?.querySelector('.page-title')).withContext(path).toBeNull();
       }
+    });
+
+    it('renders the Request builder page in the outlet, no longer a placeholder', async () => {
+      const router = TestBed.inject(Router);
+      await router.navigateByUrl('/request-builder');
+      const main = shell(fixture).querySelector('.app-main');
+
+      expect(router.url).toBe('/request-builder');
+      expect(main?.querySelector('.request h2')?.textContent?.trim()).toBe('Request');
+      expect(main?.querySelector('.codes h2')?.textContent?.trim()).toBe('Status codes');
     });
 
     it('renders the Saved queries page in the outlet, no longer a placeholder', async () => {

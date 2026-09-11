@@ -1,0 +1,148 @@
+<app-working-query-card />
+
+<div class="builder-layout">
+  <section class="card request">
+    <div class="card-head">
+      <h2>Request</h2>
+    </div>
+
+    <div class="request-body">
+      <fieldset class="endpoints">
+        <legend class="field-label">Endpoint</legend>
+        @for (spec of endpoints; track spec.endpoint) {
+          <button
+            type="button"
+            class="btn endpoint"
+            [class.on]="isSelected(spec)"
+            [attr.aria-pressed]="isSelected(spec)"
+            (click)="selectEndpoint(spec)"
+          >{{ spec.label }}</button>
+        }
+      </fieldset>
+
+      @if (blockedReason(); as reason) {
+        <p class="state" role="status">{{ reason }}</p>
+      } @else {
+        <!-- The host is a placeholder because it is a secret this browser has no
+             way to learn; the consumer guide writes it the same way. -->
+        <pre class="url">{{ consumerUrl() }}</pre>
+      }
+
+      <div class="actions">
+        <button
+          type="button"
+          class="btn send"
+          [disabled]="!canSend()"
+          [attr.title]="blockedReason()"
+          (click)="send()"
+        >{{ busy() ? 'Sending…' : 'Send request' }}</button>
+
+        <button
+          type="button"
+          class="btn outline-green copy"
+          [disabled]="!valid()"
+          (click)="copyCurl()"
+        >Copy curl</button>
+      </div>
+
+      @if (copied(); as message) {
+        <p class="state" role="status">{{ message }}</p>
+      }
+
+      @if (valid()) {
+        <pre class="curl">{{ curl() }}</pre>
+        <p class="note">
+          Replace <code>&lt;core-api-host&gt;</code> with your Core API host and
+          <code>$TOKEN</code> with your own token.
+        </p>
+      }
+
+      <p class="note">
+        Both authentication schemes are accepted: a suite token works as-is, M2M clients use
+        the client-credentials grant. There is no macro-specific scope.
+      </p>
+
+      <!-- Said plainly: a console that shows one URL and calls another is
+           teaching the wrong thing. -->
+      <p class="note proxy">
+        <strong>Send request</strong> calls this console's own passthrough,
+        <code>{{ proxyUrl() }}</code>, which is the only origin the browser can reach and the
+        only one holding a token. The answer below is the Core API's, relayed byte for byte.
+      </p>
+    </div>
+  </section>
+
+  <div class="right">
+    <section class="card response">
+      <div class="card-head">
+        <h2>Response</h2>
+        <span class="meta">
+          <span class="pill status" [class]="statusTone()">{{ statusLabel() }}</span>
+          @if (sent()) {
+            @if (elapsed() !== null) {
+              <span class="elapsed">{{ elapsed() }} ms</span>
+            }
+          } @else {
+            <span class="elapsed">press send</span>
+          }
+        </span>
+      </div>
+
+      <div class="response-body">
+        @if (unreachable()) {
+          <p class="state" role="status">{{ unreachableMessage() }}</p>
+        } @else {
+          <dl class="headers">
+            <dt>ETag</dt>
+            <dd>{{ etag() }}</dd>
+            <dt>Cache-Control</dt>
+            <dd>{{ cacheControl() }}</dd>
+            <dt>X-Total-Count</dt>
+            <dd>{{ totalCount() }}</dd>
+          </dl>
+
+          @if (bodyNote(); as note) {
+            <p class="body-note" role="status">{{ note }}</p>
+          } @else {
+            <!-- Interpolation only, which escapes it. The body is service text
+                 and is never evaluated or set as HTML. -->
+            <pre class="body">{{ body() }}</pre>
+          }
+        }
+
+        <p class="note">
+          Send <strong>If-None-Match</strong> on repeat queries — you get 304 until a new
+          vintage publishes.
+        </p>
+      </div>
+    </section>
+
+    <section class="card codes">
+      <div class="card-head">
+        <h2>Status codes</h2>
+      </div>
+
+      <table class="grid">
+        <caption class="visually-hidden">
+          The status codes this service returns, what each means, and its typical cause.
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Status</th>
+            <th scope="col">Meaning</th>
+            <th scope="col">Typical cause</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (code of statusRows; track code.status) {
+            <tr>
+              <td class="code-cell">{{ code.status }}</td>
+              <td>{{ code.meaning }}</td>
+              <td>{{ code.cause }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </section>
+  </div>
+</div>

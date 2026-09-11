@@ -30,7 +30,7 @@
     and the two formats that need no new dependency
   - [ ] 11b. **XLSX export** - the third format, which needs a spreadsheet writer
     added to `ui/`; split out on 2026-09-11 so the dependency is its own decision
-- [ ] 12. **Request builder** - live URL and curl for the working query, real response
+- [x] 12. **Request builder** - live URL and curl for the working query, real response
   envelope and headers, and the status code reference
 - [ ] 13. **Deployment readiness** - configure both Render services, env vars, health
   check and CORS, and verify the production build (run via `/release render`)
