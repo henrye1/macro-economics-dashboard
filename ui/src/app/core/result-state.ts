@@ -15,7 +15,7 @@ import { WorkingQueryStore } from './working-query.store';
  * with the second and third each introducing a defect the other copy did not
  * have. One owner is the fix.
  */
-type ResultState<T> =
+type ResultStatus<T> =
   | { status: 'ready'; items: readonly T[]; meta: EnvelopeMeta }
   /**
    * A request is in flight.
@@ -33,7 +33,7 @@ type ResultState<T> =
   | { status: 'unavailable'; message: string };
 
 /** What a result page reads. Everything here is derived from one pipeline. */
-export interface ResultState$<T> {
+export interface ResultSignals<T> {
   /** True before the first answer and for every in-flight request after it. */
   readonly loading: Signal<boolean>;
   /** The query is unsendable, so no request was issued. */
@@ -55,7 +55,7 @@ export interface ResultState$<T> {
   readonly next: () => void;
 }
 
-export interface ResultStateConfig<T> {
+export interface ResultSignalsConfig<T> {
   /** The provider call for this tab. The seam that keeps transport out of here. */
   readonly fetch: (query: ObservationsQuery) => Observable<Envelope<T>>;
   /** Shown when the request failed without the service explaining itself. */
@@ -78,7 +78,7 @@ export interface ResultStateConfig<T> {
 export function createResultState<T>({
   fetch,
   unavailable
-}: ResultStateConfig<T>): ResultState$<T> {
+}: ResultSignalsConfig<T>): ResultSignals<T> {
   const store = inject(WorkingQueryStore);
 
   /** `null` while the query is unsendable, which keeps the request out of flight. */
@@ -98,17 +98,17 @@ export function createResultState<T>({
    */
   let heldMeta: EnvelopeMeta | null = null;
 
-  const result = toSignal<ResultState<T> | null>(
+  const result = toSignal<ResultStatus<T> | null>(
     toObservable(request).pipe(
       switchMap((query) =>
         query === null
-          ? of<ResultState<T>>({ status: 'invalid' })
+          ? of<ResultStatus<T>>({ status: 'invalid' })
           : fetch(query).pipe(
               tap((envelope) => {
                 heldMeta = envelope.meta;
               }),
               map(
-                (envelope): ResultState<T> => ({
+                (envelope): ResultStatus<T> => ({
                   status: 'ready',
                   items: envelope.data,
                   meta: envelope.meta
@@ -117,14 +117,14 @@ export function createResultState<T>({
               // A failure does not clear the held meta: the last real answer is
               // still the best thing the pager knows.
               catchError((error: unknown) =>
-                of<ResultState<T>>({
+                of<ResultStatus<T>>({
                   status: 'unavailable',
                   message: macroErrorMessage(error, unavailable)
                 })
               ),
               // Evaluated when the inner pipe is built, which is exactly when
               // the previous answer is still the held one.
-              startWith<ResultState<T>>({ status: 'loading', previousMeta: heldMeta })
+              startWith<ResultStatus<T>>({ status: 'loading', previousMeta: heldMeta })
             )
       )
     ),

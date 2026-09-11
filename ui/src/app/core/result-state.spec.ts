@@ -4,7 +4,7 @@ import { Observable, of } from 'rxjs';
 
 import { MacroRequestError } from './http/macro-error';
 import type { Envelope, Observation, ObservationsQuery } from './macro-contracts';
-import { type ResultState$, createResultState } from './result-state';
+import { type ResultSignals, createResultState } from './result-state';
 import { WorkingQueryStore } from './working-query.store';
 
 const UNAVAILABLE = 'Observations are unavailable.';
@@ -77,7 +77,7 @@ class DeferredSource {
 describe('createResultState', () => {
   let store: WorkingQueryStore;
   let source: DeferredSource;
-  let state: ResultState$<Observation>;
+  let state: ResultSignals<Observation>;
 
   function build(): void {
     TestBed.configureTestingModule({ providers: [WorkingQueryStore, DeferredSource] });
