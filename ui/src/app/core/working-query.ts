@@ -67,6 +67,42 @@ export function validateWorkingQuery(query: WorkingQuery): QueryValidation {
   return { valid: problems.length === 0, problems };
 }
 
+/** Same codes in the same order. Order is part of the request string. */
+function sameCodes(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((code, index) => code === b[index]);
+}
+
+/**
+ * Whether two working queries would produce the same request.
+ *
+ * Compared by value, not identity, so a query rebuilt from equal parts is
+ * recognised as unchanged. `WorkingQueryStore` uses this to refuse a mutation
+ * that changes nothing: without it, re-selecting the source already selected
+ * mints a new object, every downstream computed recomputes, and a full round
+ * trip goes out for a query nobody changed.
+ *
+ * The arrays compare by content **and order**. `['GDP','CPI']` and
+ * `['CPI','GDP']` serialise to different query strings, so they are different
+ * queries even though they are the same set.
+ *
+ * Every field of `WorkingQuery` is compared. Adding a field to that interface
+ * without adding it here would silently swallow mutations of it, so the spec
+ * covers each one.
+ */
+export function sameWorkingQuery(a: WorkingQuery, b: WorkingQuery): boolean {
+  return (
+    sameCodes(a.indicators, b.indicators) &&
+    sameCodes(a.countries, b.countries) &&
+    a.yearFrom === b.yearFrom &&
+    a.yearTo === b.yearTo &&
+    a.source === b.source &&
+    a.forecast === b.forecast &&
+    a.vintage === b.vintage &&
+    a.page === b.page &&
+    a.pageSize === b.pageSize
+  );
+}
+
 /** True when the query pins a specific vintage rather than tracking `latest`. */
 export function hasPinnedVintage(query: WorkingQuery): boolean {
   return query.vintage !== 'latest';

@@ -1,6 +1,7 @@
 import {
   DEFAULT_WORKING_QUERY,
   hasPinnedVintage,
+  sameWorkingQuery,
   toObservationsQuery,
   validateWorkingQuery,
   type WorkingQuery
@@ -169,5 +170,94 @@ describe('toObservationsQuery', () => {
 
     expect(source.indicators).toEqual(['X']);
     expect(source.countries).toEqual(['ZAF']);
+  });
+});
+
+/**
+ * F-22: the equality that lets the store refuse a mutation changing nothing.
+ *
+ * The per-field cases are the important half. An over-eager comparison that
+ * swallows a genuine mutation is far worse than the wasted request it replaces,
+ * so every field of `WorkingQuery` gets a case proving a real difference is
+ * still detected.
+ */
+describe('sameWorkingQuery', () => {
+  /** A fully populated query, so no field is compared against a default. */
+  const base: WorkingQuery = {
+    indicators: ['GDP_GROWTH_REAL', 'CPI_INFLATION_AVG'],
+    countries: ['ZAF', 'NAM'],
+    yearFrom: 2018,
+    yearTo: 2031,
+    source: 'IMF_WEO',
+    forecast: 'forecast',
+    vintage: 12,
+    page: 3,
+    pageSize: 50
+  };
+
+  it('matches a query against itself', () => {
+    expect(sameWorkingQuery(base, base)).toBeTrue();
+  });
+
+  it('matches a structurally equal query built from different objects', () => {
+    const rebuilt: WorkingQuery = {
+      ...base,
+      indicators: [...base.indicators],
+      countries: [...base.countries]
+    };
+
+    expect(rebuilt).not.toBe(base);
+    expect(rebuilt.indicators).not.toBe(base.indicators);
+    expect(sameWorkingQuery(base, rebuilt)).toBeTrue();
+  });
+
+  it('matches the default query against a fresh copy of itself', () => {
+    expect(sameWorkingQuery(DEFAULT_WORKING_QUERY, { ...DEFAULT_WORKING_QUERY })).toBeTrue();
+  });
+
+  describe('detects a difference in each field', () => {
+    const cases: readonly [string, Partial<WorkingQuery>][] = [
+      ['indicators added', { indicators: ['GDP_GROWTH_REAL', 'CPI_INFLATION_AVG', 'UNEMP'] }],
+      ['indicators removed', { indicators: ['GDP_GROWTH_REAL'] }],
+      ['countries', { countries: ['ZAF'] }],
+      ['yearFrom', { yearFrom: 2019 }],
+      ['yearFrom cleared', { yearFrom: null }],
+      ['yearTo', { yearTo: 2030 }],
+      ['source', { source: 'WB_WDI' }],
+      ['forecast', { forecast: 'actual' }],
+      ['vintage', { vintage: 'latest' }],
+      ['page', { page: 4 }],
+      ['pageSize', { pageSize: 25 }]
+    ];
+
+    for (const [label, change] of cases) {
+      it(label, () => {
+        expect(sameWorkingQuery(base, { ...base, ...change }))
+          .withContext(label)
+          .toBeFalse();
+      });
+    }
+  });
+
+  it('treats a reordered array as a different query', () => {
+    // Order reaches the wire: `indicators=A,B` and `indicators=B,A` are
+    // different request strings, so they are different queries even though
+    // they are the same set.
+    const reordered: WorkingQuery = {
+      ...base,
+      indicators: ['CPI_INFLATION_AVG', 'GDP_GROWTH_REAL']
+    };
+
+    expect(sameWorkingQuery(base, reordered)).toBeFalse();
+  });
+
+  it('does not confuse an empty array with a populated one', () => {
+    expect(sameWorkingQuery(base, { ...base, countries: [] })).toBeFalse();
+  });
+
+  it('is symmetric', () => {
+    const other: WorkingQuery = { ...base, page: 9 };
+
+    expect(sameWorkingQuery(base, other)).toBe(sameWorkingQuery(other, base));
   });
 });

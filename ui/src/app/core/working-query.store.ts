@@ -3,6 +3,7 @@ import { Injectable, computed, signal } from '@angular/core';
 import type { ForecastFilter, SourceFilter, VintageSelector } from './macro-contracts';
 import {
   DEFAULT_WORKING_QUERY,
+  sameWorkingQuery,
   toObservationsQuery,
   validateWorkingQuery,
   type WorkingQuery
@@ -64,7 +65,9 @@ export class WorkingQueryStore {
 
   /** The one mutation that does not reset paging. */
   setPage(page: number): void {
-    this.state.update((current) => ({ ...current, page: Math.max(1, Math.trunc(page)) }));
+    this.state.update((current) =>
+      this.settle(current, { ...current, page: Math.max(1, Math.trunc(page)) })
+    );
   }
 
   reset(): void {
@@ -93,6 +96,24 @@ export class WorkingQueryStore {
    * not leave the user staring at a page that no longer exists.
    */
   private patch(changes: Partial<WorkingQuery>): void {
-    this.state.update((current) => ({ ...current, ...changes, page: 1 }));
+    this.state.update((current) => this.settle(current, { ...current, ...changes, page: 1 }));
+  }
+
+  /**
+   * Returns `current` when the candidate would not change the query.
+   *
+   * Signals compare by identity, so handing back a structurally equal but new
+   * object notifies every reader and costs a full round trip for a query nobody
+   * changed. `addTo` and `removeFrom` have always short-circuited their own
+   * no-ops; this is the same guarantee for the two mutators that rebuild the
+   * whole object.
+   *
+   * The candidate is built before the comparison rather than comparing the
+   * incoming changes, because `patch` also forces `page: 1`. Patching an
+   * unchanged filter while on page 3 really is a change, and building first
+   * makes that fall out instead of needing a special case.
+   */
+  private settle(current: WorkingQuery, candidate: WorkingQuery): WorkingQuery {
+    return sameWorkingQuery(current, candidate) ? current : candidate;
   }
 }

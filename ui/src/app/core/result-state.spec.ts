@@ -200,6 +200,55 @@ describe('createResultState', () => {
     });
   });
 
+  describe('no-op mutations', () => {
+    // F-22: the point of the store's guard, asserted where it actually costs
+    // something. `working-query.store.spec.ts` pins the reference identity;
+    // this pins the round trip that identity was protecting.
+    beforeEach(() => {
+      sendableQuery();
+      store.setSource('IMF_WEO');
+      flush();
+      source.releaseLatest();
+    });
+
+    it('issues no request when a setter is called with the current value', () => {
+      // Read rather than assumed: the two mutations in beforeEach share one
+      // flush, so the effect coalesces them into a single request.
+      const before = source.calls.length;
+      expect(before).toBeGreaterThan(0);
+
+      store.setSource('IMF_WEO');
+      flush();
+      store.setForecast(store.query().forecast);
+      flush();
+      store.setPage(store.query().page);
+      flush();
+
+      expect(source.calls.length).toBe(before);
+      // Still settled: no phantom loading flash either.
+      expect(state.settled()).toBeTrue();
+    });
+
+    it('still issues a request for a real change', () => {
+      const before = source.calls.length;
+
+      store.setSource('WB_WDI');
+      flush();
+
+      expect(source.calls.length).toBe(before + 1);
+      expect(state.loading()).toBeTrue();
+    });
+
+    it('issues no request when an already-selected code is added again', () => {
+      const before = source.calls.length;
+
+      store.addIndicator('GDP_GROWTH_REAL');
+      flush();
+
+      expect(source.calls.length).toBe(before);
+    });
+  });
+
   describe('failure', () => {
     beforeEach(() => {
       sendableQuery();

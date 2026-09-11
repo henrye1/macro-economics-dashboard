@@ -151,7 +151,7 @@ click keeps the hold. Do it with the pager's third behaviour change, not as a
 fourth standalone patch.
 **Resolution:**
 
-### F-22 [P3] open - A no-op query mutation re-issues the request, and feature 10 will make that reachable
+### F-22 [P3] fixed - A no-op query mutation re-issues the request, and feature 10 will make that reachable
 
 **File:** ui/src/app/core/working-query.store.ts:95
 **Found:** 2026-09-11 by /audit (scope: full; lens: performance)
@@ -172,7 +172,16 @@ reloading the query you are already looking at is the ordinary case.
 `current` when nothing changed, exactly as `addTo` already does. Cheaper than
 adding equality to the `apiQuery` computed, and it keeps the guarantee in the
 one place that owns mutation.
-**Resolution:**
+**Resolution:** Fixed on 2026-09-11 as suggested. `sameWorkingQuery` in
+`core/working-query.ts` compares all nine fields, with the two arrays by content
+and order, and a private `settle()` in the store returns `current` when the
+built candidate matches. Both mutators build the candidate before comparing,
+because `patch` also forces `page: 1`: re-selecting the current source while on
+page 3 is a real change, and a spec pins that. Verified by removing the
+comparison: nine specs fail, eight on reference identity and one on the round
+trip itself. Also covered: clamped (`setPage(0)`) and truncated
+(`setPage(3.7)`) values that resolve to the current page are no-ops too. `ui`
+353 tests, up from 317.
 
 ### F-23 [P3] fixed - The shared result API is named with an Observable convention but returns only Signals
 
