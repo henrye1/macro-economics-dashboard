@@ -181,6 +181,23 @@ describe('toObservationsQuery', () => {
  * so every field of `WorkingQuery` gets a case proving a real difference is
  * still detected.
  */
+/**
+ * A value for each field that differs from `base`, so "is this field compared?"
+ * can be asked of every field the interface actually declares rather than a
+ * list written out by hand, which would have the same drift problem it checks.
+ */
+const SENTINELS: Record<keyof WorkingQuery, unknown> = {
+  indicators: ['SOMETHING_ELSE'],
+  countries: ['ZWE'],
+  yearFrom: 1999,
+  yearTo: 2099,
+  source: 'WB_WDI',
+  forecast: 'actual',
+  vintage: 'latest',
+  page: 42,
+  pageSize: 7
+};
+
 describe('sameWorkingQuery', () => {
   /** A fully populated query, so no field is compared against a default. */
   const base: WorkingQuery = {
@@ -194,6 +211,25 @@ describe('sameWorkingQuery', () => {
     page: 3,
     pageSize: 50
   };
+
+  it('compares every field the default query actually has', () => {
+    // The compile-time guard is `satisfies Record<keyof WorkingQuery, true>`,
+    // which a test cannot observe. This is its runtime companion: it catches a
+    // list that drifts from the real shape within a single compile, and it
+    // fails loudly if a field is added to the interface and the default but
+    // left out of the comparison.
+    const fields = Object.keys(DEFAULT_WORKING_QUERY).sort();
+
+    for (const field of fields) {
+      const changed = { ...base, [field]: SENTINELS[field as keyof WorkingQuery] };
+
+      expect(sameWorkingQuery(base, changed as WorkingQuery))
+        .withContext(`${field} is not compared`)
+        .toBeFalse();
+    }
+
+    expect(fields.length).toBe(9);
+  });
 
   it('matches a query against itself', () => {
     expect(sameWorkingQuery(base, base)).toBeTrue();

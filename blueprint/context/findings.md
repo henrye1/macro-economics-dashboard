@@ -151,7 +151,7 @@ click keeps the hold. Do it with the pager's third behaviour change, not as a
 fourth standalone patch.
 **Resolution:**
 
-### F-24 [P3] open - sameWorkingQuery is not exhaustive by construction, so a new query field would be silently ignored
+### F-24 [P3] fixed - sameWorkingQuery is not exhaustive by construction, so a new query field would be silently ignored
 
 **File:** ui/src/app/core/working-query.ts:92
 **Found:** 2026-09-11 by /audit (scope: full; lens: quality)
@@ -173,7 +173,25 @@ user can change.
 and iterate it, or destructure the parameter so an unhandled field is an unused
 binding. Either turns the next added field into a compile error instead of a
 silently dead control.
-**Resolution:**
+**Resolution:** Fixed on 2026-09-11 with the first suggestion. `COMPARED` in
+`working-query.ts` lists the nine keys under
+`satisfies Record<keyof WorkingQuery, true>`, and `sameWorkingQuery` iterates it,
+dispatching on `Array.isArray` so a future array field gets content comparison
+rather than identity by default. `===` was kept over `Object.is`; they differ on
+`-0` and this was a no-behaviour change.
+
+The second suggestion does not work here and should not be retried:
+`ui/tsconfig.json` does not set `noUnusedLocals`, so an unhandled destructured
+field is not an error and would enforce nothing.
+
+Verified by probe, since no test can observe a field nobody has added. Adding
+`savedQueryName: string` to `WorkingQuery` fails with
+`TS1360 ... 'savedQueryName' is missing in type ... Record<keyof WorkingQuery, true>`
+at `COMPARED`; misspelling a key as `pageSizze` fails with `TS2561`, so the guard
+holds in both directions. A runtime companion spec drives a sentinel value
+through every key of `DEFAULT_WORKING_QUERY` and asserts each is compared, which
+catches drift within a single compile. No existing assertion was edited: `ui`
+419 tests, up from 418 by exactly the one added.
 
 ### F-25 [P3] open - The store has four mutation paths and three different no-op guards
 

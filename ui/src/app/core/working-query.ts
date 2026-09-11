@@ -73,6 +73,35 @@ function sameCodes(a: readonly string[], b: readonly string[]): boolean {
 }
 
 /**
+ * Every field a working query is compared on.
+ *
+ * `satisfies` is the whole point: it fails the build in both directions. Add a
+ * field to `WorkingQuery` and this map is missing a key; remove or rename one
+ * and it has a stray key. Either is a compile error here rather than a control
+ * that silently stops working.
+ *
+ * That matters because the failure mode is invisible at runtime. `sameWorkingQuery`
+ * decides whether `WorkingQueryStore` accepts a mutation, so a field left out
+ * would make its setter a no-op: the value would never change, no request would
+ * be issued, and no existing spec could catch it, because no spec knows about a
+ * field that does not exist yet.
+ */
+const COMPARED = {
+  indicators: true,
+  countries: true,
+  yearFrom: true,
+  yearTo: true,
+  source: true,
+  forecast: true,
+  vintage: true,
+  page: true,
+  pageSize: true
+} satisfies Record<keyof WorkingQuery, true>;
+
+/** The compared keys, typed so indexing a `WorkingQuery` with them is safe. */
+const COMPARED_KEYS = Object.keys(COMPARED) as (keyof WorkingQuery)[];
+
+/**
  * Whether two working queries would produce the same request.
  *
  * Compared by value, not identity, so a query rebuilt from equal parts is
@@ -81,26 +110,26 @@ function sameCodes(a: readonly string[], b: readonly string[]): boolean {
  * mints a new object, every downstream computed recomputes, and a full round
  * trip goes out for a query nobody changed.
  *
- * The arrays compare by content **and order**. `['GDP','CPI']` and
- * `['CPI','GDP']` serialise to different query strings, so they are different
- * queries even though they are the same set.
+ * Arrays compare by content **and order**. `['GDP','CPI']` and `['CPI','GDP']`
+ * serialise to different query strings, so they are different queries even
+ * though they are the same set. Dispatching on `Array.isArray` rather than on
+ * the key name means a future array field gets content comparison by default,
+ * instead of the identity comparison that would be quietly wrong.
  *
- * Every field of `WorkingQuery` is compared. Adding a field to that interface
- * without adding it here would silently swallow mutations of it, so the spec
- * covers each one.
+ * `===` rather than `Object.is`: the two differ on `-0`, and this function has
+ * always used `===`.
  */
 export function sameWorkingQuery(a: WorkingQuery, b: WorkingQuery): boolean {
-  return (
-    sameCodes(a.indicators, b.indicators) &&
-    sameCodes(a.countries, b.countries) &&
-    a.yearFrom === b.yearFrom &&
-    a.yearTo === b.yearTo &&
-    a.source === b.source &&
-    a.forecast === b.forecast &&
-    a.vintage === b.vintage &&
-    a.page === b.page &&
-    a.pageSize === b.pageSize
-  );
+  return COMPARED_KEYS.every((key) => {
+    const left: unknown = a[key];
+    const right: unknown = b[key];
+
+    if (Array.isArray(left) && Array.isArray(right)) {
+      return sameCodes(left, right);
+    }
+
+    return left === right;
+  });
 }
 
 /** True when the query pins a specific vintage rather than tracking `latest`. */
