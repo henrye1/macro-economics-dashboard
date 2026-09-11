@@ -448,3 +448,206 @@ describe('VintagesPage', () => {
     });
   });
 });
+let fixture: ComponentFixture<VintagesPage>;
+
+/**
+ * F-26: the pager must stay on screen and keep a real count while a page is in
+ * flight.
+ *
+ * This needs a deferred double. `CountingProvider` resolves synchronously, so
+ * the in-flight window is zero-width — which is exactly why this defect reached
+ * a green suite, and the same reason F-11, F-13 and F-16 did on the other tabs.
+ */
+describe('VintagesPage pager during a page change', () => {
+  class DeferredRevisions extends FixtureMacroDataProvider {
+    private pending: (() => void)[] = [];
+    calls = 0;
+    /** 76 rows at pageSize 25 is 4 pages. */
+    total = 76;
+
+    override revisions(): Observable<Envelope<Revision>> {
+      this.calls += 1;
+
+      return new Observable<Envelope<Revision>>((subscriber) => {
+        this.pending.push(() => {
+          subscriber.next(envelope(FIXTURE_REVISIONS, this.total));
+          subscriber.complete();
+        });
+      });
+    }
+
+    releaseLatest(): void {
+      const settle = this.pending.pop();
+      this.pending = [];
+      settle?.();
+    }
+  }
+
+  let provider: DeferredRevisions;
+
+  function setUpDeferred(): void {
+    provider = new DeferredRevisions();
+    TestBed.configureTestingModule({
+      imports: [VintagesPage],
+      providers: [{ provide: MACRO_DATA, useValue: provider }]
+    });
+    fixture = TestBed.createComponent(VintagesPage);
+    fixture.detectChanges();
+  }
+
+  afterEach(() => TestBed.resetTestingModule());
+
+  const strip = () =>
+    (fixture.nativeElement as HTMLElement)
+      .querySelector('.paging-state')
+      ?.textContent?.replace(/\s+/g, ' ')
+      .trim() ?? '';
+
+  const prevButton = () =>
+    (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
+      'button[aria-label="Previous page"]'
+    );
+
+  function selectAndSettle(id: number): void {
+    const button = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>(
+        '.vintages .linklike'
+      )
+    ).find((b) => b.textContent?.trim() === String(id));
+    button?.click();
+    fixture.detectChanges();
+    provider.releaseLatest();
+    fixture.detectChanges();
+  }
+
+  it('keeps the footer on screen while the first request is in flight', () => {
+    setUpDeferred();
+    const button = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>(
+        '.vintages .linklike'
+      )
+    ).find((b) => b.textContent?.trim() === '13');
+    button?.click();
+    fixture.detectChanges();
+
+    // Loading, not settled. The control must not vanish under the pointer.
+    expect(fixture.nativeElement.querySelector('app-paging-footer')).not.toBeNull();
+  });
+
+  it('keeps the asked-for page and the last real count during a page change', () => {
+    setUpDeferred();
+    selectAndSettle(13);
+
+    expect(strip()).toContain('Page 1 of 4');
+
+    (fixture.nativeElement as HTMLElement)
+      .querySelector<HTMLButtonElement>('button[aria-label="Next page"]')
+      ?.click();
+    fixture.detectChanges();
+
+    // Mid-flight: the page the user asked for, out of the count last known real.
+    expect(strip()).toContain('Page 2 of 4');
+    expect(strip()).not.toContain('of 1');
+  });
+
+  it('leaves Prev reachable while a page change is in flight', () => {
+    setUpDeferred();
+    selectAndSettle(13);
+
+    (fixture.nativeElement as HTMLElement)
+      .querySelector<HTMLButtonElement>('button[aria-label="Next page"]')
+      ?.click();
+    fixture.detectChanges();
+
+    expect(prevButton()?.disabled).toBeFalse();
+  });
+
+  it('keeps the footer on screen when a vintage changed nothing', () => {
+    setUpDeferred();
+    provider.total = 0;
+    selectAndSettle(13);
+
+    expect(fixture.nativeElement.querySelector('app-paging-footer')).not.toBeNull();
+  });
+});
+
+/** F-26: the footer survives the unavailable state too. */
+describe('VintagesPage pager when revisions fail', () => {
+  it('keeps the footer on screen', () => {
+    TestBed.configureTestingModule({
+      imports: [VintagesPage],
+      providers: [{ provide: MACRO_DATA, useValue: new FailingRevisions() }]
+    });
+    fixture = TestBed.createComponent(VintagesPage);
+    fixture.detectChanges();
+
+    const button = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>(
+        '.vintages .linklike'
+      )
+    ).find((b) => b.textContent?.trim() === '13');
+    button?.click();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('app-paging-footer')).not.toBeNull();
+    expect(
+      Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('[role="status"]')
+      ).map((n) => n.textContent?.trim())
+    ).toContain('Unknown vintage id: 99.');
+
+    TestBed.resetTestingModule();
+  });
+});
+
+/**
+ * F-27: the panels summarise the page, not the filtered table, and say so.
+ *
+ * They deliberately stay on the unfiltered page. An appeared row's change is
+ * null, so it can never be significant: routing the filter through here would
+ * make `Significant only` permanently hide the one category it can never
+ * surface.
+ */
+describe('VintagesPage summary labels', () => {
+  it('says the panels are unfiltered', () => {
+    TestBed.configureTestingModule({
+      imports: [VintagesPage],
+      providers: [{ provide: MACRO_DATA, useValue: new FixtureMacroDataProvider() }]
+    });
+    fixture = TestBed.createComponent(VintagesPage);
+    fixture.detectChanges();
+
+    const button = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>(
+        '.vintages .linklike'
+      )
+    ).find((b) => b.textContent?.trim() === '13');
+    button?.click();
+    fixture.detectChanges();
+
+    const titles = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('.summary-title')
+    ).map((p) => p.textContent?.trim());
+
+    expect(titles[0]).toBe('Series that appeared · this page, unfiltered');
+    expect(titles[1]).toBe('Series that disappeared · this page, unfiltered');
+
+    // The behaviour the label explains: the filter empties the table while the
+    // appeared panel keeps its entry.
+    (fixture.nativeElement as HTMLElement)
+      .querySelector<HTMLButtonElement>('.revisions-controls button')
+      ?.click();
+    fixture.detectChanges();
+
+    const flaggedRows = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('.revisions tbody tr')
+    );
+    expect(flaggedRows.every((row) => row.querySelector('.pill.significant'))).toBeTrue();
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('.summary-entry.appeared')
+        ?.textContent
+    ).toContain('LENDING_RATE');
+
+    TestBed.resetTestingModule();
+  });
+});

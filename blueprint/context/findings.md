@@ -151,88 +151,84 @@ click keeps the hold. Do it with the pager's third behaviour change, not as a
 fourth standalone patch.
 **Resolution:**
 
-### F-24 [P3] fixed - sameWorkingQuery is not exhaustive by construction, so a new query field would be silently ignored
+### F-26 [P2] fixed - The revisions pager disappears on every page change, and its count collapses behind it
 
-**File:** ui/src/app/core/working-query.ts:92
+**File:** ui/src/app/vintages/vintages.html:118
 **Found:** 2026-09-11 by /audit (scope: full; lens: quality)
-**Why it matters:** The comparison lists all nine fields of `WorkingQuery` by
-hand. Adding a tenth field compiles cleanly: `DEFAULT_WORKING_QUERY` fails
-typecheck until the field is given a default, which is the safety net people will
-notice, but `sameWorkingQuery` does not, and neither does anything else. The
-store would then treat a mutation of that field as a no-op and refuse it
-outright. That is strictly worse than the wasted request F-22 removed: a swallowed
-mutation is a control that does nothing, and the suite would stay green because
-no spec can know about a field that does not exist yet.
+**Why it matters:** The revisions table and `app-paging-footer` sit inside the
+final `@else` of a chain whose first branch is `revisionsLoading()`. Clicking
+Next therefore unmounts the pager for the whole round trip: the button vanishes
+from under the pointer, the layout jumps, and the control the user is operating
+is missing until the answer lands. Observations and Series render their footer
+unconditionally for exactly this reason, so this tab is the only one of the three
+that behaves this way.
 
-Its own doc comment already warns a reader to keep the list in step, which is an
-admission that nothing enforces it. Feature 10 is the likely trigger: a saved
-query wants an identifier or a name on the working query, and both are fields a
-user can change.
-**Suggested fix:** make the key list checkable by the compiler, for example
-`const COMPARED = { indicators: true, ... } satisfies Record<keyof WorkingQuery, true>`
-and iterate it, or destructure the parameter so an unhandled field is an unused
-binding. Either turns the next added field into a compile error instead of a
-silently dead control.
-**Resolution:** Fixed on 2026-09-11 with the first suggestion. `COMPARED` in
-`working-query.ts` lists the nine keys under
-`satisfies Record<keyof WorkingQuery, true>`, and `sameWorkingQuery` iterates it,
-dispatching on `Array.isArray` so a future array field gets content comparison
-rather than identity by default. `===` was kept over `Object.is`; they differ on
-`-0` and this was a no-behaviour change.
+Behind it is the shape F-13 and F-16 named. `pageCount` at
+`vintages.ts:221` reads `readyRevisions()?.totalCount ?? 0`, and `readyRevisions`
+is null in the loading state, so the count collapses to 1 while `currentPage`
+still reports the page the user asked for. That is invisible today only because
+the pager is unmounted at the same moment. Moving the footer out of the `@else`
+to match the other two tabs, which is the obvious repair for the first half,
+would immediately render `Page 3 of 1` with Next disabled. The two halves have to
+be fixed together.
 
-The second suggestion does not work here and should not be retried:
-`ui/tsconfig.json` does not set `noUnusedLocals`, so an unhandled destructured
-field is not an error and would enforce nothing.
+`createResultState` solved this for the other tabs by carrying the last settled
+`meta` on the loading state. This page has its own pipeline, correctly so, but it
+did not carry that lesson across.
+**Suggested fix:** hold the last settled `totalCount` the way `result-state.ts`
+holds `meta` — a value kept outside the stream, updated when an answer settles,
+read while one is in flight — then render the footer unconditionally like the
+other two result tabs. Add a spec that pages and asserts the footer text
+mid-flight, as `observations.spec.ts` already does.
+**Resolution:** Fixed on 2026-09-11 as suggested. The loading state carries
+`previousTotal`, captured where the inner pipe is built, and a `pagerTotal`
+computed feeds `pageCount`; `app-paging-footer` now sits outside the state chain
+like the other two result tabs. `ListState` is shared with the vintages list,
+which passes `previousTotal: null` because it issues one request and has no pager.
 
-Verified by probe, since no test can observe a field nobody has added. Adding
-`savedQueryName: string` to `WorkingQuery` fails with
-`TS1360 ... 'savedQueryName' is missing in type ... Record<keyof WorkingQuery, true>`
-at `COMPARED`; misspelling a key as `pageSizze` fails with `TS2561`, so the guard
-holds in both directions. A runtime companion spec drives a sentinel value
-through every key of `DEFAULT_WORKING_QUERY` and asserts each is compared, which
-catches drift within a single compile. No existing assertion was edited: `ui`
-419 tests, up from 418 by exactly the one added.
+Both halves were probed separately, because they fail in different ways.
+Reinstating the collapse produced
+`Expected 'Page 2 of 1 · pageSize 25 · vintages WDI 2026-03-27' to contain
+'Page 2 of 4'` — the finding's predicted string, from one spec. Moving the footer
+back inside the `@else` failed four specs on a missing element. One correction
+to the done-when: the "Prev stays reachable" case does **not** guard the collapse.
+With `pageCount` at 1 and `page` at 2, `canPrev` is still `page > 1`, so Prev
+stays enabled either way; it failed only in the unmount probe. It is kept as a
+guard against a neighbouring regression, not claimed as evidence for this one.
 
-### F-25 [P3] fixed - The store has four mutation paths and three different no-op guards
+The specs needed a deferred provider double, which `vintages.spec.ts` did not
+have: `CountingProvider` resolves synchronously, so the in-flight window was
+zero-width. That is the same reason this defect, and F-11, F-13 and F-16 before
+it, reached a green suite.
 
-**File:** ui/src/app/core/working-query.store.ts:74
+### F-27 [P3] fixed - The summary strip ignores the Significant only filter it sits beneath
+
+**File:** ui/src/app/vintages/vintages.ts:243
 **Found:** 2026-09-11 by /audit (scope: full; lens: quality)
-**Why it matters:** After the F-22 repair the store guards no-op mutations three
-different ways. `patch` and `setPage` compare through `settle`. `addTo` and
-`removeFrom` keep their own inline `includes` check, which is equivalent but
-separate. `reset()` at line 74 has no guard at all: it assigns
-`DEFAULT_WORKING_QUERY` by reference, so resetting a query that is structurally
-default but a different object, which is what "add an indicator, remove it,
-press Reset" produces, mints a new identity and notifies every reader.
+**Why it matters:** `appeared` and `disappeared` derive from `views()`, the whole
+page, while the table above them renders `rows()`, the page filtered by the
+`Significant only` toggle. An appeared or disappeared row can never be
+significant, because its change is null, so switching the filter on empties those
+rows from the table while the panels beneath keep listing the same series. The
+reading is then "no significant changes on this page" directly above "series that
+appeared: LENDING_RATE · MUS · 2010–2024", which invites the conclusion that the
+appeared series was filtered out for being insignificant rather than being a
+different kind of thing entirely.
 
-Nothing breaks today. That reset case ends with an empty `indicators`, so
-`validation()` is invalid, `request` is null and no HTTP goes out; the cost is
-recomputation, not a round trip. The concern is structural rather than current:
-F-22 existed because one mutator was written without the guarantee the others
-had, and the repair left the surface in the same shape it was in when that
-happened. Feature 10 adds the mutator most likely to repeat it, because loading a
-saved query writes the whole object at once.
-**Suggested fix:** route every mutation through `settle`, including `reset`
-(`settle(current, DEFAULT_WORKING_QUERY)`) and the two array helpers, so the
-guarantee is a property of the store rather than a habit each method has to
-remember. The inline `includes` checks then become redundant and can go.
-**Resolution:** Fixed on 2026-09-11. `settle` became `mutate`, a private method
-taking a `(current) => candidate` function and performing the only write to
-`state` in the file; `patch`, `setPage`, `reset`, `addTo` and `removeFrom` are
-all one-line callers. The structural claim is checkable rather than visual:
-`this.state.update(` and `this.state.set(` now appear once in total, so a future
-mutator cannot bypass the guarantee without deliberately reaching past it.
-
-**One part of this finding was wrong and following it literally would have
-introduced a bug.** It says both inline `includes` checks become redundant. That
-holds for `removeFrom`, whose filter yields an equal-content array that the
-comparison recognises, and the check was removed. It does not hold for `addTo`:
-appending a code already present produces a genuinely different array, so the
-comparison would correctly report a change and `indicators=GDP,GDP` would reach
-the query string. That check is a de-duplication rule rather than a no-op
-optimisation; it stayed, and its comment now says why.
-
-Verified by removing the comparison from `mutate`: 13 specs fail, including one
-pre-existing case that now depends on `mutate` rather than `removeFrom`'s own
-check, which is the consolidation working. No existing assertion was edited.
-`ui` 429 tests, up from 419.
+Defensible as designed — the panels summarise the page, not the filtered view,
+and the titles do say "this page" — which is why this is P3 rather than a
+correctness bug. But the two regions currently answer different questions from
+the same toggle with no visible cue.
+**Suggested fix:** either derive the panels from `rows()` so the filter reaches
+them consistently, or leave them on `views()` and say so in the panel titles, for
+example "this page · unfiltered". The second is likely the better product answer
+because appeared and disappeared series are the one thing the significance filter
+can never surface.
+**Resolution:** Fixed on 2026-09-11 with the second option, and the first was
+rejected on the reasoning this finding itself raised: an appeared row's change is
+null, so it can never be significant, and routing the filter through the panels
+would make `Significant only` permanently delete the one category it can never
+surface. The titles now read `Series that appeared · this page, unfiltered` and
+the same for disappeared. A spec asserts both titles and the behaviour the label
+explains: with the filter on, every table row carries a Significant pill while the
+appeared panel still lists its entry.

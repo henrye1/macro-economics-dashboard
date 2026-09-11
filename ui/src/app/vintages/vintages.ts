@@ -36,7 +36,18 @@ const SPAN_LIMIT = 5;
 
 type ListState<T> =
   | { status: 'ready'; items: readonly T[]; totalCount: number }
-  | { status: 'loading' }
+  /**
+   * A request is in flight.
+   *
+   * It carries the last settled total so the pager keeps reporting a real page
+   * count while it waits. Deriving the count from the settled state instead
+   * collapses it to 1 mid-flight, which reads as "Page 3 of 1" the moment the
+   * footer is on screen at the same time. `core/result-state.ts` carries the
+   * same value for the same reason on the other two result tabs.
+   *
+   * The vintages list passes null: it issues one request and has no pager.
+   */
+  | { status: 'loading'; previousTotal: number | null }
   | { status: 'unavailable'; message: string };
 
 interface RevisionRequest {
@@ -73,7 +84,7 @@ export class VintagesPage {
           message: macroErrorMessage(error, VINTAGES_UNAVAILABLE)
         })
       ),
-      startWith<ListState<Vintage>>({ status: 'loading' })
+      startWith<ListState<Vintage>>({ status: 'loading', previousTotal: null })
     ),
     { initialValue: null }
   );
@@ -141,8 +152,12 @@ export class VintagesPage {
     ListState<Revision> | null
   >(
     toObservable(this.request).pipe(
-      switchMap((request) =>
-        request === null
+      switchMap((request) => {
+        // Read where the inner pipe is built, which is while the previous
+        // answer is still the settled one.
+        const previousTotal = this.readyRevisions()?.totalCount ?? null;
+
+        return request === null
           ? of<ListState<Revision> | null>(null)
           : this.macro
               .revisions(request.vintageId, { page: request.page, pageSize: PAGE_SIZE })
@@ -162,9 +177,9 @@ export class VintagesPage {
                 ),
                 // Per request, so paging returns to loading rather than holding
                 // the previous page's rows.
-                startWith<ListState<Revision>>({ status: 'loading' })
-              )
-      )
+                startWith<ListState<Revision>>({ status: 'loading', previousTotal })
+              );
+      })
     ),
     { initialValue: null }
   );
@@ -218,10 +233,25 @@ export class VintagesPage {
   protected readonly currentPage = computed(() => this.page());
   protected readonly pageSize = PAGE_SIZE;
 
-  protected readonly pageCount = computed(() => {
-    const total = this.readyRevisions()?.totalCount ?? 0;
-    return Math.max(1, Math.ceil(total / PAGE_SIZE));
+  /**
+   * The total the pager describes: the settled answer, or the last one that
+   * settled while a request is in flight. Never zero just because nothing has
+   * arrived yet, which would claim a single page.
+   */
+  private readonly pagerTotal = computed<number | null>(() => {
+    const state = this.revisionsState();
+    if (state === null) {
+      return null;
+    }
+    if (state.status === 'ready') {
+      return state.totalCount;
+    }
+    return state.status === 'loading' ? state.previousTotal : null;
   });
+
+  protected readonly pageCount = computed(() =>
+    Math.max(1, Math.ceil((this.pagerTotal() ?? 0) / PAGE_SIZE))
+  );
 
   protected prev(): void {
     this.page.update((page) => Math.max(1, page - 1));

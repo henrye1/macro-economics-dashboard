@@ -137,23 +137,28 @@
           }
         </tbody>
       </table>
-
-      <app-paging-footer
-        [page]="currentPage()"
-        [pageCount]="pageCount()"
-        [pageSize]="pageSize"
-        [vintageLabels]="pagerVintage()"
-        (prev)="prev()"
-        (next)="next()"
-      />
     }
+
+    <!-- Outside the state chain, like Observations and Series: unmounting the
+         control the user is operating for the length of a round trip moves the
+         button out from under the pointer. -->
+    <app-paging-footer
+      [page]="currentPage()"
+      [pageCount]="pageCount()"
+      [pageSize]="pageSize"
+      [vintageLabels]="pagerVintage()"
+      (prev)="prev()"
+      (next)="next()"
+    />
 
     @if (!revisionsLoading() && !revisionsUnavailable() && !unchanged()) {
       <div class="summary">
         <div class="summary-panel">
-          <!-- Scoped to the page on screen, and labelled as such: the service
-               pages revisions, so the whole result is not in hand here. -->
-          <p class="summary-title">Series that appeared · this page</p>
+          <!-- Scoped to the page on screen and not filtered, both stated: the
+               service pages revisions, so the whole result is not in hand, and
+               an appeared row can never be significant, so `Significant only`
+               would empty these panels permanently if it reached them. -->
+          <p class="summary-title">Series that appeared · this page, unfiltered</p>
           @if (appearedShown().length === 0) {
             <p class="summary-none">None</p>
           } @else {
@@ -167,7 +172,7 @@
         </div>
 
         <div class="summary-panel">
-          <p class="summary-title">Series that disappeared · this page</p>
+          <p class="summary-title">Series that disappeared · this page, unfiltered</p>
           @if (disappearedShown().length === 0) {
             <p class="summary-none">None</p>
           } @else {
