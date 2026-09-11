@@ -23,6 +23,25 @@ const NEWLINE = '\r\n';
 /** Comment lines are not part of RFC 4180; this is the convention readers skip. */
 const COMMENT = '# ';
 
+/**
+ * The UTF-8 byte-order mark, written at the head of every CSV document.
+ *
+ * Excel on Windows ignores the Blob's `charset=utf-8` for a file opened from
+ * disk and falls back to the system codepage without this, so the `·` in
+ * the stamp line below renders as mojibake in the one application this format
+ * exists to feed.
+ *
+ * The cost, since it is not free: a reader that does not strip the mark sees one
+ * invisible character at the very start of the file. That position is already a
+ * comment line, so a strict `comment='#'` reader could stop recognising the
+ * first line as a comment. Excel, pandas and R with `UTF-8-BOM` all strip it,
+ * and without it Excel is wrong for every export, so this is the better trade.
+ *
+ * CSV only. JSON is read by parsers that require no such hint, and a mark there
+ * would be a leading character in a document that is supposed to start with `{`.
+ */
+const UTF8_BOM = '\ufeff';
+
 export interface CsvOptions {
   /** Writes the vintage ids into the header so the pull can be reproduced. */
   readonly pinVintages: boolean;
@@ -62,7 +81,7 @@ export function toCsv(
     lines.push(EXPORT_COLUMNS.map((column) => csvField(observation[column])).join(','));
   }
 
-  return lines.join(NEWLINE) + NEWLINE;
+  return UTF8_BOM + lines.join(NEWLINE) + NEWLINE;
 }
 
 /** `12 WEO 10.0.0 2026-04-14; 7 WDI 2026-03-27`, or a plain none. */

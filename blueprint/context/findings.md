@@ -162,44 +162,6 @@ which falls back to `store.query().pageSize` while loading, so changing the page
 size mid-flight computes a count from two different queries' numbers. Same defect,
 same repair. P3, so it does not block.
 
-### F-28 [P2] fixed - One refused write disables saving for the rest of the session, with no way back
-
-**File:** ui/src/app/saved-queries/saved-queries.ts:47
-**Found:** 2026-09-11 by /audit (scope: full; lens: quality)
-**Why it matters:** `SavedQueryStore.save` sets `failure` when `setItem` throws,
-and clears it only after a later write succeeds
-(`saved-query.store.ts:93, 97`). But `saveBlockedReason` returns
-`storageProblem()` first, so `canSave` is false and the Save button is
-`[disabled]` at `saved-queries.html:76` from that moment on. The only write that
-could clear the flag is the one the flag prevents, so the page is latched: the
-user cannot retry even after freeing space, and only a reload recovers it,
-because the store re-reads storage in its constructor. `setName` clears the
-confirmation but not the failure.
-
-The spec that covers this path asserts only that the name survives, and its
-comment - "The name survives, so the user can retry rather than retype"
-(`saved-queries.spec.ts:347`) - states a behaviour the code does not have. That
-is the same shape as F-17: a test whose stated intent and assertion disagree.
-**Suggested fix:** clear `failure` when the user edits the name, so the next
-attempt is allowed to reach storage and either succeed or re-set the flag. A
-one-line change in `setName`, plus a spec that fails a write, retypes, succeeds,
-and asserts the entry lands.
-**Resolution:** Fixed on 2026-09-11 as suggested. `SavedQueryStore.clearWriteProblem()`
-drops the message and returns early when `storage === null`, so an unusable
-browser stays latched on purpose; `SavedQueriesPage.setName` calls it beside the
-existing `confirmation.set(null)`, which keeps the store the sole writer of
-`failure`.
-
-Probed by reverting the `setName` call: `lets the next attempt through once the
-name is edited` failed on `Expected true to be false` (the button stayed
-disabled) and `Expected 0 to be 1` (no row landed). Restored and re-run green.
-
-Six specs added, not two. The extra three cover what clearing on edit could
-break rather than what it fixes: a second refusal is re-reported instead of
-being hidden by the edit that preceded it, the saved list is untouched by the
-clear, and the null-storage card stays disabled however much the user types. The
-existing test's misleading comment was corrected rather than kept.
-
 ### F-29 [P3] open - The revisions pager holds the previous vintage's page count while a different vintage loads
 
 **File:** ui/src/app/vintages/vintages.ts:158
@@ -231,4 +193,121 @@ wrong. Nothing reads a stale value, so this is presentation only.
 **Suggested fix:** either bind the dot to a real signal - the same request the
 vintage strip already makes is the cheapest honest source - or drop the dot and
 keep the label, which already says what the pill is for.
+**Resolution:**
+
+### F-31 [P2] open - The only code that actually writes a file has no test and revokes its URL before the browser may have read it
+
+**File:** ui/src/app/core/export/export.service.ts:161
+**Found:** 2026-09-11 by /audit (scope: full; lens: tests)
+**Why it matters:** `EXPORT_DOWNLOADER` is overridden in every spec, which is
+right for the service's logic and leaves `anchorDownload` itself with zero
+coverage. That would be acceptable for a trivial adapter, but this one takes two
+shortcuts known to be fragile outside Chromium: the anchor is never appended to
+the document, and `URL.revokeObjectURL` runs synchronously on the line after
+`click()`. Chromium takes a reference during the click, so it works there — which
+is exactly why it would pass by hand. Firefox has historically needed the anchor
+in the document, and revoking in the same task can abort the save.
+
+Nothing proves this either way in this project: there is no browser harness, and
+the manual try path was only ever going to be run in one browser. Recorded as a
+defect rather than a risk because the shortcuts are deliberate choices visible in
+the code, not an unknown.
+**Suggested fix:** append the anchor, click, remove it, and revoke from a
+`setTimeout(..., 0)` so the revoke lands in a later task. Then either cover it
+through `/browser-tests`, or say in the comment that it is proven by hand in
+Chromium only.
+**Resolution:**
+
+### F-32 [P3] open - The Export card reads "1 indicators", and a spec asserts the mistake
+
+**File:** ui/src/app/export/export-card.ts:105
+**Found:** 2026-09-11 by /audit (scope: full; lens: quality)
+**Why it matters:** `scopeLine` interpolates the count straight into the full
+word, so a single-indicator query reads `56 rows · 1 indicators · all countries`.
+The saved-queries `scopeLabel` gets away without pluralising because it uses the
+design's terse `1 ind`; this line spells the word out, so the same shortcut reads
+as a bug rather than a convention. `1 rows` has the same problem.
+
+Recorded partly because `export-card.spec.ts:226` and `:234` both assert
+`1 indicators` verbatim. The suite pins the wrong string, which is the F-17 shape
+once more: a test that will resist the repair.
+**Suggested fix:** pluralise `rows`, `indicators` and `countries` on their own
+counts, and update the two specs to the corrected wording rather than leaving
+them to fail.
+**Resolution:**
+
+### F-33 [P3] fixed - The CSV carries no byte-order mark, so Excel mangles the one character its header always contains
+
+**File:** ui/src/app/core/export/export-csv.ts:46
+**Found:** 2026-09-11 by /audit (scope: full; lens: quality)
+**Why it matters:** The first line is always
+`# Cyte Macro Data export · <date>`, and `·` is not ASCII. The Blob is declared
+`text/csv;charset=utf-8`, but Excel on Windows ignores the MIME type for a file
+opened from disk and falls back to the system codepage unless a UTF-8 BOM is
+present. The stamp line therefore renders as mojibake in the application this
+format exists to feed. Vintage labels and attribution can carry non-ASCII too.
+No data value is affected today, because every `Observation` field is ASCII.
+**Suggested fix:** prefix the CSV contents with a UTF-8 byte-order mark. It costs one
+character, every other reader tolerates it, and it is the only thing that makes
+Excel read the file as UTF-8. JSON needs no BOM and must not get one.
+**Resolution:** Fixed on 2026-09-11 as suggested. `UTF8_BOM` at
+`export-csv.ts:43`, returned ahead of the joined lines by `toCsv`; `toJson` is
+untouched and a spec pins that it still starts with a brace. Written as the
+escape `'\ufeff'` rather than the character itself, which an editor renders as
+nothing and a reviewer cannot see. This ledger entry had the same problem and was
+corrected in the same pass.
+
+The code comment records the cost this finding did not: a reader that does not
+strip the mark sees one invisible character exactly where a `#` comment line
+begins, so a strict `comment='#'` parser could stop treating that first line as
+a comment. Kept anyway, because without the mark Excel is wrong for every export.
+
+Six specs. The suite surfaced that same hazard immediately: `dataLines` filters on
+a leading `#`, the marked first line stopped matching, and two existing header
+cases failed until `lines()` learned to strip the mark. That is the trade-off
+reproduced in miniature, and it is why the strip lives in one helper rather than
+in each assertion.
+
+Probed by removing the prefix, which failed five specs across the writer and the
+service, including the one proving JSON stays unmarked. Restored and re-run green.
+
+### F-34 [P3] open - A CSV field beginning with an operator is a live formula when the export is opened in a spreadsheet
+
+**File:** ui/src/app/core/export/export-csv.ts:88
+**Found:** 2026-09-11 by /audit (scope: full; lens: security)
+**Why it matters:** `csvField` implements RFC 4180 quoting correctly, which is a
+transport rule and not a safety one. A field whose text begins with `=`, `+`, `-`
+or `@` is evaluated as a formula by Excel, LibreOffice and Sheets, and quoting
+does not prevent it. The reachable path is `indicator` and `country`, supplied by
+the Core API — outside this console's control and explicitly treated as untrusted
+everywhere else in the codebase, which is why `saved-query.store.ts` structurally
+validates everything it reads back.
+
+Low likelihood: it needs a hostile or compromised upstream, and this is an
+internal console with one known data source. Recorded because the mechanism is
+real, the mitigation is one line, and the export is the only artifact this project
+hands to another application.
+**Suggested fix:** prefix a field with a single quote when its first character is
+one of `=+-@`. Do it inside `csvField` so every column is covered; `value` is a
+number and never reaches that branch as text.
+**Resolution:**
+
+### F-35 [P3] unverified - Nothing confirms the live service honours pageSize=5000, and the refusal names our number as if it were the limit
+
+**File:** ui/src/app/core/export/export.service.ts:20
+**Found:** 2026-09-11 by /audit (scope: full; lens: quality)
+**Why it matters:** `EXPORT_PAGE_SIZE` is 5000 because CONSUMER-GUIDE section 6
+steers bulk consumers there, but feature 8's live reconciliation never probed it,
+and `/countries` was observed ignoring `pageSize` entirely. If the service caps
+the page lower — 500, say — then `data.length` is the cap rather than our request,
+and every export above it refuses with "one export can carry 500", which reads as
+a limit this console chose. The user would be told to narrow a query that paging
+would have answered.
+
+Unverified on purpose: confirming it needs a live request against a result larger
+than 5000 rows, which this session did not make. A lead, not a defect, and it
+gates nothing.
+**Suggested fix:** probe `/observations?pageSize=5000` against the live service
+and record what `meta.pageSize` comes back as. If it is capped, either page the
+export or word the refusal as the service's limit rather than ours.
 **Resolution:**

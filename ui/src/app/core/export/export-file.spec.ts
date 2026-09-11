@@ -36,9 +36,15 @@ function row(overrides: Partial<Observation> = {}): Observation {
   };
 }
 
-/** Splits on CRLF only, which also asserts the line ending is right. */
+/** The mark is asserted on its own; every other case is about the text. */
+const BOM = '\ufeff';
+
+/**
+ * Splits on CRLF only, which also asserts the line ending is right, and drops
+ * the byte-order mark so the header assertions stay about the header.
+ */
 function lines(csv: string): string[] {
-  return csv.split('\r\n');
+  return csv.replace(BOM, '').split('\r\n');
 }
 
 function dataLines(csv: string): string[] {
@@ -191,6 +197,32 @@ describe('toCsv', () => {
     });
   });
 
+  describe('the byte-order mark', () => {
+    it('starts the document, so Excel reads it as UTF-8', () => {
+      // Without it Excel falls back to the system codepage and the stamp line's
+      // middle dot arrives as mojibake.
+      expect(toCsv([row()], meta(), { pinVintages: false, nowIso: NOW }).startsWith(BOM))
+        .toBeTrue();
+    });
+
+    it('is followed immediately by the first comment, not by a blank', () => {
+      const csv = toCsv([row()], meta(), { pinVintages: false, nowIso: NOW });
+
+      expect(csv.slice(BOM.length, BOM.length + 2)).toBe('# ');
+    });
+
+    it('is written exactly once, not per line', () => {
+      const csv = toCsv([row(), row({ year: 2025 })], meta(), { pinVintages: true, nowIso: NOW });
+
+      expect(csv.split(BOM).length - 1).toBe(1);
+    });
+
+    it('is written even for an empty result, which is still a CSV document', () => {
+      expect(toCsv([], meta({ totalCount: 0 }), { pinVintages: false, nowIso: NOW }))
+        .toContain(BOM);
+    });
+  });
+
   it('ends with a line terminator, so the last row is a complete line', () => {
     expect(toCsv([row()], meta(), { pinVintages: false, nowIso: NOW }).endsWith('\r\n')).toBeTrue();
   });
@@ -205,6 +237,13 @@ describe('toJson', () => {
 
   it('carries meta.vintages, which is what makes the pin checkbox inert here', () => {
     expect(JSON.parse(toJson(envelope)).meta.vintages.length).toBe(2);
+  });
+
+  it('carries no byte-order mark, unlike the CSV', () => {
+    // JSON parsers need no encoding hint, and a mark would be a stray character
+    // in a document that must start with a brace.
+    expect(toJson(envelope).startsWith('\ufeff')).toBeFalse();
+    expect(toJson(envelope).startsWith('{')).toBeTrue();
   });
 
   it('is indented, because a consumer reads this one', () => {

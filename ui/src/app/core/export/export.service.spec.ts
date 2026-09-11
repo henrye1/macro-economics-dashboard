@@ -199,6 +199,21 @@ describe('ExportService', () => {
       expect(saved[1].contents).not.toContain('# vintages:');
     });
 
+    it('marks the CSV it hands over as UTF-8, and the JSON not', async () => {
+      sendable();
+      let pending = service.download('csv', false);
+      macro.release();
+      await pending;
+
+      expect(saved[0].contents.startsWith('\ufeff')).toBeTrue();
+
+      pending = service.download('json', false);
+      macro.release();
+      await pending;
+
+      expect(saved[1].contents.startsWith('\ufeff')).toBeFalse();
+    });
+
     it('writes JSON as the envelope, ignoring the pin flag', async () => {
       sendable();
       const pending = service.download('json', false);
