@@ -204,11 +204,20 @@ directory and runs its commands from there.
 - Build command: `npm ci && npm run build`
 - Publish directory: `dist/ui/browser` (relative to the `ui` root directory). `ui/angular.json`
   sets no explicit `outputPath`, so the builder defaults to the project name, `ui`.
-- Rewrite rule: `/*` → `/index.html` (200) for client-side routing
-- Env vars (build time, non-secret): `API_BASE_URL`
-  > TODO: Angular does not read process env at build time by itself. Feature 13 has to
-  > choose the mechanism, most likely a build-time file replacement or a small generated
-  > config file, and record it here.
+- Rewrite rules, in order:
+  1. `/api/*` → the API service, as a proxy. This is the production equivalent of
+     `ui/proxy.conf.json` in development: the browser only ever talks to the console's
+     own origin, so the console needs no API base URL and the app code keeps its
+     relative `/api/macro`.
+  2. `/*` → `/index.html` (200) for client-side routing
+- Env vars: **none.** Decided on 2026-09-11, replacing an earlier `API_BASE_URL`
+  build-time variable. Angular does not read process env at build time, so that
+  approach needed a generated file and one build per environment; the rewrite needs
+  neither, and it also means no cross-origin request is ever made from the browser.
+  > **Unverified.** Render's rewrite-to-an-external-service behaviour has not been
+  > confirmed against its documentation or a real service. `/release render` must
+  > check it. If a static site cannot proxy to another service, the fallback is the
+  > build-time generated file and `API_BASE_URL` returns.
 
 **API (Express)** — Render Web Service
 

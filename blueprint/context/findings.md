@@ -341,3 +341,57 @@ earlier send in this session, or clear the hold when the page is destroyed. The
 first keeps the `304` demonstration working across a tab change; the second is
 simpler and gives it up.
 **Resolution:**
+
+### F-40 [P3] open - The base path is defined twice, and the comment on one of them claims it is the only one
+
+**File:** ui/src/app/core/http/http-macro-data.provider.ts:23
+**Found:** 2026-09-11 by /audit (scope: changed; lens: quality)
+**Why it matters:** `BASE = '/api/macro'` at `:29` carries a comment saying a
+configurable production base URL "is feature 13's open TODO, and inventing one
+here would be a second source of truth to unpick later." Two things about that
+are now wrong.
+
+The TODO is resolved: the plan change under review chooses a Render rewrite that
+proxies `/api/*` to the API service, so the relative path is correct in
+production and no configurable base URL is coming. A comment pointing at a
+decision that has been made sends the next reader looking for work that does not
+exist.
+
+And the second source of truth already exists. `request-text.ts:15` declares
+`PROXY_BASE = '/api/macro'` independently, for the request builder's own send.
+They cannot diverge silently today, because specs in both files assert the
+literal path — but the comment asserts a uniqueness the code does not have, and
+if the rewrite assumption fails and `API_BASE_URL` returns, the repair has two
+constants to find rather than the one the comment promises.
+**Suggested fix:** have `request-text.ts` export the base and the provider import
+it, or the reverse — one owner either way — and rewrite the comment to record the
+rewrite decision rather than the TODO it replaced.
+**Resolution:**
+
+### F-41 [P3] open - The plan now makes CORS unexercised while still describing it as the lock
+
+**File:** blueprint/project-plan.md:220
+**Found:** 2026-09-11 by /audit (scope: changed; lens: security)
+**Why it matters:** The change under review states that with the `/api/*` rewrite
+"no cross-origin request is ever made from the browser." That is the point of the
+approach and it is correct. The same document's Notes still read "CORS on the API
+is locked to the console's origin via `CORS_ORIGIN`", and `api/src/app.ts:17`
+configures `cors({ origin: config.corsOrigin })` accordingly.
+
+Both statements can be true at once, and that is the problem: after the rewrite,
+requests reach the API from Render's proxy rather than from a browser, so the
+`Origin` header may not be present and the CORS headers stop being the control
+they are described as. Nothing breaks — `cors()` simply adds nothing when there
+is no origin to match — but `/release render` will otherwise configure
+`CORS_ORIGIN` believing it gates access, when the only thing actually gating
+access is that the API's URL is not published.
+
+The project overview already records the underlying gap as accepted: until
+logins exist, anyone with the API URL can use the M2M credentials by proxy. This
+finding is that the plan's CORS sentence now reads as a mitigation it is not.
+**Suggested fix:** keep `CORS_ORIGIN` configured — it costs nothing and still
+applies if the console ever calls the API directly — and correct the sentence to
+say CORS is defence in depth rather than the lock. Then decide at
+`/release render` whether the accepted gap needs the shared-header mitigation the
+plan already describes as throwaway code.
+**Resolution:**
