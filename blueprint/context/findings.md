@@ -278,7 +278,7 @@ without saying what breaks if it goes.
 real, and the bare statement and its comment both disappear.
 **Resolution:**
 
-### F-38 [P2] fixed - The Response card keeps describing a request the URL block no longer shows
+### F-38 [P2] closed - The Response card keeps describing a request the URL block no longer shows
 
 **File:** ui/src/app/request-builder/request-builder.ts:76
 **Found:** 2026-09-11 by /audit (scope: full; lens: quality)
@@ -302,7 +302,22 @@ viewport.
 **Suggested fix:** clear `result` and `copied` when the request key changes, not
 only when the endpoint does. An `effect` on `proxyUrl()` covers both causes in
 one place, and `selectEndpoint`'s two manual resets can then go.
-**Resolution:** Fixed on 2026-09-11 as suggested. `clearOnRequestChange` reads
+**Resolution:** Closed by the 2026-09-21 audit at a3ceed7. Re-examined at the
+code: `request-builder.ts:103` holds one `effect` that reads `proxyUrl()` and
+clears both `result` and `copied`, and `proxyUrl` at `:93` is computed from the
+endpoint and the query together, so a code, country or year edit in the card
+above now drops the answer exactly as an endpoint change does. `selectEndpoint`
+is down to a single `set`.
+
+The repair opened one window worth checking and the suite already closes it: an
+answer arriving after the query changed would have re-seated a stale result over
+a cleared card, and `request-builder.spec.ts:277` sends, mutates the query
+mid-flight, then flushes, and asserts the card stays `Not sent`. Five further
+cases cover the code, year and copy-confirmation paths and the claim that
+re-selecting the current endpoint notifies nothing. All green in the 713-spec
+run at this commit. No new defect in the file.
+
+Fixed on 2026-09-11 as suggested. `clearOnRequestChange` reads
 `proxyUrl()` and clears both signals; `selectEndpoint` is reduced to a single
 `set`, its early return removed because signals compare with `Object.is` and
 re-selecting the current endpoint notifies nothing.
@@ -693,7 +708,7 @@ glyphs follow the design reference. Then fix the one comment at `series.ts:91`
 that the narrowed rule still catches.
 **Resolution:** Confirmed independently, 2026-09-21. The conflict between the standard and the product copy is real and is a standards question rather than a code defect. Stays open for the user to decide; a reviewer cannot accept it on their behalf.
 
-### F-71 [P3] open - The Angular CLI analytics id is committed, so every clone reports usage telemetry under one shared identity
+### F-71 [P3] closed - The Angular CLI analytics id is committed, so every clone reports usage telemetry under one shared identity
 
 **File:** ui/angular.json:6
 **Found:** 2026-09-21 by /audit independent (scope: current; lens: security)
@@ -717,7 +732,12 @@ it to `false` solves that without opting anyone in.
 set `NG_CLI_ANALYTICS=false` in the Playwright `webServer` env. If telemetry is
 wanted, record the choice in `AGENTS.md` so it is a decision rather than an
 artefact.
-**Resolution:**
+**Resolution:** Closed by the 2026-09-21 full audit at a3ceed7. Master had already
+made the opposite call in `cda5e62`, which sets `"analytics": false` instead of
+checking in the uuid, and the squash merge of the fix branch kept that side of
+the conflict. `ui/angular.json:6` now reads `"analytics": false` and no uuid
+remains in the file. The telemetry opt-out is the CLI behaviour the finding
+asked for.
 
 ### F-72 [P3] open - The chart's screen-reader description states a forecast even on a chart that has none
 
@@ -789,4 +809,55 @@ the app did not write - but the guard is one line and the failure is total.
 year outside that is not selectable anyway. Tightening `isNullableNumber` to
 `Number.isInteger` plus a plausible range would fix the class rather than the
 symptom.
+**Resolution:**
+
+### F-75 [P3] open - The API ships Express's default fingerprint and parses a JSON body on a read-only surface
+
+**File:** api/src/app.ts:14
+**Found:** 2026-09-21 by /audit (scope: full; lens: security)
+**Why it matters:** `createApp()` mounts `cors`, `express.json()`, the auth seam
+and the router, and nothing else. Three small gaps follow from that:
+
+`x-powered-by` is left on, so every response advertises Express. It is not a
+vulnerability by itself, it is free reconnaissance, and `app.disable('x-powered-by')`
+is the one-line answer.
+
+No response security headers are set. There is no `X-Content-Type-Options`,
+`Referrer-Policy` or `X-Frame-Options`. The relay answers JSON, so the practical
+risk is small, but `notFound` at `error-handler.ts:4` reflects `req.originalUrl`
+into a response body, and nosniff is exactly the header that keeps a reflected
+value from ever being treated as markup.
+
+`express.json()` parses a body on every request when every route the service has
+is a `GET`. It is reachable surface with no consumer: a POST of 100 kB of JSON to
+any path is parsed before the 404 is written.
+
+None of this is exploitable as the service stands. It matters because feature 13
+puts this on Render and features 14 and 15 put real sessions behind it, and
+hardening a relay is much cheaper before either.
+**Suggested fix:** `app.disable('x-powered-by')`, and drop `express.json()` until
+a route needs a body. Add `helmet` when feature 13 configures the deployment, or
+set the three headers by hand if the dependency is not wanted.
+**Resolution:**
+
+### F-76 [P3] open - A non-numeric PORT silently binds a random port instead of failing
+
+**File:** api/src/config.ts:47
+**Found:** 2026-09-21 by /audit (scope: full; lens: quality)
+**Why it matters:** `port: Number(process.env.PORT ?? 3000)` has no guard.
+`PORT=""` gives `0` and `PORT=http` gives `NaN`, and Node treats both as "pick
+an ephemeral port", so `index.ts` binds something arbitrary and logs the wrong
+number: `API listening on http://localhost:NaN`. The platform health check then
+fails against a port nothing is listening on, and the log actively misdirects
+whoever reads it.
+
+Every other setting in this file is either validated or has a meaningful empty
+default, and `isMacroConfigured` exists precisely because the module's own
+comment says a partially configured service is worse than an unconfigured one.
+Port is the one setting that escaped that reasoning, and it is the setting a
+deployment platform always supplies.
+**Suggested fix:** parse once and fall back deliberately, for example
+`const parsed = Number(process.env.PORT); const port = Number.isInteger(parsed) && parsed > 0 && parsed < 65536 ? parsed : 3000;`
+Throwing instead of falling back is also defensible, since a platform that sets
+`PORT` wrong wants to know.
 **Resolution:**
