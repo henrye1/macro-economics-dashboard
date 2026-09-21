@@ -1,0 +1,157 @@
+<section class="card chart-card">
+  <div class="card-head">
+    <div class="chart-title">
+      <span class="name">{{ chart().name }}</span>
+      <span class="code">{{ chart().indicator }}</span>
+    </div>
+    <span class="meta">{{ chart().metaLabel }}</span>
+  </div>
+
+  <div class="plot">
+    <!--
+      The chart is decoration to a screen reader: the shapes carry no text and
+      the tooltip only exists under a pointer. The description states the shape
+      of it, and the table states every plotted value, which is what the points
+      strip this chart replaced used to show as text.
+    -->
+    <div class="sr-only">
+      <p>{{ chart().description }}</p>
+
+      <table>
+        <caption>{{ chart().name }} by year, one row per country</caption>
+        <thead>
+          <tr>
+            <th scope="col">Country</th>
+            @for (year of chart().table.years; track year) {
+              <th scope="col">{{ year }}</th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of chart().table.rows; track row.country) {
+            <tr>
+              <th scope="row">{{ row.country }}</th>
+              @for (cell of row.cells; track $index) {
+                <td>
+                  @if (cell) {
+                    {{ cell.value }}@if (cell.forecast) {, forecast}
+                  } @else {
+                    not reported
+                  }
+                </td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <!--
+      The tooltip is placed in percentages of the viewBox, so its containing
+      block has to be the SVG's own box. The canvas is capped at the viewBox
+      width and the SVG fills it at the viewBox aspect, which keeps the two in
+      step at every card width.
+    -->
+    <div class="canvas" [style.max-width.px]="width">
+      <svg
+        [attr.viewBox]="'0 0 ' + width + ' ' + height"
+        preserveAspectRatio="xMidYMid meet"
+        aria-hidden="true"
+        focusable="false"
+      >
+        @if (chart().hasForecast) {
+          <rect
+            [attr.x]="chart().forecastBandX"
+            y="14"
+            [attr.width]="chart().forecastBandWidth"
+            height="200"
+            class="forecast-band"
+          />
+        }
+
+        @for (tick of chart().yTicks; track tick.position) {
+          <line x1="56" [attr.y1]="tick.position" x2="748" [attr.y2]="tick.position" class="gridline" />
+          <text [attr.x]="yLabelX" [attr.y]="tick.position + 4" text-anchor="end" class="axis">
+            {{ tick.label }}
+          </text>
+        }
+
+        <line x1="56" y1="214" x2="748" y2="214" class="axis-rule" />
+
+        @for (tick of chart().xTicks; track tick.label) {
+          <text [attr.x]="tick.position" [attr.y]="xLabelY" text-anchor="middle" class="axis">
+            {{ tick.label }}
+          </text>
+        }
+
+        @if (chart().boundaryInWindow) {
+          <line
+            [attr.x1]="chart().boundaryX"
+            y1="14"
+            [attr.x2]="chart().boundaryX"
+            y2="214"
+            class="boundary"
+          />
+        }
+
+        @if (chart().hasForecast) {
+          <text [attr.x]="chart().boundaryX + 8" y="26" class="boundary-label">FORECAST</text>
+        }
+
+        @for (line of chart().lines; track line.country) {
+          <g>
+            @if (line.actualPath) {
+              <path [attr.d]="line.actualPath" fill="none" [attr.stroke]="line.color" stroke-width="2" />
+            }
+            @if (line.forecastPath) {
+              <path
+                [attr.d]="line.forecastPath"
+                fill="none"
+                [attr.stroke]="line.color"
+                stroke-width="2"
+                stroke-dasharray="5 4"
+                opacity="0.9"
+              />
+            }
+          </g>
+        }
+
+        @for (point of chart().points; track point.key) {
+          <circle
+            [attr.cx]="point.cx"
+            [attr.cy]="point.cy"
+            [attr.r]="point.radius"
+            [attr.fill]="point.fill"
+            [attr.stroke]="point.color"
+            stroke-width="1.5"
+            class="point"
+            (mouseenter)="hover(point)"
+            (mouseleave)="clearHover()"
+          />
+        }
+      </svg>
+
+      @if (hovered(); as point) {
+        <div
+          class="tip"
+          role="presentation"
+          [style.left.%]="point.leftPercent"
+          [style.top.%]="point.topPercent"
+        >
+          <div class="tip-head">{{ point.head }}</div>
+          <div class="tip-value">{{ point.value }}</div>
+        </div>
+      }
+    </div>
+  </div>
+
+  <div class="legend">
+    @for (entry of chart().legend; track entry.country) {
+      <div class="entry">
+        <span class="swatch" [style.background]="entry.color"></span>
+        <span class="country">{{ entry.label }}</span>
+        <span class="detail">{{ entry.detail }}</span>
+      </div>
+    }
+  </div>
+</section>

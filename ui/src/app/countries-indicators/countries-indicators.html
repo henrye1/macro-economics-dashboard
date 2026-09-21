@@ -9,7 +9,7 @@
     <div class="card-body search-row">
       <label class="search">
         <span class="sr-only">Search countries</span>
-        <span aria-hidden="true">&#9906;</span>
+        <span class="ms-icon" aria-hidden="true">search</span>
         <input
           type="search"
           placeholder="Search countries"
@@ -28,12 +28,25 @@
     } @else {
       <ul class="country-list">
         @for (country of countries(); track country.iso3) {
-          <li class="country-row">
-            <span class="who">
-              <span class="name">{{ country.name }}</span>
-              <span class="sources">{{ country.sources.join(' · ') }}</span>
-            </span>
-            <span class="iso">{{ country.iso3 }}</span>
+          <li>
+            <button
+              type="button"
+              class="country-row"
+              [class.selected]="isChosenCountry(country.iso3)"
+              [attr.aria-pressed]="isChosenCountry(country.iso3)"
+              (click)="chooseCountry(country.iso3)"
+            >
+              <span class="who">
+                <span class="name">{{ country.name }}</span>
+                <span class="sources">{{ country.sources.join(' · ') }}</span>
+              </span>
+              <span class="iso">
+                {{ country.iso3 }}
+                @if (isChosenCountry(country.iso3)) {
+                  <span class="sr-only">in working query</span>
+                }
+              </span>
+            </button>
           </li>
         }
       </ul>
@@ -49,7 +62,7 @@
     <div class="filters">
       <label class="search">
         <span class="sr-only">Search code or name</span>
-        <span aria-hidden="true">&#9906;</span>
+        <span class="ms-icon" aria-hidden="true">search</span>
         <input
           type="search"
           placeholder="Search code or name (q)"
@@ -78,16 +91,14 @@
         </select>
       </label>
 
-      <!--
-        Pressed and disabled on purpose. The project plan keeps non-curated WEO
-        factors out of the MVP: reachable by code, but not listed here.
-      -->
       <button
         type="button"
-        class="btn navy lg"
-        aria-pressed="true"
-        disabled
-        title="Non-curated WEO factors are not listed in v1. They stay reachable by code."
+        class="btn lg"
+        [class.navy]="curatedOnly()"
+        [class.outline-muted]="!curatedOnly()"
+        [attr.aria-pressed]="curatedOnly()"
+        title="Turn off to list the auto-registered WEO factors alongside the curated set."
+        (click)="toggleCurated()"
       >Curated only</button>
     </div>
 
@@ -147,8 +158,9 @@
       </table>
 
       <div class="card-foot">
-        Click any code to add the indicator to the working query. Units mix percent,
-        index values and US dollars, so read <strong>unit</strong>, never assume.
+        Click any code to add the indicator to the working query, or a country on the
+        left to add that. Units mix percent, index values and US dollars, so read
+        <strong>unit</strong>, never assume.
       </div>
     }
   </section>

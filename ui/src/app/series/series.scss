@@ -15,7 +15,6 @@
   gap: var(--space-3);
 
   .code {
-    font-family: var(--font-mono);
     font-size: var(--text-md);
     font-weight: var(--weight-bold);
     color: var(--navy);
@@ -45,10 +44,6 @@
 
   .v {
     font-weight: var(--weight-bold);
-
-    &.mono {
-      font-family: var(--font-mono);
-    }
   }
 }
 
@@ -130,24 +125,26 @@
     gap: var(--space-2);
   }
 
-  .box {
-    width: 14px;
-    height: 14px;
-    border-radius: 2px;
-
-    &.actual {
-      background: var(--badge-actual-bg);
-    }
+  /* Samples of the stroke each one draws with, in the chart's own neutral. */
+  .rule {
+    width: 18px;
+    border-top: 2px solid var(--text);
 
     &.forecast {
-      background: var(--badge-forecast-bg);
+      border-top-style: dashed;
     }
 
     &.boundary {
-      border-left: 2px dashed var(--navy);
-      width: 8px;
-      border-radius: 0;
+      width: 0;
+      height: 14px;
+      border-top: none;
+      border-left: 1px dashed var(--navy);
+      opacity: 0.5;
     }
+  }
+
+  .note {
+    font-style: italic;
   }
 }
 

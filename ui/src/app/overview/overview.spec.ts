@@ -190,11 +190,17 @@ describe('OverviewPage', () => {
     it('hides the decorative icons from assistive technology', () => {
       const fixture = build(new CountingProvider());
       const icons = Array.from(
-        (fixture.nativeElement as HTMLElement).querySelectorAll('.use-cases h2 .icon')
+        (fixture.nativeElement as HTMLElement).querySelectorAll('.use-cases h2 .ms-icon')
       );
 
       expect(icons.length).toBe(3);
       expect(icons.every((icon) => icon.getAttribute('aria-hidden') === 'true')).toBeTrue();
+      // Material Symbols ligature names, not stand-in text glyphs.
+      expect(icons.map((icon) => icon.textContent?.trim())).toEqual([
+        'trending_up',
+        'leaderboard',
+        'history'
+      ]);
     });
 
     it('names both sources in the cadence card', () => {

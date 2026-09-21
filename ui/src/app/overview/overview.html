@@ -35,28 +35,28 @@
         } @else {
           <dl class="stats" [attr.aria-busy]="loading()">
             <div class="stat">
+              <dt>Countries with data</dt>
               @if (counts(); as value) {
                 <dd>{{ value.countries }}</dd>
               } @else {
                 <dd class="pending"><span class="skeleton" aria-hidden="true"></span></dd>
               }
-              <dt>Countries with data</dt>
             </div>
             <div class="stat">
+              <dt>Curated indicators</dt>
               @if (counts(); as value) {
                 <dd>{{ value.indicators }}</dd>
               } @else {
                 <dd class="pending"><span class="skeleton" aria-hidden="true"></span></dd>
               }
-              <dt>Curated indicators</dt>
             </div>
             <div class="stat">
+              <dt>Published vintages</dt>
               @if (counts(); as value) {
                 <dd>{{ value.vintages }}</dd>
               } @else {
                 <dd class="pending"><span class="skeleton" aria-hidden="true"></span></dd>
               }
-              <dt>Published vintages</dt>
             </div>
           </dl>
         }
@@ -86,12 +86,12 @@
       <section class="card">
         <div class="card-body">
           <h2>
-            <span class="icon" aria-hidden="true">{{ useCase.icon }}</span>
+            <span class="ms-icon" aria-hidden="true">{{ useCase.icon }}</span>
             {{ useCase.title }}
           </h2>
           <p>{{ useCase.body }}</p>
           <a class="action" [routerLink]="useCase.route">
-            {{ useCase.action }} <span aria-hidden="true">&#8594;</span>
+            {{ useCase.action }} <span class="ms-icon" aria-hidden="true">arrow_forward</span>
           </a>
         </div>
       </section>

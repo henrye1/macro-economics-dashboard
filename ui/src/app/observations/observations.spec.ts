@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { Observable, throwError } from 'rxjs';
 
 import { FixtureMacroDataProvider } from '../core/fixtures/fixture-macro-data.provider';
@@ -43,7 +44,7 @@ describe('ObservationsPage', () => {
   function setUp(provider: unknown = new FixtureMacroDataProvider()): void {
     TestBed.configureTestingModule({
       imports: [ObservationsPage],
-      providers: [{ provide: MACRO_DATA, useValue: provider }]
+      providers: [provideRouter([]), { provide: MACRO_DATA, useValue: provider }]
     });
 
     store = TestBed.inject(WorkingQueryStore);
@@ -231,7 +232,7 @@ describe('ObservationsPage paging', () => {
   function setUp(provider: unknown = new FixtureMacroDataProvider()): void {
     TestBed.configureTestingModule({
       imports: [ObservationsPage],
-      providers: [{ provide: MACRO_DATA, useValue: provider }]
+      providers: [provideRouter([]), { provide: MACRO_DATA, useValue: provider }]
     });
 
     store = TestBed.inject(WorkingQueryStore);
@@ -363,7 +364,7 @@ describe('ObservationsPage query summary', () => {
   function setUp(provider: unknown = new FixtureMacroDataProvider()): void {
     TestBed.configureTestingModule({
       imports: [ObservationsPage],
-      providers: [{ provide: MACRO_DATA, useValue: provider }]
+      providers: [provideRouter([]), { provide: MACRO_DATA, useValue: provider }]
     });
 
     store = TestBed.inject(WorkingQueryStore);
@@ -432,7 +433,7 @@ describe('ObservationsPage when the service explains the failure', () => {
   function headMetaFor(provider: FixtureMacroDataProvider): Element | null {
     TestBed.configureTestingModule({
       imports: [ObservationsPage],
-      providers: [{ provide: MACRO_DATA, useValue: provider }]
+      providers: [provideRouter([]), { provide: MACRO_DATA, useValue: provider }]
     });
     const store = TestBed.inject(WorkingQueryStore);
     store.reset();
@@ -502,7 +503,7 @@ describe('ObservationsPage loading state across a re-query', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [ObservationsPage],
-      providers: [{ provide: MACRO_DATA, useValue: (provider = new DeferredProvider()) }]
+      providers: [provideRouter([]), { provide: MACRO_DATA, useValue: (provider = new DeferredProvider()) }]
     });
 
     store = TestBed.inject(WorkingQueryStore);

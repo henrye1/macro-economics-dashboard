@@ -278,6 +278,7 @@ Two packages, no root workspace. Run each command from its own directory.
 - Typecheck: covered by `npm run build`; no separate script
 - Test: `npm test` (Karma and Jasmine, headless Chrome, one shot)
 - Test watch: `npm run test:watch`
+- Browser tests: `npm run test:browser` (Playwright, Chromium, run from `ui/`)
 
 No lint command is configured in either package. No `Verify` command exists yet.
 
@@ -294,7 +295,18 @@ its stack:
 There is no root `package.json`, so there is no single command that runs both.
 Run `npm test` in each package you changed.
 
-Browser testing is also opt-in. Run `/browser-tests` or `$browser-tests` to add
-or normalize a browser harness and document its exact command as `Browser
-tests`. Check and Continuous Mode can then reuse it without installing tooling
-mid-feature.
+Browser testing is **on** for `ui/`, through **Playwright** against Chromium.
+Specs live in `ui/e2e/` and run with `npm run test:browser` from `ui/`.
+
+The suite stubs `/api/macro/**` in the browser (`ui/e2e/stub-api.ts`) rather than
+running the Express relay, so it needs no API, no network and no credentials. It
+exists for the claims unit tests cannot reach: rendered geometry and layout. An
+unstubbed macro route answers `501` on purpose, so a console request the suite
+does not know about fails loudly instead of looking like an empty result.
+
+Playwright starts `ng serve` itself and reuses an existing dev server when one is
+already up. Generated `test-results/` and `playwright-report/` stay out of Git.
+Browser tests are deliberately **not** part of any Verify command or CI workflow.
+
+A green run does not prove visual fidelity against the design reference, and the
+`api/` package has no browser surface.

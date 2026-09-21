@@ -38,20 +38,20 @@
   display: block;
   width: 100%;
   color: var(--muted);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   margin-bottom: var(--space-2);
   padding: 0;
 }
 
 .btn.endpoint {
-  font-family: var(--mono, ui-monospace, monospace);
-  font-size: 0.875rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
 }
 
 .btn.endpoint.on {
-  background: var(--navy, #14226b);
-  border-color: var(--navy, #14226b);
-  color: #fff;
+  background: var(--navy);
+  border-color: var(--navy);
+  color: var(--navy-ink);
 }
 
 /* ---------- URL and curl ---------- */
@@ -59,26 +59,26 @@
 .url,
 .curl,
 .body {
-  font-family: var(--mono, ui-monospace, monospace);
-  font-size: 0.8125rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
   line-height: 1.6;
   margin: 0;
   padding: var(--space-4);
-  border-radius: 4px;
+  border-radius: var(--radius);
   /* The URL is long and has no spaces; wrapping beats a scrollbar. */
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
 .url {
-  background: var(--navy, #14226b);
-  color: #fff;
+  background: var(--navy);
+  color: var(--navy-ink);
 }
 
 .curl,
 .body {
-  background: var(--surface-alt, #f4f6f9);
-  border: 1px solid var(--line, #d7dae0);
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
 }
 
 .actions {
@@ -88,33 +88,33 @@
 }
 
 .btn.send {
-  background: #1f7a44;
-  color: #fff;
+  background: var(--accent);
+  color: var(--navy-ink);
   border: 0;
   padding-inline: var(--space-5);
 }
 
 .btn.send:disabled {
-  background: #cfd4db;
-  color: #767d88;
+  background: var(--surface-muted);
+  color: var(--faint);
   cursor: not-allowed;
 }
 
 .note {
   color: var(--muted);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   line-height: 1.5;
   margin: var(--space-4) 0 0;
 }
 
 .note.proxy {
-  border-top: 1px solid var(--line, #d7dae0);
+  border-top: 1px solid var(--border);
   padding-top: var(--space-4);
 }
 
 .note code {
-  font-family: var(--mono, ui-monospace, monospace);
-  font-size: 0.8125rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
 }
 
 /* ---------- response ---------- */
@@ -126,33 +126,33 @@
 }
 
 .pill.status {
-  font-family: var(--mono, ui-monospace, monospace);
-  font-weight: 600;
+  font-family: var(--font-mono);
+  font-weight: var(--weight-semibold);
 }
 
 .pill.status.idle {
-  background: var(--surface-alt, #e9edf3);
+  background: var(--cl-status-draft-bg);
   color: var(--muted);
 }
 
 .pill.status.good {
-  background: #d8f0e1;
-  color: #14532d;
+  background: var(--cl-status-completed-bg);
+  color: var(--cl-status-completed-text);
 }
 
 .pill.status.cached {
-  background: #fdeccd;
-  color: #7a4b00;
+  background: var(--cl-status-running-bg);
+  color: var(--cl-status-running-text);
 }
 
 .pill.status.bad {
-  background: #fbdcdc;
-  color: #7a1414;
+  background: var(--cl-error-background-color);
+  color: var(--cl-error-color);
 }
 
 .elapsed {
   color: var(--muted);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
 }
 
 .headers {
@@ -160,13 +160,13 @@
   grid-template-columns: max-content minmax(0, 1fr);
   gap: var(--space-2) var(--space-4);
   margin: 0 0 var(--space-4);
-  font-family: var(--mono, ui-monospace, monospace);
-  font-size: 0.8125rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
 }
 
 .headers dt {
-  color: var(--navy, #14226b);
-  font-weight: 600;
+  color: var(--navy);
+  font-weight: var(--weight-semibold);
 }
 
 .headers dd {
@@ -181,16 +181,16 @@
 
 .body-note {
   color: var(--muted);
-  font-family: var(--mono, ui-monospace, monospace);
-  font-size: 0.8125rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
   margin: 0;
   padding: var(--space-4);
-  background: var(--surface-alt, #f4f6f9);
-  border-radius: 4px;
+  background: var(--surface-subtle);
+  border-radius: var(--radius);
 }
 
 .code-cell {
-  font-family: var(--mono, ui-monospace, monospace);
-  font-weight: 600;
-  color: var(--navy, #14226b);
+  font-family: var(--font-mono);
+  font-weight: var(--weight-semibold);
+  color: var(--navy);
 }

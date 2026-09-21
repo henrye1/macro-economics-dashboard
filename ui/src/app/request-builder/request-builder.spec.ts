@@ -1,6 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 
 import { FixtureMacroDataProvider } from '../core/fixtures/fixture-macro-data.provider';
 import { MACRO_DATA } from '../core/macro-data.provider';
@@ -29,7 +30,7 @@ describe('RequestBuilderPage', () => {
 
     TestBed.configureTestingModule({
       imports: [RequestBuilderPage],
-      providers: [
+      providers: [provideRouter([]), 
         provideHttpClient(),
         provideHttpClientTesting(),
         // The query card reaches the provider for its catalogue lists.

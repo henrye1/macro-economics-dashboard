@@ -1,33 +1,21 @@
 import { Component, computed, inject } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { catchError, map, of } from 'rxjs';
 
 import type { Series } from '../core/macro-contracts';
 import { MACRO_DATA } from '../core/macro-data.provider';
 import { createResultState } from '../core/result-state';
-import { formatValue } from '../core/value-format';
+import { buildCharts } from '../core/series-chart';
 import { WorkingQueryStore } from '../core/working-query.store';
 import { PagingFooter } from '../query/paging-footer';
 import { WorkingQueryCard } from '../query/working-query-card';
+import { SeriesChartCard } from './series-chart';
 
 const UNAVAILABLE = 'Series are unavailable.';
 
-interface PointView {
-  year: number;
-  value: string;
-  forecast: boolean;
-}
-
-interface SeriesView {
-  series: Series;
-  /** `series 2 of 4`, counted across the whole result rather than the page. */
-  position: string;
-  points: readonly PointView[];
-  /**
-   * Index of the point the boundary rule is drawn after, or `null` when
-   * `lastActualYear` falls outside the visible window.
-   */
-  boundaryAfter: number | null;
-  /** Announced to screen readers, which cannot see the tinting or the rule. */
-  description: string;
+interface SeriesRow {
+  readonly series: Series;
+  readonly years: string;
 }
 
 /**
@@ -39,13 +27,13 @@ interface SeriesView {
  * scenarios. It reads the same `WorkingQueryStore.apiQuery` as Observations, so
  * the two tabs cannot disagree about what was asked.
  *
- * There is deliberately no charting library. Points are tinted cells, which is
- * enough to show the boundary and keeps the bundle honest until the tab needs
- * more.
+ * Charts are grouped one per indicator, not one per series, so several
+ * countries share a value axis and can be read against each other. The geometry
+ * is hand-rolled in `core/series-chart.ts`; no charting library is installed.
  */
 @Component({
   selector: 'app-series',
-  imports: [PagingFooter, WorkingQueryCard],
+  imports: [PagingFooter, SeriesChartCard, WorkingQueryCard],
   templateUrl: './series.html',
   styleUrl: './series.scss'
 })
@@ -82,20 +70,36 @@ export class SeriesPage {
     this.state.settled() ? `${this.total()} series` : null
   );
 
-  protected readonly views = computed<readonly SeriesView[]>(() => {
-    if (!this.state.settled()) {
-      return [];
-    }
+  /**
+   * ISO3 to name, from the catalogue. The series payload names a country by
+   * code only, and the design labels the legend and the metadata table with the
+   * name, so the tab resolves it here. A failed catalogue read is not a failed
+   * tab: the map stays empty and every label falls back to its code.
+   */
+  private readonly countryNames = toSignal(
+    this.macro.countries().pipe(
+      map((envelope) => new Map(envelope.data.map(({ iso3, name }) => [iso3, name]))),
+      catchError(() => of(new Map<string, string>()))
+    ),
+    { initialValue: new Map<string, string>() }
+  );
 
-    // Through the null-safe signals: `page` and `pageSize` are nullable on the
-    // routes that do not paginate, and fall back to the working query.
-    const totalCount = this.total();
-    const offset = (this.page() - 1) * this.pageSize();
+  protected readonly charts = computed(() =>
+    this.state.settled() ? buildCharts(this.state.items(), this.countryNames()) : []
+  );
 
-    return this.state
-      .items()
-      .map((series, index) => toView(series, offset + index + 1, totalCount));
-  });
+  /** `ZAF — South Africa`, or just the code where the catalogue is silent. */
+  protected countryLabel(iso3: string): string {
+    const name = this.countryNames().get(iso3);
+    return name === undefined ? iso3 : `${iso3} — ${name}`;
+  }
+
+  /** The metadata table under the charts: one row per series on this page. */
+  protected readonly rows = computed<readonly SeriesRow[]>(() =>
+    this.state.settled()
+      ? this.state.items().map((series) => ({ series, years: yearSpan(series) }))
+      : []
+  );
 
   /** The footer decides when a direction is available and only emits then. */
   protected prev(): void {
@@ -107,45 +111,15 @@ export class SeriesPage {
   }
 }
 
-function toView(series: Series, position: number, total: number): SeriesView {
-  const points = series.points.map((point) => ({
-    year: point.year,
-    value: formatValue(point.value),
-    forecast: point.isForecast
-  }));
-
-  return {
-    series,
-    position: `series ${position} of ${total}`,
-    points,
-    boundaryAfter: boundaryIndex(series),
-    description: describe(series)
-  };
-}
-
-/**
- * Where to draw the boundary rule, by year rather than by `isForecast`.
- *
- * Returns `null` when the rule would sit at either edge of the window: a
- * history-only or forecast-only view has no boundary to show, and drawing one
- * against the card's edge would imply the data stops there. The sub-strip still
- * states `lastActualYear` in both cases, so the fact is never lost.
- */
-function boundaryIndex(series: Series): number | null {
-  const last = series.points.reduce(
-    (found, point, index) => (point.year <= series.lastActualYear ? index : found),
-    -1
-  );
-
-  return last === -1 || last === series.points.length - 1 ? null : last;
-}
-
-function describe(series: Series): string {
+/** `2010 to 2031`, or the single year when the series has just one point. */
+function yearSpan(series: Series): string {
   const years = series.points.map((point) => point.year);
   const first = years[0];
   const last = years[years.length - 1];
 
-  const span = first === undefined || last === undefined ? 'no years' : `${first} to ${last}`;
+  if (first === undefined || last === undefined) {
+    return 'no years';
+  }
 
-  return `${series.name} for ${series.country}, ${series.unit}, ${span}, actual through ${series.lastActualYear}.`;
+  return first === last ? String(first) : `${first} to ${last}`;
 }

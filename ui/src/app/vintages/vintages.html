@@ -30,10 +30,14 @@
       </thead>
       <tbody>
         @for (vintage of vintages(); track vintage.id) {
+          <!-- The whole row is the target, as the head above promises. The id
+               keeps its button so the same choice is reachable by keyboard;
+               select() is idempotent, so the bubbled second call is a no-op. -->
           <tr
-            class="vintage-row"
+            class="vintage-row clickable"
             [class.selected]="isSelected(vintage)"
             [attr.aria-selected]="isSelected(vintage)"
+            (click)="select(vintage)"
           >
             <td class="num">
               <button
@@ -183,6 +187,14 @@
               <p class="summary-more">+{{ disappearedOverflow() }} more on this page</p>
             }
           }
+        </div>
+
+        <div class="summary-panel">
+          <!-- The design calls this "Last actual year moved". The revisions
+               response carries no forecast flag, so the boundary cannot be
+               seen from here; the horizon it can see is what it reports. -->
+          <p class="summary-title">Latest year covered · this page, unfiltered</p>
+          <p class="summary-entry horizon">{{ horizonLabel() }}</p>
         </div>
       </div>
     }

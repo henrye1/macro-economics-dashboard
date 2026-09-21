@@ -1,0 +1,138 @@
+.chart-card {
+  margin-bottom: var(--space-5);
+}
+
+.chart-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  min-width: 0;
+
+  .name {
+    font-size: var(--text-md);
+    font-weight: var(--weight-bold);
+    color: var(--navy);
+  }
+
+  .code {
+    font-size: var(--text-sm);
+    letter-spacing: 0.02em;
+    color: var(--muted);
+  }
+}
+
+.plot {
+  padding: var(--space-4) var(--cell-x) var(--space-2);
+}
+
+/*
+  The tooltip is positioned in percentages of the viewBox, so this box has to be
+  the SVG's box exactly. Capping it at the viewBox width and letting the SVG
+  take its own aspect ratio keeps it that way: wider cards leave margin either
+  side rather than stretching the drawing, which is what the fixed height and
+  preserveAspectRatio did before, only without the tooltip agreeing.
+*/
+.canvas {
+  position: relative;
+  margin-inline: auto;
+}
+
+svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* Axis labels sit below the plot box and would otherwise be clipped. */
+  overflow: visible;
+}
+
+.forecast-band {
+  fill: var(--surface-subtle);
+}
+
+.gridline {
+  stroke: var(--cl-grey-color-lighter);
+  stroke-width: 1;
+}
+
+.axis-rule {
+  stroke: var(--cl-grey-color-light);
+  stroke-width: 1;
+}
+
+.axis {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  fill: var(--muted);
+}
+
+.boundary {
+  stroke: var(--navy);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  opacity: 0.5;
+}
+
+.boundary-label {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.5px;
+  fill: var(--navy);
+}
+
+.point {
+  cursor: crosshair;
+}
+
+.tip {
+  position: absolute;
+  /* Anchored on the point, then lifted clear of it. */
+  transform: translate(-50%, -128%);
+  background: var(--navy);
+  color: var(--navy-ink);
+  padding: 7px 10px;
+  pointer-events: none;
+  white-space: nowrap;
+  box-shadow: 0 2px 5px rgb(0 0 0 / 30%);
+  z-index: 5;
+}
+
+.tip-head {
+  font-size: var(--text-xs);
+  color: var(--cl-primary-100);
+  margin-bottom: 2px;
+}
+
+.tip-value {
+  font-size: var(--text-base);
+  font-weight: var(--weight-bold);
+}
+
+.legend {
+  padding: var(--space-1) var(--cell-x) var(--space-4);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+  align-items: center;
+}
+
+.entry {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+
+  .swatch {
+    width: 14px;
+    height: 3px;
+  }
+
+  .country {
+    font-size: var(--text-base);
+    font-weight: var(--weight-semibold);
+  }
+
+  .detail {
+    font-size: var(--text-xs);
+    color: var(--muted);
+  }
+}

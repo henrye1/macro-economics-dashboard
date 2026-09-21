@@ -8,7 +8,7 @@
 }
 
 .habit-title {
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   margin: 0 0 var(--space-3);
 }
 
@@ -33,15 +33,15 @@
   display: block;
   width: 100%;
   color: var(--muted);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   margin-bottom: var(--space-2);
   padding: 0;
 }
 
 .btn.format.on {
-  background: var(--navy, #14226b);
-  border-color: var(--navy, #14226b);
-  color: #fff;
+  background: var(--navy);
+  border-color: var(--navy);
+  color: var(--navy-ink);
 }
 
 .btn.format:disabled {
@@ -55,8 +55,8 @@
   display: flex;
   gap: var(--space-3);
   align-items: start;
-  background: var(--surface-alt, #f4f6f9);
-  border-radius: 4px;
+  background: var(--surface-subtle);
+  border-radius: var(--radius);
   padding: var(--space-4);
 }
 
@@ -70,13 +70,13 @@
 
 .pin-title {
   display: block;
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
 }
 
 .pin-note {
   display: block;
   color: var(--muted);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   margin-top: var(--space-1);
   line-height: 1.4;
 }
@@ -90,7 +90,7 @@
 
 .scope-hint {
   color: var(--muted);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   margin: var(--space-1) 0 0;
   line-height: 1.4;
 }
@@ -99,16 +99,16 @@
   display: block;
   width: 100%;
   margin-top: var(--space-4);
-  background: #1f7a44;
-  color: #fff;
+  background: var(--accent);
+  color: var(--navy-ink);
   border: 0;
   padding: var(--space-4);
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
 }
 
 .btn.download:disabled {
-  background: #cfd4db;
-  color: #767d88;
+  background: var(--surface-muted);
+  color: var(--faint);
   cursor: not-allowed;
 }
 

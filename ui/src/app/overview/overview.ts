@@ -112,7 +112,7 @@ export class OverviewPage {
 
   protected readonly useCases = [
     {
-      icon: '↗',
+      icon: 'trending_up',
       title: 'IFRS 9 forward-looking information',
       body:
         'Take the WEO forecast path, GDP growth, inflation, unemployment, as scenario ' +
@@ -121,7 +121,7 @@ export class OverviewPage {
       route: '/series'
     },
     {
-      icon: '▦',
+      icon: 'leaderboard',
       title: 'Benchmarking and dashboards',
       body:
         'History plus forecast series for any country, grouped one object per ' +
@@ -130,7 +130,7 @@ export class OverviewPage {
       route: '/countries-indicators'
     },
     {
-      icon: '↻',
+      icon: 'history',
       title: 'Reproducible reporting',
       body:
         'Re-fetch exactly the numbers that were current at a past reporting date by ' +

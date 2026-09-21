@@ -52,27 +52,27 @@
 .field-label {
   display: block;
   color: var(--muted);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   margin-bottom: var(--space-1);
 }
 
 .field input {
   width: 100%;
   padding: var(--space-3);
-  border: 1px solid var(--line, #d7dae0);
-  border-radius: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   font: inherit;
 }
 
 .btn.save {
-  background: #1f7a44;
-  color: #fff;
+  background: var(--accent);
+  color: var(--accent-ink);
   border: 0;
 }
 
 .btn.save:disabled {
-  background: #cfd4db;
-  color: #767d88;
+  background: var(--surface-muted);
+  color: var(--faint);
   cursor: not-allowed;
 }
 

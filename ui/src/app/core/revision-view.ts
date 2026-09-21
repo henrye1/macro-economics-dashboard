@@ -177,3 +177,59 @@ export function predecessorOf(
 export function byNewestFirst(vintages: readonly Vintage[]): Vintage[] {
   return [...vintages].sort((a, b) => b.id - a.id);
 }
+
+/** The newest year a vintage covers, on either side of the comparison. */
+export interface YearHorizon {
+  readonly previous: number | null;
+  readonly current: number | null;
+}
+
+/**
+ * How far forward the data now runs, against its predecessor.
+ *
+ * The design labels this panel "Last actual year moved", but `lastActualYear`
+ * cannot be derived from a revisions response: the rows carry
+ * `indicator, country, year, previousValue, newValue` and no forecast flag, so
+ * nothing here distinguishes an actual from a forecast. What the rows do show
+ * is the newest year each side of the comparison carries a value for, which is
+ * the horizon movement a new release is actually read for. The panel is titled
+ * for that instead of claiming a boundary it cannot see.
+ *
+ * Scoped to the rows it is handed, which is one page: the service paginates
+ * revisions, so this is a statement about the page, not the whole vintage.
+ */
+export function yearHorizon(rows: readonly Revision[]): YearHorizon {
+  let previous: number | null = null;
+  let current: number | null = null;
+
+  for (const row of rows) {
+    if (row.previousValue !== null && (previous === null || row.year > previous)) {
+      previous = row.year;
+    }
+
+    if (row.newValue !== null && (current === null || row.year > current)) {
+      current = row.year;
+    }
+  }
+
+  return { previous, current };
+}
+
+/** `2024 → 2025`, or a plain statement when there is no movement to report. */
+export function formatYearHorizon(horizon: YearHorizon): string {
+  const { previous, current } = horizon;
+
+  if (previous === null && current === null) {
+    return 'None';
+  }
+
+  if (previous === null) {
+    return `New through ${current}`;
+  }
+
+  if (current === null) {
+    return `Nothing new past ${previous}`;
+  }
+
+  return previous === current ? `Unchanged at ${current}` : `${previous} → ${current}`;
+}

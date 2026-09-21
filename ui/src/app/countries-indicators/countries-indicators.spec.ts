@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { Observable, throwError } from 'rxjs';
 
 import { FixtureMacroDataProvider } from '../core/fixtures/fixture-macro-data.provider';
@@ -48,7 +49,7 @@ function build(provider: FixtureMacroDataProvider = new FixtureMacroDataProvider
 } {
   TestBed.configureTestingModule({
     imports: [CountriesIndicatorsPage],
-    providers: [{ provide: MACRO_DATA, useValue: provider }]
+    providers: [provideRouter([]), { provide: MACRO_DATA, useValue: provider }]
   });
 
   const fixture = TestBed.createComponent(CountriesIndicatorsPage);
@@ -265,13 +266,58 @@ describe('CountriesIndicatorsPage', () => {
       expect(countryNames(fixture).length).toBe(FIXTURE_COUNTRIES.length);
     });
 
-    it('keeps the curated toggle pressed and disabled, per the MVP scope', () => {
+    it('starts with the curated toggle pressed, per the MVP default', () => {
       const { fixture } = build();
       const toggle = el(fixture).querySelector('.filters .btn') as HTMLButtonElement;
 
       expect(toggle.textContent?.trim()).toBe('Curated only');
       expect(toggle.getAttribute('aria-pressed')).toBe('true');
-      expect(toggle.disabled).toBeTrue();
+      expect(toggle.disabled).toBeFalse();
+    });
+
+    it('re-queries uncurated when the toggle is released, and back again', () => {
+      const provider = new RecordingProvider();
+      const { fixture } = build(provider);
+      const toggle = el(fixture).querySelector('.filters .btn') as HTMLButtonElement;
+
+      expect(provider.queries.at(-1)?.curated).toBeTrue();
+
+      toggle.click();
+      fixture.detectChanges();
+
+      expect(toggle.getAttribute('aria-pressed')).toBe('false');
+      expect(provider.queries.at(-1)?.curated).toBeFalse();
+
+      toggle.click();
+      fixture.detectChanges();
+
+      expect(provider.queries.at(-1)?.curated).toBeTrue();
+    });
+  });
+
+  describe('countries', () => {
+    it('adds the clicked country to the working query', () => {
+      const { fixture, store } = build();
+      const row = el(fixture).querySelector('.country-row') as HTMLButtonElement;
+
+      expect(row.getAttribute('aria-pressed')).toBe('false');
+
+      row.click();
+      fixture.detectChanges();
+
+      expect(store.query().countries).toEqual([FIXTURE_COUNTRIES[0].iso3]);
+      expect(row.getAttribute('aria-pressed')).toBe('true');
+    });
+
+    it('does not duplicate a country already in the query', () => {
+      const { fixture, store } = build();
+      const row = el(fixture).querySelector('.country-row') as HTMLButtonElement;
+
+      row.click();
+      row.click();
+      fixture.detectChanges();
+
+      expect(store.query().countries).toEqual([FIXTURE_COUNTRIES[0].iso3]);
     });
   });
 
@@ -416,7 +462,7 @@ describe('CountriesIndicatorsPage when the service explains the failure', () => 
   function slot(provider: FixtureMacroDataProvider, area: string): Element | null {
     TestBed.configureTestingModule({
       imports: [CountriesIndicatorsPage],
-      providers: [{ provide: MACRO_DATA, useValue: provider }]
+      providers: [provideRouter([]), { provide: MACRO_DATA, useValue: provider }]
     });
     TestBed.inject(WorkingQueryStore).reset();
 

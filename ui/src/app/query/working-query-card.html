@@ -17,13 +17,13 @@
         <div class="chip-set">
           @for (code of query().indicators; track code) {
             <span class="chip indicator">
-              {{ code }}
+              <span class="code">{{ code }}</span>
               <button
                 type="button"
                 class="remove"
                 [attr.aria-label]="'Remove indicator ' + code"
                 (click)="removeIndicator(code)"
-              >&times;</button>
+              ><span class="ms-icon" aria-hidden="true">close</span></button>
             </span>
           }
         </div>
@@ -58,13 +58,13 @@
         <div class="chip-set">
           @for (iso3 of query().countries; track iso3) {
             <span class="chip country">
-              {{ iso3 }}
+              <span class="code">{{ iso3 }}</span>
               <button
                 type="button"
                 class="remove"
                 [attr.aria-label]="'Remove country ' + iso3"
                 (click)="removeCountry(iso3)"
-              >&times;</button>
+              ><span class="ms-icon" aria-hidden="true">close</span></button>
             </span>
           }
         </div>
@@ -86,30 +86,39 @@
       </label>
     </div>
 
-    <label class="field">
+    <div class="pair">
+    <label class="field select">
       <span class="label">Year from</span>
-      <input
-        type="number"
-        inputmode="numeric"
+      <select
         [value]="query().yearFrom ?? ''"
         [attr.aria-invalid]="invertedRange() ? 'true' : null"
         [attr.aria-describedby]="invertedRange() ? 'year-problem' : null"
         (change)="setYearFrom($event)"
       >
+        <option value="">earliest</option>
+        @for (year of years(); track year) {
+          <option [value]="year" [selected]="year === query().yearFrom">{{ year }}</option>
+        }
+      </select>
     </label>
 
-    <label class="field">
+    <label class="field select">
       <span class="label">Year to</span>
-      <input
-        type="number"
-        inputmode="numeric"
+      <select
         [value]="query().yearTo ?? ''"
         [attr.aria-invalid]="invertedRange() ? 'true' : null"
         [attr.aria-describedby]="invertedRange() ? 'year-problem' : null"
         (change)="setYearTo($event)"
       >
+        <option value="">latest</option>
+        @for (year of years(); track year) {
+          <option [value]="year" [selected]="year === query().yearTo">{{ year }}</option>
+        }
+      </select>
     </label>
+    </div>
 
+    <div class="pair">
     <label class="field select">
       <span class="label">Source</span>
       <select [value]="query().source" (change)="setSource($event)">
@@ -127,6 +136,7 @@
         }
       </select>
     </label>
+    </div>
 
   </div>
 
@@ -158,6 +168,16 @@
       result you must reproduce.
     </p>
 
-    <button type="button" class="btn outline-green" (click)="reset()">Reset</button>
+    <div class="query-actions">
+      <button type="button" class="btn outline-green" (click)="reset()">
+        <span class="ms-icon" aria-hidden="true">restart_alt</span> Reset
+      </button>
+
+      <!-- Naming and provenance live on the Saved queries tab, so this hands the
+           query over rather than inventing a name for it. -->
+      <a class="btn primary" routerLink="/saved-queries">
+        <span class="ms-icon" aria-hidden="true">bookmark_add</span> Save query
+      </a>
+    </div>
   </div>
 </section>

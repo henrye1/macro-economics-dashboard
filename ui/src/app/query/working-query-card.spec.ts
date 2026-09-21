@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { Observable, throwError } from 'rxjs';
 
 import { FixtureMacroDataProvider } from '../core/fixtures/fixture-macro-data.provider';
@@ -26,7 +27,7 @@ function build(
 ): { fixture: ComponentFixture<WorkingQueryCard>; store: WorkingQueryStore } {
   TestBed.configureTestingModule({
     imports: [WorkingQueryCard],
-    providers: [{ provide: MACRO_DATA, useValue: provider }]
+    providers: [provideRouter([]), { provide: MACRO_DATA, useValue: provider }]
   });
 
   const fixture = TestBed.createComponent(WorkingQueryCard);
@@ -40,8 +41,8 @@ function el(fixture: ComponentFixture<WorkingQueryCard>): HTMLElement {
 }
 
 function chipText(fixture: ComponentFixture<WorkingQueryCard>, kind: string): string[] {
-  return Array.from(el(fixture).querySelectorAll(`.chip.${kind}`)).map((chip) =>
-    (chip.textContent ?? '').replace('×', '').trim()
+  return Array.from(el(fixture).querySelectorAll(`.chip.${kind} .code`)).map((code) =>
+    code.textContent?.trim() ?? ''
   );
 }
 
@@ -145,7 +146,7 @@ describe('WorkingQueryCard', () => {
       fixture.detectChanges();
 
       expect(chipText(fixture, 'indicator')).toEqual(['GDP_GROWTH_REAL']);
-      expect(el(fixture).querySelector('.btn')).toBeTruthy();
+      expect(el(fixture).querySelector('button.btn')).toBeTruthy();
     });
 
     it('shows a loading placeholder while the lists load', () => {
@@ -178,17 +179,18 @@ describe('WorkingQueryCard', () => {
       expect(el(fixture).querySelector('select')?.getAttribute('aria-invalid')).toBeNull();
     });
 
-    it('flags an inverted year range on both inputs and announces it', () => {
+    it('flags an inverted year range on both selects and announces it', () => {
       const { fixture, store } = build();
 
       store.addIndicator('GDP_GROWTH_REAL');
       store.setYearRange(2030, 2020);
       fixture.detectChanges();
 
-      const inputs = Array.from(el(fixture).querySelectorAll('input[type="number"]'));
+      const inputs = Array.from(
+        el(fixture).querySelectorAll('select[aria-invalid="true"]')
+      );
 
       expect(inputs.length).toBe(2);
-      expect(inputs.every((input) => input.getAttribute('aria-invalid') === 'true')).toBeTrue();
       expect(inputs.every((input) => input.getAttribute('aria-describedby') === 'year-problem'))
         .toBeTrue();
       expect(el(fixture).querySelector('.year-problem')?.getAttribute('role')).toBe('status');
@@ -252,13 +254,12 @@ describe('WorkingQueryCard', () => {
       expect(chipText(fixture, 'indicator')).toEqual([]);
     });
 
-    it('ships no save control, since saving is feature 10', () => {
+    it('hands the query to the Saved queries tab rather than naming it here', () => {
       const { fixture } = build();
-      const labels = Array.from(el(fixture).querySelectorAll('button')).map(
-        (button) => button.textContent?.toLowerCase() ?? ''
-      );
+      const save = el(fixture).querySelector('a.btn.primary') as HTMLAnchorElement;
 
-      expect(labels.some((label) => label.includes('save'))).toBeFalse();
+      expect(save.textContent?.toLowerCase()).toContain('save query');
+      expect(save.getAttribute('href')).toBe('/saved-queries');
     });
   });
 });
@@ -276,7 +277,7 @@ describe('WorkingQueryCard result summary', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [WorkingQueryCard],
-      providers: [{ provide: MACRO_DATA, useClass: FixtureMacroDataProvider }]
+      providers: [provideRouter([]), { provide: MACRO_DATA, useClass: FixtureMacroDataProvider }]
     });
 
     store = TestBed.inject(WorkingQueryStore);

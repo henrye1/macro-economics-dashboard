@@ -1,103 +1,196 @@
 @use '@angular/material' as mat;
-
 /* ==========================================================================
-   Theme tokens - ported from prototypes/theme.css, which is the design's
-   token set read off blueprint/references/.
+   Theme tokens - the Cyte Risk Suite design system, read off the standalone
+   reference export rather than prototypes/theme.css, which was a simplified
+   re-draw and drifted (see blueprint/context/current-feature.md).
 
-   This block is the single source of colour, type and scale for the console.
+   The --cl-* names below are the design system's own, so a tenant theme that
+   swaps --cl-primary-color and --cl-action-color re-skins the console the way
+   the suite intends. The short names under them are aliases the component SCSS
+   already uses; they exist so this port did not have to rewrite every file.
+
    Never hardcode a colour, font or radius anywhere else: reference a variable.
    ========================================================================== */
 
 :root {
+  /* ---- brand pivots - the two a tenant theme swaps ---- */
+  --cl-primary-color: #0b188f;
+  --cl-action-color: #3faa24;
+
+  /* ---- primary (indigo) ramp ---- */
+  --cl-primary-color-shaded: #4852aa;
+  --cl-primary-lighter-color: #0b188f33;
+  --cl-primary-50: #e2e3f2;
+  --cl-primary-100: #b6badd;
+  --cl-primary-300: #545db1;
+  --cl-primary-700: #08117c;
+  --cl-primary-900: #030860;
+  --cl-pale-border-color: #0b188f25;
+  --cl-card-outline-color: #0b188f26;
+
+  /* ---- action (green) ramp ---- */
+  --cl-action-hover-color: #73d35b;
+  --cl-action-opacity-color: #ebf7e8;
+  --cl-action-50: #e8f5e5;
+  --cl-action-200: #9fd592;
+  --cl-action-700: #319a1b;
+
+  /* ---- greyscale and surfaces ---- */
+  --cl-text-color: #020205;
+  --cl-off-text-color: #707070;
+  --cl-subtext-color: #a3a3a3;
+  --cl-inactive-color: #8c8c8c;
+  --cl-disabled-color: #00000015;
+  --cl-background-color: #f9faf9;
+  --cl-card-background-color: #ffffff;
+  --cl-block-accent-color: #f4f5fa;
+  --cl-grey-color-light: #cfcfcf;
+  --cl-grey-color-lighter: #f2f2f2;
+  --cl-hover-color: #f0f0f0;
+  --cl-border-color: #dbe3f1;
+  --cl-button-text-color: #ffffff;
+
+  /* ---- semantic status ---- */
+  --cl-error-color: #d20101;
+  --cl-error-background-color: #ffe0e0;
+  --cl-positive-color: #288400;
+  --cl-positive-background-color: #def3d5;
+  --cl-progress-state-color: #ff9300;
+
+  /* ---- workflow pills ---- */
+  --cl-status-running-bg: #fff3cd;
+  --cl-status-running-text: #856404;
+  --cl-status-completed-bg: #d4edda;
+  --cl-status-completed-text: #155724;
+  --cl-status-published-bg: #cce5ff;
+  --cl-status-published-text: #004085;
+  --cl-status-draft-bg: #e2e3e5;
+  --cl-status-draft-text: #383d41;
+
+  /* ---- chart accents ---- */
+  --red-color: #d20413;
+  --amber-color: #ffba31;
+  --green-color: #23ab34;
+
+  /* ==== aliases the component SCSS reads ==== */
+
   /* surfaces */
-  --bg: #f7f8fa;              /* page background                          */
-  --surface: #ffffff;         /* cards, table rows, inputs                */
-  --surface-header: #f2f4f9;  /* card header bars                         */
-  --surface-subtle: #f4f6fb;  /* inset panels, curl block, property strip */
-  --surface-muted: #eef0f4;   /* disabled controls                        */
-  --border: #e2e6ee;
-  --border-strong: #d3d9e4;
+  --bg: var(--cl-background-color);
+  --surface: var(--cl-card-background-color);
+  --surface-header: var(--cl-block-accent-color);
+  --surface-subtle: var(--cl-block-accent-color);
+  --surface-muted: var(--cl-grey-color-lighter);
+  --border: var(--cl-border-color);
+  --border-strong: var(--cl-grey-color-light);
+  /* Table rules are the faint grey, not the indigo-tinted card border. */
+  --border-faint: var(--cl-grey-color-lighter);
+  --card-outline: var(--cl-card-outline-color);
 
   /* text */
-  --text: #1f2733;            /* primary          */
-  --muted: #6b7280;           /* secondary, cells */
-  --faint: #9ca3af;           /* hints, eyebrows  */
+  --text: var(--cl-text-color);
+  --muted: var(--cl-off-text-color);
+  --faint: var(--cl-subtext-color);
 
   /* navy - header, headings, active tab, secondary buttons, code block */
-  --navy: #1a2a8f;
-  --navy-hover: #16237a;
-  --navy-deep: #101c66;
+  --navy: var(--cl-primary-color);
+  --navy-hover: var(--cl-primary-700);
+  --navy-deep: var(--cl-primary-900);
   --navy-ink: #ffffff;
 
   /* green accent - primary buttons, uppercase links, wordmark */
-  --accent: #2fa83c;
-  --accent-hover: #268a31;
-  --accent-link: #1e9433;     /* uppercase links on white   */
-  --accent-bright: #4cbb52;   /* wordmark and dots on navy  */
-  --accent-ink: #ffffff;
+  --accent: var(--cl-action-color);
+  --accent-hover: var(--cl-action-700);
+  --accent-link: var(--cl-action-700);
+  --accent-bright: var(--cl-action-color);
+  --accent-ink: var(--cl-button-text-color);
 
   /* semantic badges - each is a bg + ink pair, some with a dot */
-  --badge-actual-bg: #dff0e0;
-  --badge-actual-ink: #24702f;
-  --badge-forecast-bg: #fdf3d3;
-  --badge-forecast-ink: #8a6410;
-  --badge-significant-bg: #fdf3d3;
-  --badge-significant-ink: #8a6410;
-  --badge-significant-dot: #e0a415;
-  --badge-latest-bg: #d6e4fb;
-  --badge-latest-ink: #1a2a8f;
-  --badge-superseded-bg: #e9ebef;
-  --badge-superseded-ink: #5b6472;
-  --badge-curated-bg: #eaf7ec;
-  --badge-curated-ink: #1e9433;
-  --badge-curated-dot: #2fa83c;
+  --badge-actual-bg: var(--cl-positive-background-color);
+  --badge-actual-ink: var(--cl-positive-color);
+  --badge-forecast-bg: var(--cl-status-running-bg);
+  --badge-forecast-ink: var(--cl-status-running-text);
+  --badge-significant-bg: var(--cl-status-running-bg);
+  --badge-significant-ink: var(--cl-status-running-text);
+  --badge-significant-dot: var(--cl-progress-state-color);
+  --badge-latest-bg: var(--cl-status-published-bg);
+  --badge-latest-ink: var(--cl-status-published-text);
+  --badge-superseded-bg: var(--cl-status-draft-bg);
+  --badge-superseded-ink: var(--cl-status-draft-text);
+  --badge-curated-bg: var(--cl-action-50);
+  --badge-curated-ink: var(--cl-action-700);
+  --badge-curated-dot: var(--cl-action-color);
 
   /* query chips - indicators read navy, countries read green */
-  --chip-indicator-bg: #e4e8f8;
-  --chip-indicator-ink: #1a2a8f;
-  --chip-country-bg: #ddf1de;
-  --chip-country-ink: #1e7a2c;
+  --chip-indicator-bg: var(--cl-primary-lighter-color);
+  --chip-indicator-ink: var(--cl-primary-color);
+  --chip-country-bg: #3faa2433;
+  --chip-country-ink: var(--cl-action-700);
 
   /* change deltas - the only place red appears */
-  --change-up: #1e8e3e;
-  --change-down: #d93025;
+  --change-up: var(--cl-positive-color);
+  --change-down: var(--cl-error-color);
 
   /* code surfaces */
   --code-bg: var(--navy);
   --code-ink: #ffffff;
-  --code-subtle-bg: #f4f6fb;
-  --code-subtle-ink: #1f2733;
-  --code-key: #1a2a8f;
+  --code-subtle-bg: var(--cl-block-accent-color);
+  --code-subtle-ink: var(--cl-text-color);
+  --code-key: var(--cl-primary-color);
+
+  /* chart series - walked in order, one colour per country on a chart */
+  --series-1: #0b188f;
+  --series-2: #3faa24;
+  --series-3: #ffba31;
+  --series-4: #d20413;
+  --series-5: #545db1;
+  --series-6: #319a1b;
 
   /* type */
-  --font-sans: "Lato", "Segoe UI", system-ui, -apple-system, sans-serif;
-  --font-mono: "Courier New", "IBM Plex Mono", ui-monospace, monospace;
+  --font-sans: "Source Sans Pro", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-icon: "Material Symbols Outlined";
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, "Courier New", monospace;
 
   --text-xs: 11px;
-  --text-sm: 13px;
+  --text-sm: 12px;
   --text-base: 14px;
   --text-md: 16px;
   --text-lg: 22px;
-  --text-xl: 30px;
+  --text-xl: 24px;
 
-  --weight-normal: 400;
+  /* Source Sans Pro ships 300/400/600/700. The suite's --body-weight is 500,
+     which this family has no cut for, so it resolves to 400 - same as the
+     reference export, which loads the same four weights. */
+  --weight-normal: 500;
+  --weight-semibold: 600;
   --weight-bold: 700;
+  --weight-heavy: 800;
 
-  /* scale - the designs are near-square with pill badges */
-  --radius: 3px;
+  /* scale. The reference export declares --border-radius: 5px and then applies
+     it nowhere: every card, control and button in it computes to a square
+     corner. The rendered design is the contract, so the system is squared and
+     the token is kept only for the pill shapes that really are round. */
+  --radius: 0;
   --radius-pill: 999px;
+  --radius-button: 0;
 
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 24px;
-  --space-6: 32px;
+  --space-1: 3px;
+  --space-2: 5px;
+  --space-3: 10px;
+  --space-4: 15px;
+  --space-5: 20px;
+  --space-6: 30px;
 
-  --cell-y: 16px;
-  --cell-x: 16px;
-  --header-h: 56px;
-  --content-max: 1640px;
+  --control-height: 48px;
+  /* Card chrome padding. Table cells are roomier and carry their own pair. */
+  --cell-y: 12px;
+  --cell-x: 15px;
+  --table-y: 15px;
+  --table-x: 20px;
+  --header-h: 62px;
+  /* The content column itself. The page gutter sits outside it, so the shell
+     reserves --content-max + two gutters. */
+  --content-max: 1280px;
+  --gutter: 28px;
 }
 
 /* ==========================================================================
@@ -116,7 +209,7 @@ html {
       tertiary: mat.$green-palette,
       theme-type: light,
     ),
-    typography: Lato,
+    typography: 'Source Sans Pro',
     density: 0,
   ));
 
@@ -169,8 +262,59 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-sans);
-  font-size: var(--text-base);
+  font-size: var(--text-md);
+  font-weight: var(--weight-normal);
   -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--navy);
+  text-decoration: none;
+
+  &:hover {
+    color: var(--navy-hover);
+    text-decoration: underline;
+  }
+}
+
+/* The suite's heading scale. h4 is the small uppercase eyebrow, not a heading
+   in the visual hierarchy sense. */
+h1 {
+  font-size: var(--text-xl);
+  line-height: 31px;
+  font-weight: var(--weight-heavy);
+  color: var(--navy);
+}
+
+h2 {
+  font-size: var(--text-lg);
+  line-height: 28px;
+  font-weight: var(--weight-bold);
+}
+
+h3 {
+  font-size: var(--text-md);
+  line-height: 20px;
+  font-weight: var(--weight-bold);
+}
+
+/* Ligature-driven icon font. Content is the icon name: <span class="ms-icon">search</span> */
+.ms-icon {
+  font-family: var(--font-icon);
+  font-weight: normal;
+  font-style: normal;
+  font-size: var(--text-md);
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
 }
 
 /* ==========================================================================
@@ -181,21 +325,39 @@ body {
 
 .card {
   background: var(--surface);
-  border: 1px solid var(--border);
+  /* The signature indigo-tinted hairline, not a grey one. */
+  border: 1px solid var(--card-outline);
   border-radius: var(--radius);
 }
 
 .card-head {
   background: var(--surface-header);
   border-bottom: 1px solid var(--border);
-  padding: var(--space-4) var(--space-5);
+  padding: 11px var(--cell-x);
   display: flex;
   align-items: center;
   gap: var(--space-4);
 
+  /* The reference fills the head of a card that is the subject of the card
+     above it, so the pairing reads as one unit. */
+  &.dark {
+    background: var(--navy);
+    border-bottom-color: var(--navy);
+
+    h2 {
+      color: var(--navy-ink);
+    }
+
+    .meta {
+      color: rgb(255 255 255 / 70%);
+    }
+  }
+
   h2 {
     margin: 0;
     font-size: var(--text-md);
+    line-height: 20px;
+    font-weight: var(--weight-bold);
     color: var(--navy);
   }
 
@@ -207,17 +369,36 @@ body {
 }
 
 .card-body {
-  padding: var(--space-5);
+  padding: var(--space-5) 22px;
 }
 
+/* Block, not flex: these feet carry prose with inline <strong>, and flex would
+   make each text node its own item and space them apart. Feet that lay out
+   controls opt into flex with .row. */
 .card-foot {
   border-top: 1px solid var(--border);
-  padding: var(--space-4) var(--space-5);
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
+  padding: var(--space-3) var(--cell-x);
   color: var(--muted);
   font-size: var(--text-sm);
+  line-height: 1.5;
+
+  &.row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+  }
+}
+
+/* A message standing in for a card's body: loading, unavailable, empty. It
+   takes the body's own inset so it lines up with copy in the cards beside it.
+
+   Scoped to a card's direct child on purpose. The same class also names the
+   inline note that sits under a control inside a card body, and that one is
+   already inside the padding. */
+.card > .state {
+  margin: 0;
+  padding: var(--space-5) 22px;
+  color: var(--muted);
 }
 
 .eyebrow {
@@ -240,9 +421,12 @@ body {
   display: grid;
   gap: 2px;
   min-width: 0;
+  /* The suite gives every control the same 48px box. */
+  min-height: var(--control-height);
+  align-content: center;
 
   .label {
-    font-size: var(--text-xs);
+    font-size: var(--text-sm);
     color: var(--muted);
   }
 
@@ -280,11 +464,11 @@ body {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  padding: 6px var(--space-3);
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: var(--text-sm);
-  font-weight: var(--weight-bold);
+  font-weight: var(--weight-semibold);
 
   &.indicator {
     background: var(--chip-indicator-bg);
@@ -303,10 +487,10 @@ body {
     padding: 0;
     cursor: pointer;
     color: inherit;
-    font: inherit;
-    font-weight: var(--weight-normal);
+    font-size: 15px;
     opacity: 0.75;
     line-height: 1;
+    display: inline-flex;
 
     &:hover {
       opacity: 1;
@@ -324,16 +508,22 @@ body {
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
+  padding: 0 16px;
+  min-height: 38px;
   border-radius: var(--radius);
   border: 1px solid transparent;
   font-family: var(--font-sans);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-bold);
-  letter-spacing: 0.04em;
+  font-size: 13px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.03em;
   text-transform: uppercase;
   cursor: pointer;
   background: none;
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+
+  .ms-icon {
+    font-size: 18px;
+  }
 
   &.primary {
     background: var(--accent);
@@ -372,7 +562,8 @@ body {
   }
 
   &.lg {
-    padding: var(--space-4) var(--space-5);
+    padding: 0 var(--space-5);
+    min-height: 42px;
     font-size: var(--text-base);
   }
 
@@ -402,18 +593,21 @@ table {
 
 thead th {
   text-align: left;
-  font-weight: var(--weight-normal);
+  /* 400, not the 500 body weight: the reference keeps column heads lighter
+     than the cells under them. */
+  font-weight: 400;
   color: var(--muted);
   font-size: var(--text-base);
-  padding: var(--space-4) var(--cell-x);
+  padding: var(--table-y) var(--table-x);
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
 }
 
 tbody td {
-  padding: var(--cell-y) var(--cell-x);
-  border-bottom: 1px solid var(--border);
-  border-right: 1px solid var(--border);
+  font-size: var(--text-base);
+  padding: var(--table-y) var(--table-x);
+  border-bottom: 1px solid var(--border-faint);
+  border-right: 1px solid var(--border-faint);
   vertical-align: middle;
 }
 
@@ -440,11 +634,18 @@ tbody tr.clickable:hover {
 }
 
 /* An indicator code rendered as text. The catalogue's `.code-link` is the same
-   look wearing a button; use this one wherever the code is not a control. */
+   look wearing a button; use this one wherever the code is not a control.
+
+   Codes are set in the body face, not a monospace one. The reference reserves
+   monospace for request payloads - URLs, headers and JSON - and sets every
+   code that names a domain object in Source Sans Pro. */
 .code-text {
   color: var(--navy);
   font-weight: var(--weight-bold);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
+  /* `.code-link` wears this on a <button>, which would otherwise drop to the
+     browser's own control size instead of the cell's. */
+  font-size: inherit;
 }
 
 .code-link {
@@ -503,6 +704,19 @@ tbody tr.clickable:hover {
   }
 }
 
+/* The state pill. `.badge` is its sibling with a dot and a semantic name;
+   this one is the bare lozenge the vintage and revision tables use. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px var(--space-3);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+}
+
 .search {
   display: flex;
   align-items: center;
@@ -510,7 +724,8 @@ tbody tr.clickable:hover {
   background: var(--surface-subtle);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: var(--space-3) var(--space-4);
+  padding: 0 var(--space-4);
+  min-height: var(--control-height);
 
   input {
     flex: 1;
@@ -538,8 +753,10 @@ tbody tr.clickable:hover {
 }
 
 /* Available to assistive technology, invisible on screen. Used where the design
-   conveys state by colour alone. */
-.sr-only {
+   conveys state by colour alone. `.visually-hidden` is the same thing under the
+   name the table captions use. */
+.sr-only,
+.visually-hidden {
   position: absolute;
   width: 1px;
   height: 1px;

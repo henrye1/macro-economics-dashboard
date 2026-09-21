@@ -17,6 +17,12 @@
     } @else {
       <span class="meta">{{ rowRange() }}</span>
     }
+
+    <!-- Format, vintage pinning and the download itself live on the Saved
+         queries tab, beside the query being exported. -->
+    <a class="btn outline-navy export" routerLink="/saved-queries">
+      <span class="ms-icon" aria-hidden="true">download</span> Export
+    </a>
   </div>
 
   <!--

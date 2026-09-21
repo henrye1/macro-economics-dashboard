@@ -394,4 +394,399 @@ applies if the console ever calls the API directly — and correct the sentence 
 say CORS is defence in depth rather than the lock. Then decide at
 `/release render` whether the accepted gap needs the shared-header mitigation the
 plan already describes as throwaway code.
+
+### F-45 [P3] open - series.scss keeps a hundred lines of rules for markup the rewrite deleted
+
+**File:** ui/src/app/series/series.scss:12
+**Found:** 2026-09-14 by /audit (scope: current; lens: quality)
+**Why it matters:** `series.html` no longer emits `.series-title`, `.series-sub`,
+`.points`, `.point` or the top-level `.boundary`, but all five blocks are still
+in `series.scss`, roughly lines 12 to 115. The file was not touched in this
+delta at all. The standards call out "no unused imports or variables"; this is
+the CSS form of it, and it is the kind of dead weight that gets copied forward
+because it looks like it is in use.
+
+Two of the names now exist twice with different meanings, which is the part that
+will cost someone time: `.boundary` is dead here but live in
+`series-chart.scss` as the dashed rule, and `.legend` here styles the head strip
+while `series-chart.scss` styles the per-chart one. View encapsulation keeps them
+apart, so nothing renders wrong; a reader grepping for either name does not get
+that for free.
+
+The reverse also happened: `series.html:51` and `:57` apply `class="tight"`, and
+no rule for it exists in `series.scss` or `styles.scss`. The only `td.tight` in
+the project is scoped to `countries-indicators`.
+**Suggested fix:** delete the five dead blocks, and either define `tight` for
+this table or drop the class from the two cells.
+**Resolution:** Still open, re-confirmed at 6bec3ed by the independent review,
+with one correction: the file *was* touched in this delta after all. The repair
+commit rewrote the `.legend .box` rules into `.rule` for F-44
+(`series.scss:133-152`). The five dead blocks above them are untouched and still
+there, `.boundary` and `.legend` still carry one meaning here and another in
+`series-chart.scss`, and `series.html:66` and `:70` still apply an undefined
+`tight`. Not worse, not smaller. P3, so it does not block.
+
+### F-46 [P3] open - Eight icons now depend on a Google Fonts ligature that has no fallback, and they fail as visible words
+
+**File:** ui/src/index.html:11
+**Found:** 2026-09-14 by /audit (scope: current; lens: quality)
+**Why it matters:** The delta swaps the HTML entities (`&#9906;`, `&times;`,
+`&#8594;`) for Material Symbols Outlined ligatures, so the markup now literally
+contains `<span class="ms-icon">close</span>` at eight sites. `--font-icon` is
+`"Material Symbols Outlined"` with no fallback family, and the font is only
+reachable from `fonts.googleapis.com`. If that request is blocked - an offline
+run, a CSP without the font hosts, a corporate proxy, or a font that has simply
+not arrived yet - the ligature never forms and the browser renders the word: a
+chip's remove button reads "close", the Observations header reads "download
+Export", and the query card reads "restart_alt Reset".
+
+The entities this replaced needed no network. Nothing here is a functional break
+and every one of the eight is `aria-hidden`, so assistive tech is unaffected;
+it is a first-paint and offline-resilience regression introduced by the port.
+**Suggested fix:** self-host the subset the console uses, or keep the CDN and
+give `.ms-icon` a `font-size: 0` with the glyph sized on a child, so a missing
+font collapses rather than spelling itself out.
+**Resolution:** Still open, and now wider. The 2026-09-21 fidelity pass closed
+F-62 by converting the three overview use-case glyphs to `trending_up`,
+`leaderboard` and `history`, so the count is eleven sites, not eight, and the
+overview is now among the screens that would spell themselves out. The two
+findings pull in opposite directions and F-62 wins on the evidence: the
+reference uses the ligatures, and the spec's Done when rules the entities out.
+The fallback is the thing that needs building. P3, so it does not block.
+
+### F-48 [P2] open - The port dropped three action buttons to 3.0:1, under the AA floor they used to clear
+
+**File:** ui/src/app/export/export-card.scss:102
+**Found:** 2026-09-14 by /audit (scope: current; lens: quality)
+**Why it matters:** Three filled action buttons carried a hand-picked dark green
+before this delta and read the theme token after it: `.btn.download` here,
+`.btn.send` at `request-builder.scss:91`, and `.btn.save` at
+`saved-queries.scss:67`. All three were `#1f7a44`; all three are now
+`var(--accent)`, which the port sets to the design system's
+`--cl-action-color: #3faa24`.
+
+White on `#1f7a44` is 5.35:1. White on `#3faa24` is 3.01:1, both computed from
+the running app's own colours. The label is 12px at weight 600 or 700, which is
+not WCAG large text, so the floor is 4.5:1 and these three now fail it where
+they used to clear it comfortably.
+
+The new `.btn.primary` Save query control this delta adds to the working query
+card (`working-query-card.html:178`) lands on the same 3.01:1, so the fix also
+ships one new control already under the floor. `.btn.primary` elsewhere was
+already at 3.09:1 on the old `#2fa83c`, so that part is not a regression; the
+three named above are.
+
+This is faithful to the reference token set, which is the fix's stated goal, and
+that is the tension worth recording. The honest options are to darken the ink
+pairing for text or to accept the reference's contrast out loud rather than by
+inheritance.
+**Suggested fix:** either give filled action buttons a darker background behind
+their text - `--cl-action-700: #319a1b` at minimum, though that is still only
+3.9:1, so a dedicated on-action token is the real answer - or record the
+decision to follow the design system's contrast in the `styles.scss` header so
+the next reader knows it was weighed rather than missed.
+**Resolution:**
+
+### F-49 [P3] open - The token set's source of truth is not in the repository, and the one it supersedes still is
+
+**File:** ui/src/styles.scss:3
+**Found:** 2026-09-14 by /audit (scope: current; lens: quality)
+**Why it matters:** The header comment now says the tokens were read off "the
+standalone reference export rather than prototypes/theme.css, which was a
+simplified re-draw and drifted". `macro-data-explorer-standalone.html` is not in
+this repository: `blueprint/references/` holds seven screenshots and nothing
+else. So the delta's central claim, that every colour, radius and control height
+matches the reference, cannot be checked by anyone, this review included, and
+the next person who needs a token has no file to read it from.
+
+The other half compounds it. `prototypes/` is still present with the superseded
+`theme.css`, and the Blueprint's own skills treat its presence as the design
+reference: `.claude/skills/brief/SKILL.md:57` and `feature/SKILL.md:139` both
+point a UI feature at `prototypes/` when the folder exists. The spec's Notes
+section records that it is no longer the reference, but that note lives in
+`current-feature.md`, which `/complete` archives. Nothing in `prototypes/` or
+`styles.scss` says it.
+
+No code is wrong. This is about whether the fidelity this fix bought survives
+the spec being archived.
+**Suggested fix:** commit the standalone export under `blueprint/references/`
+and name it in the `styles.scss` header, then delete `prototypes/` or leave a
+`SUPERSEDED.md` in it naming the replacement.
+**Resolution:** Still open, and it cost something concrete. The 2026-09-21
+fidelity pass verified the console against a copy of the export outside the
+repository, supplied for that session, and found fourteen differences from the
+design (F-51 to F-64) that had stood since the port. F-56 is the sharpest
+illustration of this finding: the drift table in `current-feature.md` records
+the radius as 5px because it was read from the export's `--border-radius`
+declaration rather than from what the export renders, which is square. Nobody
+could have caught that from this repository. P3 by severity, but it is the
+reason the other fourteen existed. Committing the export under
+`blueprint/references/` remains the fix.
+
+### F-50 [P3] open - The one test named for tooltip anchoring asserts the implementation's formula against itself
+
+**File:** ui/src/app/core/series-chart.spec.ts:179
+**Found:** 2026-09-14 by /audit (scope: current; lens: tests)
+**Why it matters:** `it('anchors the tooltip as a percentage of the viewBox')`
+asserts that `first.leftPercent` is close to `(first.cx / CHART_WIDTH) * 100`,
+which is character for character what `series-chart.ts:239` computes. It
+restates the source rather than pinning a fact about it, so it passes for any
+value of `cx` and would have stayed green throughout F-42.
+
+It stands out because the rest of this file is the opposite. `'bridges the
+forecast path back to the last actual point'` pins exact path strings, and
+`'carries every plotted point'` compares two independently derived counts. Those
+fail when the code is wrong. This one cannot.
+
+The thing the name promises, that the tip lands on its point, is CSS, and no
+unit test can reach it. That is fine; a test that cannot observe its subject
+should say what it can observe instead.
+**Suggested fix:** either assert the concrete number for a known point
+(`leftPercent` is 7.37 for `cx` 56) so a change to the scale is visible, or drop
+the test and note in `series-chart.scss` that the anchoring is browser-verified
+only.
+**Resolution:**
+
+### F-65 [P2] open - The Series tab now fetches the whole country catalogue twice on every visit
+
+**File:** ui/src/app/series/series.ts:80
+**Found:** 2026-09-21 by /audit (scope: current; lens: performance)
+**Why it matters:** F-63 gave `SeriesPage` its own `macro.countries()` call to
+resolve ISO3 codes to names. `WorkingQueryCard`, which the same page renders,
+already calls `macro.countries()` at `working-query-card.ts:65` to populate its
+Add country select. Both subscribe on construction, so opening `/series` issues
+two identical `GET /api/macro/countries` requests for all 214 rows, where it
+previously issued one.
+
+`HttpMacroDataProvider` holds no client-side cache by design - its own comment
+records that the API's ETag revalidation is meant to do that work - so nothing
+between the two callers collapses them. Conditional revalidation makes the
+second response cheap on the wire but it is still a round trip on every visit,
+and the relay still spends an upstream call if its cache has expired.
+
+The catalogue is the one payload three tabs all need and none of them own, so
+the duplicate is a symptom rather than the defect: `countries-indicators.ts:92`
+and `overview.ts:42` each fetch it too, independently.
+**Suggested fix:** a small catalogue service in `core/` holding
+`countries()` behind `shareReplay({ bufferSize: 1, refCount: false })`, injected
+by the four callers. That also gives feature 19's auth screens and item 16 a
+place to read it from.
+**Resolution:** Confirmed independently, 2026-09-21. `series.ts:80` and `working-query-card.ts:65` both subscribe on construction, and `http-macro-data.provider.ts:53` adds no cache or `shareReplay`, so two identical `GET /countries` go out per visit. Stays open.
+
+### F-66 [P2] open - Neither fallback in the new country-name resolution is tested
+
+**File:** ui/src/app/series/series.spec.ts:106
+**Found:** 2026-09-21 by /audit (scope: current; lens: tests)
+**Why it matters:** F-63 added two fallbacks and a test for neither:
+`buildCharts` falls back to the ISO3 when the map has no entry for a country
+(`series-chart.ts:268`), and `SeriesPage` swallows a catalogue failure into an
+empty map (`series.ts:82`). Both exist so a silent catalogue is a cosmetic loss
+rather than a broken tab, which is the claim worth pinning.
+
+The tests that were updated assert only the happy path: the legend reads
+`['Namibia', 'South Africa']` and the metadata cell reads `NAM — Namibia`. They
+pass whether or not the fallback works, so a later change that lets `undefined`
+reach the label - or that lets the catchError turn into a thrown error - is
+green. The standards' scope rule puts `buildCharts` squarely in the tested set:
+it is pure logic with an obvious edge case.
+
+`core/series-chart.spec.ts` is the natural home for the first and takes one
+case: build a chart with an empty map and assert the legend reads the code.
+**Suggested fix:** two cases. In `series-chart.spec.ts`, a chart built with an
+empty map labels its legend with the ISO3. In `series.spec.ts`, a provider whose
+`countries()` errors still renders the charts and the metadata table, with codes
+for labels.
+**Resolution:** Confirmed independently, 2026-09-21. `core/series-chart.spec.ts` has 27 cases and none builds a chart with an empty or partial name map; `series.spec.ts` asserts only the resolved labels. Both fallbacks are untested. Stays open.
+
+### F-67 [P2] open - Angular Material is themed in 187 custom properties and imported by no component
+
+**File:** ui/src/styles.scss:186
+**Found:** 2026-09-21 by /audit (scope: current; lens: quality)
+**Why it matters:** `styles.scss` runs `@include mat.theme(...)` and then
+overrides roughly 25 `--mat-sys-*` variables so Material "inherits the Cyte look
+instead of a stock palette", per its own comment. Nothing imports a Material
+component: `@angular/material` appears in no non-spec file under `src/app`. The
+console is hand-built cards, tables and buttons on the `--cl-*` tokens.
+
+It is not free. The emitted `styles.css` carries 187 `--mat-sys-*` declarations,
+8.2 kB of its 21.7 kB, so 38% of the global stylesheet is theming for a library
+the app does not use. `@angular/material` and `@angular/cdk` are also runtime
+dependencies rather than dev ones, which is two packages of supply-chain surface
+and upgrade cost for the same nothing.
+
+This predates the fidelity work but sits inside it: the block was rewritten in
+`f68784d`, which is what makes it this delta's to answer for.
+**Suggested fix:** confirm no component is planned to use Material - feature 19's
+auth forms are the next candidate and the reference draws plain inputs - then
+delete the `mat.theme()` block and the `--mat-sys-*` overrides and drop both
+dependencies. If Material is wanted later, the block is one commit to restore
+and the tokens it reads still exist.
+**Resolution:** Confirmed independently, 2026-09-21. `@use '@angular/material'` and `mat.theme()` are in `styles.scss`, and no file under `ui/src/app` references Material. Noting for the record that the import predates this delta (it is present at the base commit `8d57c0d`), so this is inherited weight the delta restated rather than introduced. Stays open.
+
+### F-68 [P3] open - .clickable means two different things, and the row it now really controls has no pointer cursor
+
+**File:** ui/src/styles.scss:622
+**Found:** 2026-09-21 by /audit (scope: current; lens: quality)
+**Why it matters:** The rule carries the comment "Hover affordance only. The
+row's real control is a button inside it", and that is exactly true of the
+catalogue at `countries-indicators.html:131`, where the `<tr>` has no handler
+and the foot tells the reader to click the code. F-64 then put a real
+`(click)` on `vintages.html:37` and reused the same class, so the class now
+means "hover hint, not a target" on one tab and "this is the target" on the
+other, and its comment is wrong for the second.
+
+The user-visible half is that `.clickable` sets only a background, so the
+vintages row that is now a genuine click target keeps the default cursor. The
+row highlights on hover and does something when clicked, but never says it is
+clickable, which is the affordance the design's "click a row for its revisions"
+promises.
+**Suggested fix:** split the two: keep `.clickable` as the hover hint, add
+`.row-target` (or similar) that sets `cursor: pointer` on top of it, and put the
+new class on the vintage row. Correct the comment on `.clickable` to say it does
+not imply a handler.
+**Resolution:** Confirmed independently, 2026-09-21. `styles.scss:622` sets background only; `vintages.html:37` carries a real `(click)` with no `cursor: pointer`, while `countries-indicators.html:131` carries the same class with no handler. Stays open.
+
+### F-69 [P3] open - Two tokens are left declared and unused by this delta
+
+**File:** ui/src/styles.scss:174
+**Found:** 2026-09-21 by /audit (scope: current; lens: quality)
+**Why it matters:** `--radius-button` had exactly two consumers, the
+`.btn.primary` and `.btn.navy` branch that F-56 deleted once the whole system
+went square. `--cell-y` had exactly one, the `tbody td` padding that F-59 moved
+to the new `--table-y`. Both are still declared in `:root` with zero `var()`
+references anywhere in `ui/src`, and `--cell-y` sits under a comment that
+introduces it as half of a pair.
+
+The standards call out unused variables directly. The cost here is not bytes: a
+token that looks live is one the next person reaches for, and `--radius-button`
+in particular reads as though filled buttons still have their own radius rule
+when they no longer do.
+**Suggested fix:** delete both declarations and reword the `--cell-y` comment to
+describe `--cell-x` alone.
+**Resolution:** Confirmed independently, 2026-09-21. `--radius-button` and `--cell-y` have zero `var()` references in `ui/src`. The same sweep found more unused alias tokens than the entry names; the chart palette half of that is recorded separately as F-73. Stays open.
+
+### F-70 [P3] open - The writing standard forbids em dashes and the product copy is built on them
+
+**File:** blueprint/context/coding-standards.md:196
+**Found:** 2026-09-21 by /audit (scope: current; lens: quality)
+**Why it matters:** The standard says "No em dashes (U+2014) in generated
+content: docs, comments, commit messages, READMEs, specs" and "Avoid en dashes
+and the ellipsis character too". The codebase does the opposite everywhere it
+shows a value: the em dash is the missing-value glyph in `vintages.ts:267`,
+`:301` and `:307`, in the paging footer's empty vintage label, and in the
+Observations and Series empty states; the en dash is the year-span separator in
+`revision-view.ts:150` and `working-query-card.ts:154`; the ellipsis character
+is in eight templates' loading text. Roughly 30 sites, almost all of them
+product copy that matches the design reference.
+
+So the rule as written is contradicted by the code it governs, and the
+contradiction is spreading: F-63 added `${iso3} — ${name}` and a doc comment
+quoting it at `series.ts:91`, both because the reference renders exactly that.
+A standard nobody follows stops being a standard, and the next reviewer either
+raises 30 findings or learns to skip the section.
+
+The rule is right about its actual target. Prose that reads as AI-generated is a
+real problem, and none of these sites are prose.
+**Suggested fix:** scope the rule to what it means - prose in docs, comments,
+commit messages and specs - and say explicitly that product copy and value
+glyphs follow the design reference. Then fix the one comment at `series.ts:91`
+that the narrowed rule still catches.
+**Resolution:** Confirmed independently, 2026-09-21. The conflict between the standard and the product copy is real and is a standards question rather than a code defect. Stays open for the user to decide; a reviewer cannot accept it on their behalf.
+
+### F-71 [P3] open - The Angular CLI analytics id is committed, so every clone reports usage telemetry under one shared identity
+
+**File:** ui/angular.json:6
+**Found:** 2026-09-21 by /audit independent (scope: current; lens: security)
+**Why it matters:** `f9f2042` added `"analytics": "21d5f6fd-..."` to the `cli`
+block of the workspace config. That is not a local preference: `cli.analytics`
+in `angular.json` is the project-level switch, so it turns Angular CLI usage
+reporting to Google on for anyone who runs `ng` in this repository, keyed to the
+id one machine generated. The per-user equivalent lives in `~/.angular-config.json`
+and is deliberately outside the repo.
+
+Nothing sensitive leaks - the CLI reports command names, flags, builder timings
+and versions - but it is an outbound-telemetry decision taken for every future
+contributor and for CI, recorded nowhere except a chore commit whose message
+says only that the id was pinned. It also makes the id a weak shared correlator
+across whoever builds the project.
+
+The likely motive was to stop the CLI's first-run analytics prompt blocking the
+new Playwright `webServer`, which starts `ng serve` non-interactively. Setting
+it to `false` solves that without opting anyone in.
+**Suggested fix:** replace the id with `"analytics": false`, or drop the key and
+set `NG_CLI_ANALYTICS=false` in the Playwright `webServer` env. If telemetry is
+wanted, record the choice in `AGENTS.md` so it is a decision rather than an
+artefact.
+**Resolution:**
+
+### F-72 [P3] open - The chart's screen-reader description states a forecast even on a chart that has none
+
+**File:** ui/src/app/core/series-chart.ts:390
+**Found:** 2026-09-21 by /audit independent (scope: current; lens: quality)
+**Why it matters:** `describe()` always ends `actual through ${lastActualYear}
+and forecast after it`, with no reference to `hasForecast`. The drawing is
+careful about exactly this: `boundaryInWindow` exists so the dashed rule is not
+drawn when the boundary falls outside the window, and the band is suppressed
+when `hasForecast` is false. The description was not given the same guard.
+
+It is reachable without unusual data. Set Forecast to `actual`, or a Year to
+that lands before `lastActualYear`, and every point on the chart is history: the
+sighted reader sees an unbanded line with no boundary, and the screen-reader
+user is told there is a forecast after a year that is not even on the axis,
+because `lastActualYear` is the group minimum and is not clamped to the window.
+
+This is the one rendering a non-sighted user has, so it carries the whole claim
+by itself. Nothing else on the card contradicts it for them.
+**Suggested fix:** pass `hasForecast` into `describe()` and end the sentence at
+the range when it is false, or say `all actual` instead. Clamp the stated
+`lastActualYear` to the window, or name the window it refers to.
+**Resolution:**
+
+### F-73 [P3] open - The chart palette is declared twice, as six CSS tokens nothing reads and six hex literals in TypeScript
+
+**File:** ui/src/app/core/series-chart.ts:34
+**Found:** 2026-09-21 by /audit independent (scope: current; lens: quality)
+**Why it matters:** `SERIES_COLORS` hardcodes the six line colours and comments
+"Matches --series-1..6". `styles.scss:139` declares `--series-1` through
+`--series-6` with the same six values, and no rule in `ui/src` reads any of
+them: the colours reach the SVG as `[attr.stroke]` and `[attr.fill]` bindings,
+which are presentation attributes and cannot resolve `var()`. So one half of the
+pair is authoritative and the other is decoration, and the file header two
+hundred lines above says "Never hardcode a colour, font or radius anywhere else:
+reference a variable."
+
+Two copies that must agree and no mechanism to make them is the drift this token
+layer exists to prevent. A tenant theme that re-skins `--cl-*` also silently
+misses the chart.
+**Suggested fix:** pick one owner. Either delete the six `--series-*`
+declarations and note in `series-chart.ts` that the palette lives in TypeScript
+because SVG presentation attributes cannot read a variable, or move the strokes
+onto CSS classes (`class="series-1"`) so the tokens are the single source. The
+first is one line of work; the second is the one that keeps the theming promise.
+**Resolution:**
+
+### F-74 [P3] open - yearOptions sizes its array from an unvalidated saved year, so one bad entry can build an array of a billion
+
+**File:** ui/src/app/core/year-range.ts:32
+**Found:** 2026-09-21 by /audit independent (scope: current; lens: performance)
+**Why it matters:** `yearOptions` widens rather than clamps, on purpose, so a
+saved range outside the console's window is still selectable. The length it then
+builds is `last - first + 1`, taken straight from whatever numbers it was
+handed, and the only caller passes `query().yearFrom` and `query().yearTo`.
+
+Those values are not always console-produced. The Year selects are bounded, but
+`saved-query.store.ts:205` restores entries from `localStorage` behind
+`isNullableNumber`, which accepts any `number`. A corrupt, hand-edited or
+future-schema entry carrying `yearFrom: 1e9` makes the card build a
+billion-element array and render a billion `<option>` elements the moment it is
+loaded, which hangs the tab; `Infinity` throws a `RangeError` out of
+`Array.from` and takes the card's render with it.
+
+This is a robustness gap rather than a live bug - the path needs storage that
+the app did not write - but the guard is one line and the failure is total.
+**Suggested fix:** clamp the window in `yearOptions`, for example to
+`MIN_YEAR - 50` and `now.getFullYear() + 50`, and return the bounded list. A
+year outside that is not selectable anyway. Tightening `isNullableNumber` to
+`Number.isInteger` plus a plausible range would fix the class rather than the
+symptom.
 **Resolution:**

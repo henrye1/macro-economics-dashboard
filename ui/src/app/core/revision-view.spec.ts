@@ -7,10 +7,12 @@ import {
   byNewestFirst,
   disappearedSeries,
   formatSeriesSpan,
+  formatYearHorizon,
   isSignificantRevision,
   predecessorOf,
   revisionChange,
-  toRevisionView
+  toRevisionView,
+  yearHorizon
 } from './revision-view';
 
 function revision(overrides: Partial<Revision> = {}): Revision {
@@ -294,5 +296,57 @@ describe('byNewestFirst', () => {
     byNewestFirst(input);
 
     expect(input.map((v) => v.id)).toEqual([9, 14]);
+  });
+});
+
+describe('yearHorizon', () => {
+  const row = (
+    year: number,
+    previousValue: number | null,
+    newValue: number | null
+  ): Revision => ({ indicator: 'GDP_GROWTH_REAL', country: 'ZAF', year, previousValue, newValue });
+
+  it('reports the newest year each side carries a value for', () => {
+    expect(yearHorizon([row(2023, 1, 1), row(2024, 2, 2), row(2025, null, 3)])).toEqual({
+      previous: 2024,
+      current: 2025
+    });
+  });
+
+  it('ignores a null side rather than counting its year', () => {
+    expect(yearHorizon([row(2030, 1, null)])).toEqual({ previous: 2030, current: null });
+  });
+
+  it('is empty for no rows', () => {
+    expect(yearHorizon([])).toEqual({ previous: null, current: null });
+  });
+
+  it('does not assume the rows arrive in year order', () => {
+    expect(yearHorizon([row(2025, null, 3), row(2023, 1, 1)])).toEqual({
+      previous: 2023,
+      current: 2025
+    });
+  });
+});
+
+describe('formatYearHorizon', () => {
+  it('shows the move', () => {
+    expect(formatYearHorizon({ previous: 2024, current: 2025 })).toBe('2024 → 2025');
+  });
+
+  it('says so when nothing moved', () => {
+    expect(formatYearHorizon({ previous: 2025, current: 2025 })).toBe('Unchanged at 2025');
+  });
+
+  it('reads as new data when there was no predecessor value', () => {
+    expect(formatYearHorizon({ previous: null, current: 2025 })).toBe('New through 2025');
+  });
+
+  it('reads as a retreat when the vintage added nothing', () => {
+    expect(formatYearHorizon({ previous: 2025, current: null })).toBe('Nothing new past 2025');
+  });
+
+  it('is None when there is nothing at all', () => {
+    expect(formatYearHorizon({ previous: null, current: null })).toBe('None');
   });
 });

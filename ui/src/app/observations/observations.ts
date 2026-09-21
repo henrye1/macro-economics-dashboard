@@ -1,4 +1,5 @@
 import { Component, computed, inject } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
 import type { Observation } from '../core/macro-contracts';
 import { MACRO_DATA } from '../core/macro-data.provider';
@@ -33,7 +34,7 @@ const UNAVAILABLE = 'Observations are unavailable.';
  */
 @Component({
   selector: 'app-observations',
-  imports: [PagingFooter, WorkingQueryCard],
+  imports: [PagingFooter, RouterLink, WorkingQueryCard],
   templateUrl: './observations.html',
   styleUrl: './observations.scss'
 })

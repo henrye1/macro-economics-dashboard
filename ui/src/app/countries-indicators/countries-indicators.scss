@@ -9,12 +9,6 @@
   padding-bottom: 0;
 }
 
-.state {
-  margin: 0;
-  padding: var(--space-5);
-  color: var(--muted);
-}
-
 /* ---------- countries ---------- */
 
 .country-list {
@@ -32,8 +26,30 @@
   gap: var(--space-4);
   padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--border);
+  width: 100%;
+  text-align: left;
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
 
-  &:last-child {
+  &:hover {
+    background: var(--surface-subtle);
+  }
+
+  &.selected {
+    background: var(--chip-country-bg);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--navy);
+    outline-offset: -2px;
+  }
+
+  li:last-child & {
     border-bottom: none;
   }
 
@@ -47,14 +63,13 @@
   }
 
   .sources {
-    font-family: var(--font-mono);
     font-size: var(--text-xs);
+    letter-spacing: 0.04em;
     color: var(--muted);
   }
 
   .iso {
     flex: none;
-    font-family: var(--font-mono);
     font-size: var(--text-sm);
     font-weight: var(--weight-bold);
     color: var(--navy);
@@ -77,8 +92,6 @@ td.tight {
 }
 
 .sources-cell {
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  color: var(--muted);
+  font-size: var(--text-base);
   line-height: 1.6;
 }

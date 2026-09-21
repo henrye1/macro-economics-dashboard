@@ -33,6 +33,7 @@ interface Filters {
   q: string;
   category: string;
   source: string;
+  curated: boolean;
 }
 
 /**
@@ -60,6 +61,12 @@ export class CountriesIndicatorsPage {
   protected readonly source = signal('');
 
   /**
+   * On by default, matching the plan: the auto-registered `WEO_` factors are
+   * reachable but not listed until asked for.
+   */
+  protected readonly curatedOnly = signal(true);
+
+  /**
    * Only the free-text term is debounced. The selects are discrete choices and
    * should take effect at once. `initialValue` keeps the first render immediate
    * rather than waiting out a debounce nobody triggered.
@@ -75,7 +82,8 @@ export class CountriesIndicatorsPage {
   private readonly filters = computed<Filters>(() => ({
     q: this.debouncedQuery(),
     category: this.category(),
-    source: this.source()
+    source: this.source(),
+    curated: this.curatedOnly()
   }));
 
   // ---------- countries: fetched once, searched locally ----------
@@ -159,12 +167,16 @@ export class CountriesIndicatorsPage {
   private readonly catalogueState = toSignal<Loaded<CatalogueResult> | null>(
     toObservable(this.filters).pipe(
       distinctUntilChanged(
-        (a, b) => a.q === b.q && a.category === b.category && a.source === b.source
+        (a, b) =>
+          a.q === b.q &&
+          a.category === b.category &&
+          a.source === b.source &&
+          a.curated === b.curated
       ),
       switchMap((filters) =>
         this.macro
           .indicators({
-            curated: true,
+            curated: filters.curated,
             pageSize: CATALOGUE_PAGE_SIZE,
             ...(filters.q.trim() ? { q: filters.q.trim() } : {}),
             ...(filters.category ? { category: filters.category } : {}),
@@ -208,7 +220,11 @@ export class CountriesIndicatorsPage {
     return state?.status === 'ready' ? state.value.total : 0;
   });
 
-  /** Drives the wording of the empty state: no matches versus nothing to show. */
+  /**
+   * Drives the wording of the empty state: no matches versus nothing to show.
+   * Curated is excluded on purpose - it is the default, and turning it off
+   * widens the catalogue rather than narrowing it.
+   */
   protected readonly filtered = computed(() => {
     const { q, category, source } = this.filters();
     return q.trim() !== '' || category !== '' || source !== '';
@@ -217,14 +233,27 @@ export class CountriesIndicatorsPage {
   // ---------- working query ----------
 
   protected readonly chosen = computed(() => this.store.query().indicators);
+  protected readonly chosenCountries = computed(() => this.store.query().countries);
 
   protected isChosen(code: string): boolean {
     return this.chosen().includes(code);
   }
 
+  protected isChosenCountry(iso3: string): boolean {
+    return this.chosenCountries().includes(iso3);
+  }
+
   /** Add only. Removal belongs to the chip in the working query card. */
   protected choose(code: string): void {
     this.store.addIndicator(code);
+  }
+
+  protected chooseCountry(iso3: string): void {
+    this.store.addCountry(iso3);
+  }
+
+  protected toggleCurated(): void {
+    this.curatedOnly.update((only) => !only);
   }
 
   // ---------- input handlers ----------

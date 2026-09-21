@@ -1,11 +1,13 @@
 import { Component, computed, inject, input } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { RouterLink } from '@angular/router';
 import { catchError, combineLatest, map, of } from 'rxjs';
 
 import { macroErrorMessage } from '../core/http/macro-error';
 import type { ForecastFilter, SourceFilter } from '../core/macro-contracts';
 import { MACRO_DATA } from '../core/macro-data.provider';
 import { WorkingQueryStore } from '../core/working-query.store';
+import { yearOptions } from '../core/year-range';
 
 interface Options {
   indicators: readonly string[];
@@ -31,6 +33,7 @@ const FORECASTS: readonly ForecastFilter[] = ['all', 'actual', 'forecast'];
  */
 @Component({
   selector: 'app-working-query-card',
+  imports: [RouterLink],
   templateUrl: './working-query-card.html',
   styleUrl: './working-query-card.scss'
 })
@@ -117,6 +120,14 @@ export class WorkingQueryCard {
     const state = this.optionsState();
     return state?.status === 'ready' ? state.options.vintages : [];
   });
+
+  /**
+   * Recomputed from the query so a range loaded from a saved entry is always
+   * selectable, even when it falls outside the console's default window.
+   */
+  protected readonly years = computed(() =>
+    yearOptions([this.query().yearFrom, this.query().yearTo])
+  );
 
   protected readonly invertedRange = computed(() =>
     this.validation().problems.includes('inverted-year-range')

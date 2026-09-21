@@ -18,58 +18,66 @@
       <span class="meta">{{ total() }} series · pagination counts series, not rows</span>
     }
 
+    <!--
+      Line style, not colour. The charts spend colour on the country, so a
+      legend that also spent it on actual against forecast contradicted every
+      chart under it.
+    -->
     <div class="legend" aria-hidden="true">
-      <span class="swatch"><span class="box actual"></span> Actual</span>
-      <span class="swatch"><span class="box forecast"></span> Forecast</span>
-      <span class="swatch"><span class="box boundary"></span> lastActualYear</span>
+      <span class="swatch"><span class="rule actual"></span> Actual</span>
+      <span class="swatch"><span class="rule forecast"></span> Forecast</span>
+      <span class="swatch"><span class="rule boundary"></span> lastActualYear</span>
+      <span class="swatch note">Colour identifies the country</span>
     </div>
   </div>
 </section>
 
-@for (view of views(); track view.series.indicator + '|' + view.series.country; let last = $last) {
-  <section class="card series-card" [attr.aria-label]="view.series.indicator + ' ' + view.series.country">
+@for (chart of charts(); track chart.indicator) {
+  <app-series-chart [chart]="chart" />
+}
+
+@if (rows().length) {
+  <section class="card series-meta">
     <div class="card-head">
-      <div class="series-title">
-        <span class="code">{{ view.series.indicator }}</span>
-        <span class="name">{{ view.series.name }}</span>
-      </div>
-      <span class="meta">{{ view.position }}</span>
+      <h2>Series metadata</h2>
+      <span class="meta">One row per series on this page</span>
     </div>
 
-    <div class="series-sub">
-      <span class="item"><span class="k">Country</span><span class="v mono">{{ view.series.country }}</span></span>
-      <span class="item"><span class="k">Unit</span><span class="v">{{ view.series.unit }}</span></span>
-      <span class="item"><span class="k">Source</span><span class="v mono">{{ view.series.source }}</span></span>
-      <span class="item"><span class="k">Vintage</span><span class="v mono">{{ view.series.vintage }}</span></span>
-      <span class="item"><span class="k">lastActualYear</span><span class="v">{{ view.series.lastActualYear }}</span></span>
-    </div>
-
-    <!--
-      The points row is not tabular data a screen reader can walk usefully, and
-      the boundary rule is purely visual, so the same facts are stated here.
-    -->
-    <p class="sr-only">{{ view.description }}</p>
-
-    <div class="points">
-      @for (point of view.points; track point.year; let i = $index) {
-        <div class="point" [class.actual]="!point.forecast" [class.forecast]="point.forecast">
-          <div class="year">{{ point.year }}</div>
-          <div class="val">{{ point.value }}</div>
-        </div>
-
-        @if (view.boundaryAfter === i) {
-          <div class="boundary" aria-hidden="true"><span>lastActualYear</span></div>
+    <table>
+      <caption class="sr-only">
+        The series behind the charts above, with the vintage each was read from
+      </caption>
+      <thead>
+        <tr>
+          <th>Indicator</th>
+          <th>Country</th>
+          <th>Unit</th>
+          <th>Source</th>
+          <th>Vintage</th>
+          <th class="num">lastActualYear</th>
+          <th>Years</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of rows(); track row.series.indicator + '|' + row.series.country) {
+          <tr>
+            <td><span class="code-text">{{ row.series.indicator }}</span></td>
+            <td>{{ countryLabel(row.series.country) }}</td>
+            <td class="tight">{{ row.series.unit }}</td>
+            <td>{{ row.series.source }}</td>
+            <td>{{ row.series.vintage }}</td>
+            <td class="num">{{ row.series.lastActualYear }}</td>
+            <td class="tight">{{ row.years }}</td>
+          </tr>
         }
-      }
-    </div>
+      </tbody>
+    </table>
 
-    @if (last) {
-      <div class="card-foot">
-        Split each series at <strong>lastActualYear</strong> to get history for fitting and
-        the forecast path for scenarios. Record the <strong>meta.vintages</strong> ids below
-        with any result you must reproduce.
-      </div>
-    }
+    <div class="card-foot">
+      Split each series at <strong>lastActualYear</strong> to get history for fitting and
+      the forecast path for scenarios. Record the <strong>meta.vintages</strong> ids below
+      with any result you must reproduce.
+    </div>
   </section>
 }
 

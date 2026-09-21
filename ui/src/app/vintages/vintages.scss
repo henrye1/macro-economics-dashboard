@@ -27,7 +27,7 @@
   border: 0;
   padding: 0;
   font: inherit;
-  color: var(--brand);
+  color: var(--navy);
   font-weight: 600;
   cursor: pointer;
 }
@@ -37,18 +37,18 @@
 }
 
 .pill.latest {
-  background: var(--brand-tint, #e3ecfd);
-  color: var(--brand, #1b3fae);
+  background: var(--badge-latest-bg);
+  color: var(--badge-latest-ink);
 }
 
 .pill.superseded {
-  background: #eceef2;
-  color: #5b6472;
+  background: var(--badge-superseded-bg);
+  color: var(--badge-superseded-ink);
 }
 
 .pill.significant {
-  background: #fdf3dd;
-  color: #8a6212;
+  background: var(--badge-significant-bg);
+  color: var(--badge-significant-ink);
 }
 
 .revisions-controls {
@@ -65,27 +65,27 @@
 }
 
 .btn.on {
-  background: var(--brand, #1b3fae);
-  color: #fff;
+  background: var(--navy);
+  color: var(--navy-ink);
 }
 
 .summary {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-4);
   padding: var(--space-5);
 }
 
 .summary-panel {
-  background: #f6f7f9;
-  border-radius: 6px;
+  background: var(--surface-subtle);
+  border-radius: var(--radius);
   padding: var(--space-4);
 }
 
 .summary-title {
   margin: 0 0 var(--space-2);
   color: var(--muted);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
 }
 
 .summary-entry,
@@ -96,12 +96,12 @@
 }
 
 .summary-entry.appeared {
-  color: #1f7a44;
+  color: var(--change-up);
 }
 
 .summary-entry.disappeared,
 .summary-none {
-  color: #b3261e;
+  color: var(--change-down);
 }
 
 /* "None" is the good outcome for disappeared and the dull one for appeared, so
@@ -117,15 +117,26 @@
 }
 
 .change.up {
-  color: #1f7a44;
+  color: var(--change-up);
 }
 
 .change.down {
-  color: #b3261e;
+  color: var(--change-down);
+}
+
+@media (max-width: 1080px) {
+  .summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 720px) {
   .summary {
     grid-template-columns: 1fr;
   }
+}
+
+.summary-entry.horizon {
+  color: var(--navy);
+  font-weight: var(--weight-bold);
 }

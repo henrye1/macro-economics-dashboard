@@ -106,4 +106,15 @@ describe('PagingFooter', () => {
     prev()?.click();
     expect(emitted).toBe(1);
   });
+  // `.card-foot` is block by default in this design system; `.row` is the opt-in
+  // that makes it a flex row, which is what pushes the controls to the right.
+  // Losing the class was finding F-47, and the markup is the only part of that a
+  // unit test can hold. The layout itself is proven in `ui/e2e/paging-footer.spec.ts`.
+  it('opts the footer into the flex row its controls depend on', () => {
+    render(1, 3);
+
+    expect(
+      fixture.nativeElement.querySelector('.card-foot')?.classList.contains('row')
+    ).toBeTrue();
+  });
 });

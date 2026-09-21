@@ -14,7 +14,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-4);
-  padding: 0 var(--space-5);
+  padding: 0 var(--gutter);
 }
 
 .wordmark {
@@ -85,11 +85,12 @@
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   display: flex;
-  gap: var(--space-6);
-  padding: 0 var(--space-6);
+  gap: 4px;
+  padding: 0 var(--gutter);
 
   a {
-    padding: var(--space-4) 0 var(--space-3);
+    padding: 16px 14px 13px;
+    font-size: var(--text-base);
     color: var(--muted);
     text-decoration: none;
     border-bottom: 3px solid transparent;
@@ -110,20 +111,21 @@
 
 .app-main {
   flex: 1 0 auto;
-  max-width: var(--content-max);
+  /* --content-max is the column; the gutter sits outside it. */
+  max-width: calc(var(--content-max) + 2 * var(--gutter));
   width: 100%;
   margin: 0 auto;
-  padding: var(--space-5) var(--space-6) var(--space-6);
+  padding: 26px var(--gutter) 60px;
 }
 
 /* ---------- attribution footer ---------- */
 
 .attribution {
   flex: none;
-  max-width: var(--content-max);
+  max-width: calc(var(--content-max) + 2 * var(--gutter));
   width: 100%;
   margin: 0 auto;
-  padding: var(--space-5) var(--space-6) var(--space-6);
+  padding: var(--space-5) var(--gutter) var(--space-6);
   border-top: 1px solid var(--border);
   color: var(--muted);
   font-size: var(--text-sm);

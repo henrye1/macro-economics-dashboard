@@ -11,3 +11,15 @@
 .card-head .meta {
   text-align: right;
 }
+
+/* The header's export handoff. A link, so it needs the button's text back. */
+.card-head .btn.export {
+  margin-left: 0;
+  flex: none;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: none;
+    background: var(--surface-subtle);
+  }
+}

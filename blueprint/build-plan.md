@@ -36,9 +36,31 @@
 ## Post-MVP
 
 - [ ] 14. **Authentication** - Supabase Auth sign-in behind the existing auth middleware
-  seam
+  seam, replacing feature 19's fixture auth provider
 - [ ] 15. **Roles** - role checks on the routes that need them
 - [ ] 16. **Saved query accounts** - move saved queries to Supabase, keyed by user, with a
   one-time migration from localStorage
 - [ ] 17. **Generated API types** - replace the hand-written contract types with types
   generated from the Core API OpenAPI document, once its URL and credentials are available
+- [ ] 18. **App shell split** - `app.html` is the shell: topbar, tabs, main and
+  attribution footer, with every route rendering inside it. Extract that into a
+  console shell component, add an auth layout beside it for the full-bleed
+  split-panel screens feature 19 needs, and convert the seven flat routes into
+  two parents with children so a route chooses its chrome. No new screens and no
+  visible change: the seven tabs render identically before and after, which is
+  the whole done-when. Its own feature because it moves `app.ts`, `app.html`,
+  `app.scss` and `app.spec.ts` wholesale and is the one change that can break
+  every existing tab at once.
+- [ ] 19. **Auth screens** - sign in, reset password, and accept invitation
+  including its expired state, built against a typed auth provider seam backed
+  by fixtures, the way feature 1 built the console before feature 8 wired live
+  data. Adds the route guard that sends a visitor with no session to sign-in.
+  No Supabase, no email, no token verification and no API change: `authSeam`
+  stays a no-op. Build before 14, which replaces the fixture provider and is the
+  point at which the seam earns its keep. The reference draws only the
+  request-a-link half of reset; the screen that consumes the emailed link reuses
+  the accept-invitation form and needs a design review before it is built.
+- [ ] 20. **Administration** - the page the sign-in copy points at: user list,
+  invitation issue and revoke, and role assignment. Not designed yet. Needs a
+  mockup before it can be specced, and needs 14 and 15 to be real work rather
+  than fixtures.

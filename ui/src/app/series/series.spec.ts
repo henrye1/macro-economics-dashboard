@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { Observable, throwError } from 'rxjs';
 
 import { FixtureMacroDataProvider } from '../core/fixtures/fixture-macro-data.provider';
@@ -32,7 +33,7 @@ describe('SeriesPage', () => {
   function setUp(provider: unknown = new FixtureMacroDataProvider()): void {
     TestBed.configureTestingModule({
       imports: [SeriesPage],
-      providers: [{ provide: MACRO_DATA, useValue: provider }]
+      providers: [provideRouter([]), { provide: MACRO_DATA, useValue: provider }]
     });
 
     store = TestBed.inject(WorkingQueryStore);
@@ -51,18 +52,11 @@ describe('SeriesPage', () => {
 
   const el = () => fixture.nativeElement as HTMLElement;
   const headMeta = () => el().querySelector('.series-head .card-head .meta');
-  const cards = () => Array.from(el().querySelectorAll('.series-card'));
-  const facts = (card: Element) =>
-    Array.from(card.querySelectorAll('.series-sub .item')).map((item) => ({
-      key: item.querySelector('.k')?.textContent?.trim(),
-      value: item.querySelector('.v')?.textContent?.trim()
-    }));
-  const points = (card: Element) => Array.from(card.querySelectorAll('.point'));
-  const cells = (card: Element) =>
-    Array.from(card.querySelectorAll('.points > *')).map((node) =>
-      node.classList.contains('boundary')
-        ? 'BOUNDARY'
-        : (node.querySelector('.year')?.textContent?.trim() ?? '')
+  const charts = () => Array.from(el().querySelectorAll('app-series-chart .chart-card'));
+  const points = (chart: Element) => Array.from(chart.querySelectorAll('circle.point'));
+  const metaRows = () =>
+    Array.from(el().querySelectorAll('.series-meta tbody tr')).map((row) =>
+      Array.from(row.querySelectorAll('td')).map((cell) => cell.textContent?.trim() ?? '')
     );
 
   afterEach(() => {
@@ -76,121 +70,152 @@ describe('SeriesPage', () => {
       fixture.detectChanges();
     });
 
-    it('renders one card per series and says paging counts series', () => {
-      expect(cards().length).toBe(4);
+    it('draws one chart per indicator, not one per series', () => {
+      // Four series: two indicators across two countries.
+      expect(charts().length).toBe(2);
       expect(headMeta()?.textContent?.trim()).toBe(
         '4 series · pagination counts series, not rows'
       );
     });
 
-    it('titles each card with the code and the catalogue name', () => {
-      const first = cards()[0];
+    it('titles each chart with the catalogue name and the code', () => {
+      const first = charts()[0];
 
-      expect(first?.querySelector('.series-title .code')?.textContent?.trim()).toBe(
-        'CPI_INFLATION_AVG'
-      );
-      expect(first?.querySelector('.series-title .name')?.textContent?.trim()).toBe(
+      expect(first?.querySelector('.chart-title .name')?.textContent?.trim()).toBe(
         'Inflation, average CPI'
       );
-      expect(first?.querySelector('.card-head .meta')?.textContent?.trim()).toBe('series 1 of 4');
+      expect(first?.querySelector('.chart-title .code')?.textContent?.trim()).toBe(
+        'CPI_INFLATION_AVG'
+      );
     });
 
-    it('states the five sub-strip facts, with the vintage label not its id', () => {
-      const first = cards()[0];
-
-      expect(facts(first!)).toEqual([
-        { key: 'Country', value: 'NAM' },
-        { key: 'Unit', value: 'Percent' },
-        { key: 'Source', value: 'IMF_WEO' },
-        { key: 'Vintage', value: 'WEO 10.0.0 2026-04-14' },
-        { key: 'lastActualYear', value: '2025' }
-      ]);
+    it('summarises unit, countries, source and vintage in the chart head', () => {
+      expect(charts()[0]?.querySelector('.card-head .meta')?.textContent?.trim()).toBe(
+        'Percent · NAM, ZAF · IMF_WEO · WEO 10.0.0 2026-04-14'
+      );
     });
 
-    it('renders a point per year, tinted by isForecast', () => {
-      const first = cards()[0];
-      const rendered = points(first!);
+    it('does not claim colour means actual or forecast, which is what country means', () => {
+      const head = fixture.nativeElement.querySelector('.series-head .legend');
 
-      expect(rendered.length).toBe(14);
-
-      for (const point of rendered) {
-        const year = Number(point.querySelector('.year')?.textContent?.trim());
-        const forecast = point.classList.contains('forecast');
-
-        expect(forecast).toBe(year > 2025);
-        expect(point.classList.contains('actual')).toBe(!forecast);
-      }
+      expect(head.querySelector('.box')).toBeNull();
+      expect(head.querySelectorAll('.rule').length).toBe(3);
+      expect(head.textContent).toContain('Colour identifies the country');
     });
 
-    it('formats point values to one decimal place', () => {
-      const values = points(cards()[0]!).map(
-        (point) => point.querySelector('.val')?.textContent?.trim() ?? ''
+    it('gives each country on a chart its own line and legend entry', () => {
+      const first = charts()[0];
+      const legend = Array.from(first!.querySelectorAll('.legend .entry .country')).map(
+        (entry) => entry.textContent?.trim()
       );
 
-      expect(values.every((value) => /^-?[\d,]+\.\d$/.test(value))).toBeTrue();
+      // Named, not coded: the series payload carries the ISO3 and the tab
+      // resolves it against the catalogue, as the design labels it.
+      expect(legend).toEqual(['Namibia', 'South Africa']);
+      expect(first!.querySelectorAll('path[stroke-dasharray]').length).toBe(2);
     });
 
-    it('draws the boundary between 2025 and 2026', () => {
-      const rendered = cells(cards()[0]!);
-      const boundary = rendered.indexOf('BOUNDARY');
+    it('states every plotted value in a visually hidden table', () => {
+      const table = charts()[0]!.querySelector('.sr-only table');
+      const head = Array.from(table!.querySelectorAll('thead th')).map((cell) =>
+        cell.textContent?.trim()
+      );
+      const rows = Array.from(table!.querySelectorAll('tbody tr'));
 
-      expect(boundary).toBeGreaterThan(0);
-      expect(rendered[boundary - 1]).toBe('2025');
-      expect(rendered[boundary + 1]).toBe('2026');
+      expect(head[0]).toBe('Country');
+      // 14 years, plus the country column.
+      expect(head.length).toBe(15);
+      expect(rows.length).toBe(2);
+      expect(rows[0]!.querySelector('th')?.textContent?.trim()).toBe('NAM');
+      expect(rows[0]!.querySelectorAll('td').length).toBe(14);
     });
 
-    it('hides the boundary rule from screen readers and states it as text', () => {
-      const first = cards()[0];
+    it('marks a forecast cell in the hidden table, since the dashing is not readable', () => {
+      const cells = Array.from(
+        charts()[0]!.querySelectorAll('.sr-only tbody tr:first-child td')
+      ).map((cell) => cell.textContent?.replace(/\s+/g, ' ').trim());
 
-      expect(first?.querySelector('.boundary')?.getAttribute('aria-hidden')).toBe('true');
+      expect(cells.some((cell) => cell?.endsWith(', forecast'))).toBeTrue();
+      expect(cells.some((cell) => cell?.endsWith('Percent'))).toBeTrue();
+    });
+
+    it('keeps the drawing itself out of the accessible tree', () => {
+      expect(charts()[0]!.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+    });
+
+    it('plots a point per year per country', () => {
+      // 14 years, two countries.
+      expect(points(charts()[0]!).length).toBe(28);
+    });
+
+    it('bands and rules the forecast side of the boundary', () => {
+      const first = charts()[0];
+
+      expect(first?.querySelector('rect.forecast-band')).not.toBeNull();
+      expect(first?.querySelector('line.boundary')).not.toBeNull();
+      expect(first?.querySelector('.boundary-label')?.textContent?.trim()).toBe('FORECAST');
+    });
+
+    it('hides the drawing from screen readers and states it as text', () => {
+      const first = charts()[0];
+
+      expect(first?.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
       expect(first?.querySelector('.sr-only')?.textContent).toContain('actual through 2025');
     });
 
-    it('names each card and describes it for screen readers', () => {
-      const first = cards()[0];
+    it('lists every series on the page in the metadata table', () => {
+      const rows = metaRows();
 
-      expect(first?.tagName).toBe('SECTION');
-      expect(first?.getAttribute('aria-label')).toBe('CPI_INFLATION_AVG NAM');
-      expect(first?.querySelector('.sr-only')?.textContent?.trim()).toBe(
-        'Inflation, average CPI for NAM, Percent, 2018 to 2031, actual through 2025.'
-      );
+      expect(rows.length).toBe(4);
+      expect(rows[0]).toEqual([
+        'CPI_INFLATION_AVG',
+        'NAM — Namibia',
+        'Percent',
+        'IMF_WEO',
+        'WEO 10.0.0 2026-04-14',
+        '2025',
+        '2018 to 2031'
+      ]);
     });
 
-    it('explains the split once, under the last card', () => {
-      const feet = cards().map((card) => card.querySelector('.card-foot'));
+    it('explains the split once, under the metadata table', () => {
+      const feet = el().querySelectorAll('.series-meta .card-foot');
 
-      expect(feet[0]).toBeNull();
-      expect(feet[3]).not.toBeNull();
-      expect(feet[3]?.textContent).toContain('lastActualYear');
+      expect(feet.length).toBe(1);
+      expect(feet[0]?.textContent).toContain('lastActualYear');
     });
   });
 
   describe('when the boundary falls outside the window', () => {
-    it('omits the rule for a forecast-only range but still states the year', () => {
+    it('omits the band for a forecast-only range but still states the year', () => {
       setUp();
       seedDesignQuery();
       store.setYearRange(2027, 2031);
       fixture.detectChanges();
 
-      const first = cards()[0];
+      const first = charts()[0];
 
-      expect(points(first!).length).toBe(5);
-      expect(cells(first!)).not.toContain('BOUNDARY');
-      expect(points(first!).every((point) => point.classList.contains('forecast'))).toBeTrue();
-      expect(facts(first!).at(-1)).toEqual({ key: 'lastActualYear', value: '2025' });
+      // Five years, two countries.
+      expect(points(first!).length).toBe(10);
+      // Every year is a forecast, so the band is the whole plot and a rule
+      // against the frame would read as the edge of the data.
+      expect(first?.querySelector('line.boundary')).toBeNull();
+      expect(first?.querySelector('rect.forecast-band')?.getAttribute('width')).toBe('692');
+      expect(metaRows()[0]?.[5]).toBe('2025');
     });
 
-    it('omits the rule for a history-only range too', () => {
+    it('omits the band for a history-only range too', () => {
       setUp();
       seedDesignQuery();
       store.setYearRange(2018, 2024);
       fixture.detectChanges();
 
-      const first = cards()[0];
+      const first = charts()[0];
 
-      expect(cells(first!)).not.toContain('BOUNDARY');
-      expect(points(first!).every((point) => point.classList.contains('actual'))).toBeTrue();
-      expect(facts(first!).at(-1)).toEqual({ key: 'lastActualYear', value: '2025' });
+      expect(first?.querySelector('line.boundary')).toBeNull();
+      expect(first?.querySelector('rect.forecast-band')).toBeNull();
+      expect(first?.querySelectorAll('path[stroke-dasharray]').length).toBe(0);
+      expect(metaRows()[0]?.[5]).toBe('2025');
     });
   });
 
@@ -235,7 +260,7 @@ describe('SeriesPage', () => {
         'No series — the query was valid, the source just does not report this combination'
       );
       expect(headMeta()?.getAttribute('role')).toBe('status');
-      expect(cards().length).toBe(0);
+      expect(charts().length).toBe(0);
     });
   });
 
@@ -256,7 +281,7 @@ describe('SeriesPage', () => {
     it('points the user back at the query', () => {
       expect(headMeta()?.textContent?.trim()).toBe('Fix the query above to see series.');
       expect(headMeta()?.getAttribute('role')).toBe('status');
-      expect(cards().length).toBe(0);
+      expect(charts().length).toBe(0);
     });
   });
 
@@ -270,7 +295,7 @@ describe('SeriesPage', () => {
     it('reports the route as unavailable', () => {
       expect(headMeta()?.textContent?.trim()).toBe('Series are unavailable.');
       expect(headMeta()?.getAttribute('role')).toBe('status');
-      expect(cards().length).toBe(0);
+      expect(charts().length).toBe(0);
     });
   });
 });
@@ -288,7 +313,7 @@ describe('SeriesPage query summary', () => {
   function setUp(): void {
     TestBed.configureTestingModule({
       imports: [SeriesPage],
-      providers: [{ provide: MACRO_DATA, useClass: FixtureMacroDataProvider }]
+      providers: [provideRouter([]), { provide: MACRO_DATA, useClass: FixtureMacroDataProvider }]
     });
 
     store = TestBed.inject(WorkingQueryStore);
@@ -356,7 +381,7 @@ describe('SeriesPage when the service explains the failure', () => {
   function headMetaFor(provider: FixtureMacroDataProvider): Element | null {
     TestBed.configureTestingModule({
       imports: [SeriesPage],
-      providers: [{ provide: MACRO_DATA, useValue: provider }]
+      providers: [provideRouter([]), { provide: MACRO_DATA, useValue: provider }]
     });
     const store = TestBed.inject(WorkingQueryStore);
     store.reset();
@@ -426,7 +451,7 @@ describe('SeriesPage loading state across a re-query', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [SeriesPage],
-      providers: [{ provide: MACRO_DATA, useValue: (provider = new DeferredProvider()) }]
+      providers: [provideRouter([]), { provide: MACRO_DATA, useValue: (provider = new DeferredProvider()) }]
     });
 
     store = TestBed.inject(WorkingQueryStore);
@@ -522,15 +547,15 @@ describe('SeriesPage loading state across a re-query', () => {
     expect(prevButton()?.disabled).toBeFalse();
   });
 
-  it('shows no series cards while a re-query is in flight', () => {
+  it('shows no charts while a re-query is in flight', () => {
     fixture.detectChanges();
     provider.release?.();
     fixture.detectChanges();
-    expect((fixture.nativeElement as HTMLElement).querySelectorAll('.series-card').length).toBeGreaterThan(0);
+    expect((fixture.nativeElement as HTMLElement).querySelectorAll('app-series-chart').length).toBeGreaterThan(0);
 
     store.setPage(2);
     fixture.detectChanges();
 
-    expect((fixture.nativeElement as HTMLElement).querySelectorAll('.series-card').length).toBe(0);
+    expect((fixture.nativeElement as HTMLElement).querySelectorAll('app-series-chart').length).toBe(0);
   });
 });

@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { Observable, of, throwError } from 'rxjs';
 
 import { FixtureMacroDataProvider } from '../core/fixtures/fixture-macro-data.provider';
@@ -70,7 +71,7 @@ describe('VintagesPage', () => {
   function setUp(provider: unknown = new FixtureMacroDataProvider()): void {
     TestBed.configureTestingModule({
       imports: [VintagesPage],
-      providers: [{ provide: MACRO_DATA, useValue: provider }]
+      providers: [provideRouter([]), { provide: MACRO_DATA, useValue: provider }]
     });
     fixture = TestBed.createComponent(VintagesPage);
     fixture.detectChanges();
@@ -414,7 +415,39 @@ describe('VintagesPage', () => {
         p.textContent?.trim()
       );
       expect(nones).toEqual(['None', 'None']);
-      expect(el().querySelectorAll('.summary-entry').length).toBe(0);
+      expect(el().querySelectorAll('.summary-entry:not(.horizon)').length).toBe(0);
+    });
+
+    it('reports the year horizon from the rows on the page', () => {
+      class MovedHorizon extends FixtureMacroDataProvider {
+        override revisions(): Observable<Envelope<Revision>> {
+          return of(
+            envelope<Revision>([
+              {
+                indicator: 'GDP_GROWTH_REAL',
+                country: 'ZAF',
+                year: 2024,
+                previousValue: 10,
+                newValue: 12
+              },
+              {
+                indicator: 'GDP_GROWTH_REAL',
+                country: 'ZAF',
+                year: 2025,
+                previousValue: null,
+                newValue: 3
+              }
+            ])
+          );
+        }
+      }
+
+      setUp(new MovedHorizon());
+      selectVintage(13);
+
+      expect(el().querySelector('.summary-entry.horizon')?.textContent?.trim()).toBe(
+        '2024 → 2025'
+      );
     });
 
     it('hides the whole strip when the vintage changed nothing', () => {
@@ -489,7 +522,7 @@ describe('VintagesPage pager during a page change', () => {
     provider = new DeferredRevisions();
     TestBed.configureTestingModule({
       imports: [VintagesPage],
-      providers: [{ provide: MACRO_DATA, useValue: provider }]
+      providers: [provideRouter([]), { provide: MACRO_DATA, useValue: provider }]
     });
     fixture = TestBed.createComponent(VintagesPage);
     fixture.detectChanges();
@@ -576,7 +609,7 @@ describe('VintagesPage pager when revisions fail', () => {
   it('keeps the footer on screen', () => {
     TestBed.configureTestingModule({
       imports: [VintagesPage],
-      providers: [{ provide: MACRO_DATA, useValue: new FailingRevisions() }]
+      providers: [provideRouter([]), { provide: MACRO_DATA, useValue: new FailingRevisions() }]
     });
     fixture = TestBed.createComponent(VintagesPage);
     fixture.detectChanges();
@@ -612,7 +645,7 @@ describe('VintagesPage summary labels', () => {
   it('says the panels are unfiltered', () => {
     TestBed.configureTestingModule({
       imports: [VintagesPage],
-      providers: [{ provide: MACRO_DATA, useValue: new FixtureMacroDataProvider() }]
+      providers: [provideRouter([]), { provide: MACRO_DATA, useValue: new FixtureMacroDataProvider() }]
     });
     fixture = TestBed.createComponent(VintagesPage);
     fixture.detectChanges();

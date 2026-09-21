@@ -13,8 +13,10 @@ import {
   byNewestFirst,
   disappearedSeries,
   formatSeriesSpan,
+  formatYearHorizon,
   predecessorOf,
-  toRevisionView
+  toRevisionView,
+  yearHorizon
 } from '../core/revision-view';
 import { formatValue } from '../core/value-format';
 import { PagingFooter } from '../query/paging-footer';
@@ -279,6 +281,14 @@ export class VintagesPage {
   );
   protected readonly disappearedOverflow = computed(() =>
     Math.max(0, this.disappeared().length - SPAN_LIMIT)
+  );
+
+  /**
+   * How far forward the page's data now runs. Not `lastActualYear`, which the
+   * revisions response gives no way to see; `yearHorizon` explains why.
+   */
+  protected readonly horizonLabel = computed(() =>
+    formatYearHorizon(yearHorizon(this.views().map((v) => v.revision)))
   );
 
   protected span(span: SeriesSpan): string {
