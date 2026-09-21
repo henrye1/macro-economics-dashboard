@@ -278,64 +278,6 @@ without saying what breaks if it goes.
 real, and the bare statement and its comment both disappear.
 **Resolution:**
 
-### F-38 [P2] closed - The Response card keeps describing a request the URL block no longer shows
-
-**File:** ui/src/app/request-builder/request-builder.ts:76
-**Found:** 2026-09-11 by /audit (scope: full; lens: quality)
-**Why it matters:** `selectEndpoint` clears `result` and `copied`, with the
-comment "the previous answer described a different request". That reasoning is
-right and is applied to only half the ways a request changes: the working-query
-card sits directly above on the same page, so editing an indicator, a country or
-a year changes the URL, the curl and the request key while the Response card goes
-on showing the previous status, its three headers and its body.
-
-The result is two regions of one screen answering different questions with no
-cue: the URL reads one query, the response beneath it answered another. On the
-export card the same staleness is unreachable because the query is edited on a
-different tab and the component is destroyed in between; here both live on one
-screen. `copied` has the same gap — "curl copied." can outlive the curl it
-described.
-
-This is the family F-13, F-16, F-21 and F-29 belong to: an answer outliving the
-question. It is the first instance where the question is editable in the same
-viewport.
-**Suggested fix:** clear `result` and `copied` when the request key changes, not
-only when the endpoint does. An `effect` on `proxyUrl()` covers both causes in
-one place, and `selectEndpoint`'s two manual resets can then go.
-**Resolution:** Closed by the 2026-09-21 audit at a3ceed7. Re-examined at the
-code: `request-builder.ts:103` holds one `effect` that reads `proxyUrl()` and
-clears both `result` and `copied`, and `proxyUrl` at `:93` is computed from the
-endpoint and the query together, so a code, country or year edit in the card
-above now drops the answer exactly as an endpoint change does. `selectEndpoint`
-is down to a single `set`.
-
-The repair opened one window worth checking and the suite already closes it: an
-answer arriving after the query changed would have re-seated a stale result over
-a cleared card, and `request-builder.spec.ts:277` sends, mutates the query
-mid-flight, then flushes, and asserts the card stays `Not sent`. Five further
-cases cover the code, year and copy-confirmation paths and the claim that
-re-selecting the current endpoint notifies nothing. All green in the 713-spec
-run at this commit. No new defect in the file.
-
-Fixed on 2026-09-11 as suggested. `clearOnRequestChange` reads
-`proxyUrl()` and clears both signals; `selectEndpoint` is reduced to a single
-`set`, its early return removed because signals compare with `Object.is` and
-re-selecting the current endpoint notifies nothing.
-
-The larger half was the window the effect opens. Without a guard the sequence is:
-edit the query mid-flight, the effect clears the card, the await resolves, and the
-old query's answer is written straight back into a card whose URL now shows a
-different request — the same defect, re-entered through the repair. `send` now
-captures `proxyUrl()` before awaiting and assigns only when it still matches, the
-shape `result-state.ts` uses for `asked`.
-
-Five specs, using `HttpTestingController` to hold a request open so that window is
-real. Probed by removing the comparison, which failed exactly the late-answer case
-and left the other four passing. Restored and re-run green at 658.
-
-Not covered: F-37 and F-39, both in this file and both still open. The effect sits
-next to `heldEtag`'s phantom `this.result()` dependency without touching it.
-
 ### F-39 [P3] open - A held validator outlives the card that could explain it
 
 **File:** ui/src/app/core/request/request-send.service.ts:56
@@ -708,37 +650,6 @@ glyphs follow the design reference. Then fix the one comment at `series.ts:91`
 that the narrowed rule still catches.
 **Resolution:** Confirmed independently, 2026-09-21. The conflict between the standard and the product copy is real and is a standards question rather than a code defect. Stays open for the user to decide; a reviewer cannot accept it on their behalf.
 
-### F-71 [P3] closed - The Angular CLI analytics id is committed, so every clone reports usage telemetry under one shared identity
-
-**File:** ui/angular.json:6
-**Found:** 2026-09-21 by /audit independent (scope: current; lens: security)
-**Why it matters:** `f9f2042` added `"analytics": "21d5f6fd-..."` to the `cli`
-block of the workspace config. That is not a local preference: `cli.analytics`
-in `angular.json` is the project-level switch, so it turns Angular CLI usage
-reporting to Google on for anyone who runs `ng` in this repository, keyed to the
-id one machine generated. The per-user equivalent lives in `~/.angular-config.json`
-and is deliberately outside the repo.
-
-Nothing sensitive leaks - the CLI reports command names, flags, builder timings
-and versions - but it is an outbound-telemetry decision taken for every future
-contributor and for CI, recorded nowhere except a chore commit whose message
-says only that the id was pinned. It also makes the id a weak shared correlator
-across whoever builds the project.
-
-The likely motive was to stop the CLI's first-run analytics prompt blocking the
-new Playwright `webServer`, which starts `ng serve` non-interactively. Setting
-it to `false` solves that without opting anyone in.
-**Suggested fix:** replace the id with `"analytics": false`, or drop the key and
-set `NG_CLI_ANALYTICS=false` in the Playwright `webServer` env. If telemetry is
-wanted, record the choice in `AGENTS.md` so it is a decision rather than an
-artefact.
-**Resolution:** Closed by the 2026-09-21 full audit at a3ceed7. Master had already
-made the opposite call in `cda5e62`, which sets `"analytics": false` instead of
-checking in the uuid, and the squash merge of the fix branch kept that side of
-the conflict. `ui/angular.json:6` now reads `"analytics": false` and no uuid
-remains in the file. The telemetry opt-out is the CLI behaviour the finding
-asked for.
-
 ### F-72 [P3] open - The chart's screen-reader description states a forecast even on a chart that has none
 
 **File:** ui/src/app/core/series-chart.ts:390
@@ -860,4 +771,58 @@ deployment platform always supplies.
 `const parsed = Number(process.env.PORT); const port = Number.isInteger(parsed) && parsed > 0 && parsed < 65536 ? parsed : 3000;`
 Throwing instead of falling back is also defensible, since a platform that sets
 `PORT` wrong wants to know.
+**Resolution:**
+
+### F-78 [P3] open - The shell's full-height rule now resolves through an unstyled app-root, and nothing holds that in place
+
+**File:** ui/src/app/shell/console-shell.scss:1
+**Found:** 2026-09-21 by /audit (scope: current; lens: quality)
+**Why it matters:** `:host { display: flex; flex-direction: column;
+min-height: 100% }` with `.app-main { flex: 1 0 auto }` is the sticky-footer
+mechanism: on a short page the attribution footer sits at the bottom of the
+viewport rather than under the content. Before this change that host was
+`app-root`, a direct child of a `body` that `styles.scss:255` gives
+`height: 100%`. It is now `app-console-shell`, nested one level deeper inside
+`app-root`.
+
+Measured at HEAD against the dev server at 1440x900 on a `/vintages` page with
+an empty result, the shell still computes to 900px and the footer's bottom edge
+is at 900px, so there is no regression today. It survives only because `App`
+declares no styles, leaving `app-root` at `display: inline`, which means it
+establishes no containing block and the percentage still resolves against
+`body`. The day anyone gives `app-root` a `display: block` or a height, the
+percentage starts resolving against an auto-height box and the footer rides up.
+No unit spec or browser case asserts the footer's position, so that regression
+would ship silently. The new browser case checks the footer is visible, not
+where it is.
+**Suggested fix:** either move the full-height contract somewhere it cannot be
+broken from outside - `app-root { display: contents }` in `styles.scss`, or
+`min-height: 100dvh` on the shell host instead of a percentage - or add one
+assertion to `ui/e2e/console-shell.spec.ts` that the footer's bottom edge is at
+the viewport bottom on a short page.
+**Resolution:**
+
+### F-79 [P3] open - Feature 18's plan line asks for two parents and an auth layout; one parent landed and the plan does not record the remainder
+
+**File:** blueprint/build-plan.md:45
+**Found:** 2026-09-21 by /audit (scope: current; lens: quality)
+**Why it matters:** Build-plan item 18 reads "add an auth layout beside it ...
+and convert the seven flat routes into two parents with children". The delta
+adds one parent and no auth layout. The deferral itself is sound and is the
+call I would make: a second layout with no child routes cannot be navigated to,
+cannot be rendered through the router in a test, and its done-when really would
+be "the file exists"; feature 18's stated risk is that it can break all seven
+tabs at once, and an unreachable sibling neither adds to nor subtracts from
+that risk. The structural goal - a route chooses its chrome - is met, because
+adding a sibling parent in 19 is now a four-line route change.
+
+The gap is traceability, not engineering. `current-feature.md` records the
+deferral under Out of scope, but `/complete` archives that file and ticks line
+18, while line 19 says nothing about an auth layout. After the archive the only
+record that item 18 shipped partially lives in a history folder. Feature 19 is
+also the feature that most easily forgets it, because the guard and the screens
+are the visible work.
+**Suggested fix:** before `/complete`, amend build-plan line 19 to name the auth
+layout as part of its scope, or annotate line 18 with "auth layout deferred to
+19". One clause either way.
 **Resolution:**

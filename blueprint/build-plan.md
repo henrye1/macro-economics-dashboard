@@ -42,7 +42,7 @@
   one-time migration from localStorage
 - [ ] 17. **Generated API types** - replace the hand-written contract types with types
   generated from the Core API OpenAPI document, once its URL and credentials are available
-- [ ] 18. **App shell split** - `app.html` is the shell: topbar, tabs, main and
+- [x] 18. **App shell split** - `app.html` is the shell: topbar, tabs, main and
   attribution footer, with every route rendering inside it. Extract that into a
   console shell component, add an auth layout beside it for the full-bleed
   split-panel screens feature 19 needs, and convert the seven flat routes into
