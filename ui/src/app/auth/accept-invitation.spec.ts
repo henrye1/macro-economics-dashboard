@@ -1,0 +1,156 @@
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { Router, provideRouter } from '@angular/router';
+
+import { App } from '../app';
+import { routes } from '../app.routes';
+import { AUTH } from '../core/auth.provider';
+import { FixtureAuthProvider } from '../core/fixtures/fixture-auth.provider';
+import { FixtureMacroDataProvider } from '../core/fixtures/fixture-macro-data.provider';
+import { provideNoSession } from '../core/fixtures/signed-in-session';
+import { MACRO_DATA } from '../core/macro-data.provider';
+import { SessionStore } from '../core/session.store';
+
+async function open(token: string): Promise<ComponentFixture<App>> {
+  await TestBed.configureTestingModule({
+    imports: [App],
+    providers: [
+      provideRouter(routes),
+      provideHttpClient(),
+      provideHttpClientTesting(),
+      provideNoSession(),
+      { provide: MACRO_DATA, useClass: FixtureMacroDataProvider },
+      { provide: AUTH, useClass: FixtureAuthProvider }
+    ]
+  }).compileComponents();
+
+  const fixture = TestBed.createComponent(App);
+  await TestBed.inject(Router).navigateByUrl(`/accept-invite/${token}`);
+  fixture.detectChanges();
+  return fixture;
+}
+
+function host(fixture: ComponentFixture<App>): HTMLElement {
+  fixture.detectChanges();
+  return fixture.nativeElement as HTMLElement;
+}
+
+function type(fixture: ComponentFixture<App>, name: string, value: string): void {
+  const input = host(fixture).querySelector<HTMLInputElement>(`input[name="${name}"]`);
+  input!.value = value;
+  input!.dispatchEvent(new Event('input'));
+  fixture.detectChanges();
+}
+
+describe('Accept invitation', () => {
+  describe('a valid invitation', () => {
+    let fixture: ComponentFixture<App>;
+
+    beforeEach(async () => {
+      fixture = await open('valid-token');
+    });
+
+    it('shows who was invited, by whom, and as what', () => {
+      const values = Array.from(host(fixture).querySelectorAll('.invite dd')).map((d) =>
+        d.textContent?.trim()
+      );
+
+      expect(values).toEqual([
+        'lerato.khumalo@cyte.co.za',
+        'Treasury Risk',
+        'Member',
+        'Thandi Mokoena'
+      ]);
+    });
+
+    it('holds the button until a name and every password rule are in', () => {
+      const button = () => host(fixture).querySelector<HTMLButtonElement>('.auth-submit')!;
+
+      expect(button().disabled).toBeTrue();
+
+      type(fixture, 'fullName', 'Lerato Khumalo');
+      expect(button().disabled).withContext('name alone').toBeTrue();
+
+      type(fixture, 'password', 'short1!A');
+      expect(button().disabled).withContext('too short').toBeTrue();
+
+      type(fixture, 'password', 'Correct-horse-1');
+      expect(button().disabled).withContext('all rules met').toBeFalse();
+    });
+
+    it('marks each rule as it is met, in text as well as colour', () => {
+      type(fixture, 'password', 'correcthorse');
+
+      const items = Array.from(host(fixture).querySelectorAll('.rules li'));
+      const met = items.map((li) => li.classList.contains('met'));
+
+      expect(met).toEqual([true, false, false]);
+      expect(items[0]?.textContent).toContain('met');
+      expect(items[1]?.textContent).toContain('not met yet');
+    });
+
+    it('activates the account and lands on Overview', async () => {
+      type(fixture, 'fullName', 'Lerato Khumalo');
+      type(fixture, 'password', 'Correct-horse-1');
+      host(fixture).querySelector<HTMLFormElement>('form')!.dispatchEvent(new Event('submit'));
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(TestBed.inject(SessionStore).session()?.email).toBe('lerato.khumalo@cyte.co.za');
+      expect(TestBed.inject(SessionStore).session()?.role).toBe('Member');
+      expect(TestBed.inject(Router).url).toBe('/overview');
+    });
+  });
+
+  describe('a dead end', () => {
+    it('names both dates when the invitation expired', async () => {
+      const text = host(await open('expired-token')).querySelector('.alert')?.textContent ?? '';
+
+      expect(text).toContain('d.jacobs@cyte.co.za');
+      expect(text).toContain('8 September 2026');
+      expect(text).toContain('15 September 2026');
+    });
+
+    it('says something different when it was revoked', async () => {
+      const text = host(await open('revoked-token')).querySelector('.alert')?.textContent ?? '';
+
+      expect(text).toContain('withdrawn by an administrator');
+      expect(text).not.toContain('expire');
+    });
+
+    it('treats a token nobody issued as a dead end, not an error', async () => {
+      const page = host(await open('typo'));
+
+      expect(page.querySelector('h2')?.textContent?.trim()).toBe(
+        'This invitation is no longer valid'
+      );
+      expect(page.querySelector('.alert')?.textContent).toContain('does not match any invitation');
+    });
+
+    it('offers only the way back, never a password form', async () => {
+      for (const token of ['expired-token', 'revoked-token', 'typo']) {
+        TestBed.resetTestingModule();
+        const page = host(await open(token));
+
+        expect(page.querySelector('form')).withContext(token).toBeNull();
+        const action = page.querySelector('a.btn.outline-green');
+        expect(action?.textContent?.trim()).withContext(token).toBe('Back to sign in');
+        expect(action?.getAttribute('href')).withContext(token).toBe('/sign-in');
+      }
+    });
+
+    it('states the reason on the error surface the reference uses, not as body copy', async () => {
+      const page = host(await open('expired-token'));
+
+      expect(page.querySelector('.alert')).toBeTruthy();
+      expect(page.querySelector('.sub')).withContext('no plain sub copy').toBeNull();
+    });
+
+    it('announces the reason, since it replaces the whole screen', async () => {
+      expect(host(await open('expired-token')).querySelector('.alert')?.getAttribute('role')).toBe(
+        'status'
+      );
+    });
+  });
+});

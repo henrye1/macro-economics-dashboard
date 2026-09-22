@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { seedQuery, stubMacroApi } from './stub-api';
+import { signIn, seedQuery, stubMacroApi } from './stub-api';
 
 /**
  * The chart's tooltip is placed in percentages of the SVG viewBox, which only
@@ -14,6 +14,7 @@ import { seedQuery, stubMacroApi } from './stub-api';
 
 async function openSeries(page: Page): Promise<void> {
   await stubMacroApi(page);
+  await signIn(page);
   await page.goto('/series');
   await seedQuery(page);
   await expect(page.locator('app-series-chart svg')).toBeVisible();

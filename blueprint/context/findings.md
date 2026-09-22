@@ -773,35 +773,6 @@ Throwing instead of falling back is also defensible, since a platform that sets
 `PORT` wrong wants to know.
 **Resolution:**
 
-### F-78 [P3] open - The shell's full-height rule now resolves through an unstyled app-root, and nothing holds that in place
-
-**File:** ui/src/app/shell/console-shell.scss:1
-**Found:** 2026-09-21 by /audit (scope: current; lens: quality)
-**Why it matters:** `:host { display: flex; flex-direction: column;
-min-height: 100% }` with `.app-main { flex: 1 0 auto }` is the sticky-footer
-mechanism: on a short page the attribution footer sits at the bottom of the
-viewport rather than under the content. Before this change that host was
-`app-root`, a direct child of a `body` that `styles.scss:255` gives
-`height: 100%`. It is now `app-console-shell`, nested one level deeper inside
-`app-root`.
-
-Measured at HEAD against the dev server at 1440x900 on a `/vintages` page with
-an empty result, the shell still computes to 900px and the footer's bottom edge
-is at 900px, so there is no regression today. It survives only because `App`
-declares no styles, leaving `app-root` at `display: inline`, which means it
-establishes no containing block and the percentage still resolves against
-`body`. The day anyone gives `app-root` a `display: block` or a height, the
-percentage starts resolving against an auto-height box and the footer rides up.
-No unit spec or browser case asserts the footer's position, so that regression
-would ship silently. The new browser case checks the footer is visible, not
-where it is.
-**Suggested fix:** either move the full-height contract somewhere it cannot be
-broken from outside - `app-root { display: contents }` in `styles.scss`, or
-`min-height: 100dvh` on the shell host instead of a percentage - or add one
-assertion to `ui/e2e/console-shell.spec.ts` that the footer's bottom edge is at
-the viewport bottom on a short page.
-**Resolution:**
-
 ### F-79 [P3] open - Feature 18's plan line asks for two parents and an auth layout; one parent landed and the plan does not record the remainder
 
 **File:** blueprint/build-plan.md:45
@@ -825,4 +796,112 @@ are the visible work.
 **Suggested fix:** before `/complete`, amend build-plan line 19 to name the auth
 layout as part of its scope, or annotate line 18 with "auth layout deferred to
 19". One clause either way.
+**Resolution:**
+
+### F-86 [P2] open - safeReturnUrl still lets a foreign origin through, because the URL parser strips the character it inspects
+
+**File:** ui/src/app/auth/session.guard.ts:43
+**Found:** 2026-09-21 by /audit independent (scope: current; lens: security)
+**Why it matters:** The repaired predicate reads the second character and rejects
+`/` and `\`. The WHATWG URL parser removes ASCII tab, newline and carriage return
+from a URL before it parses it, so the second character is not the one the parser
+sees. Verified in Node against a `http://localhost:4300/sign-in` base:
+`new URL('/\n/evil.test', base).href`, and the tab and carriage-return forms,
+all resolve to `http://evil.test/`. `safeReturnUrl('/\n/evil.test')` returns the
+candidate unchanged, so the function hands back a string that is a foreign origin
+to anything that resolves it.
+
+That string is reachable: the router decodes `?returnUrl=%2F%0A%2Fevil.test` into
+exactly it before `sign-in.ts:81` reads it.
+
+There is no open redirect today, for the same downstream reason F-83 recorded.
+Verified against the running app at `bb371bc`: signing in from
+`/sign-in?returnUrl=%2F%0A%2Fevil.test` and from the tab form both land on
+`/overview`, because `navigateByUrl` parses through `DefaultUrlSerializer`, which
+does not strip control characters and does not leave the origin.
+
+What makes this worth its own entry rather than a note on F-83 is the comment the
+repair added: "Rejecting both slashes keeps the guarantee in this function rather
+than in the router's wildcard." The guarantee is not in the function. A later
+caller that hands this output to `location.assign`, `window.open` or an `href`,
+or a real 404 page replacing the `**` redirect, turns it into a live open
+redirect, and the comment tells that author the check has already been done.
+**Suggested fix:** strip or reject ASCII tab, newline and carriage return before
+the positional test, for example reject when `/[\t\n\r]/.test(candidate)` or
+normalise them out first, then apply the existing check. Add
+`'/\n/evil.test'` and `'/\t/evil.test'` to the hostile list at
+`sign-in.spec.ts:164`. One predicate and two strings.
+**Resolution:**
+
+### F-87 [P2] open - The denied and unexpected-error states the spec puts in scope are unreachable from the fixture on two of the three forms, and untested
+
+**File:** ui/src/app/auth/sign-in.ts:84
+**Found:** 2026-09-21 by /audit independent (scope: current; lens: tests)
+**Why it matters:** The spec's In scope lists "Every state each screen needs:
+idle, submitting, field-invalid, denied, and unexpected error". The reset screen
+has a fixture address built for exactly this, `FIXTURE_UNREACHABLE_EMAIL`, and
+`reset-password.spec.ts:236` asserts the error state. The other two forms have no
+equivalent.
+
+`FixtureAuthProvider.signIn` only ever answers `FIXTURE_SESSION` or `'denied'`,
+and `acceptInvitation` only ever answers a session or `'denied'`. Neither can
+error and neither can return `'unavailable'`. So three branches in the delta can
+never run and are asserted nowhere: the `error` handler and `UNAVAILABLE` message
+at `sign-in.ts:84-90`, the `'unavailable'` arm at `sign-in.ts:69`, and the whole
+denied-and-error block at `accept-invitation.ts:118-134`. The `DENIED` constant at
+`accept-invitation.ts:9` is never rendered by any test either.
+
+This is not hypothetical dead weight: feature 14 puts HTTP behind `AUTH`, at
+which point both paths become the common ones, and the first evidence that they
+work will be a real outage.
+**Suggested fix:** give the fixture one reachable failure per screen, in the shape
+the reset screen already uses: an address that makes `signIn` error, and a token
+whose acceptance is refused after resolving as valid. Then assert the two
+messages. Roughly two fixture constants and three specs, and it makes the
+`'unavailable'` arm of `AuthFailure` mean something rather than being a type with
+no producer.
+**Resolution:**
+
+### F-88 [P3] open - The accept-invitation form declares a message id that nothing points at, unlike the sign-in form beside it
+
+**File:** ui/src/app/auth/accept-invitation.html:46
+**Found:** 2026-09-21 by /audit independent (scope: current; lens: quality)
+**Why it matters:** `<p class="problem" id="accept-problem" role="status">` gives
+the message an id, and no element carries `aria-describedby="accept-problem"`.
+`sign-in.html:13` and `sign-in.html:29` wire their inputs to `sign-in-problem`,
+and `reset-password.html:23` wires its input to `reset-problem`, so this is the
+one form of the three that does not. The spec's Notes for the AI ask to
+"associate each field with its label and its message".
+
+The consequence is small, because `role="status"` still announces the text when it
+arrives, but a visitor who moves back to the password field afterwards is not told
+what went wrong there, and the unused id reads as an oversight rather than a
+choice. The password input already carries
+`aria-describedby="password-rules"`, so the fix is a token list rather than a new
+attribute.
+**Suggested fix:** bind `[attr.aria-describedby]` on both inputs the way sign-in
+does, appending `accept-problem` to the password field's existing
+`password-rules`. Two attributes.
+**Resolution:**
+
+### F-89 [P3] open - passwordMeetsRules has no caller outside its own spec
+
+**File:** ui/src/app/core/password-rules.ts:37
+**Found:** 2026-09-21 by /audit independent (scope: current; lens: quality)
+**Why it matters:** The screen that needs the rules uses `passwordRules` through
+`accept-invitation.ts:47`, and derives its submit gate from the same computed at
+`accept-invitation.ts:57`. `passwordMeetsRules` is exported, carries eight
+assertions in `password-rules.spec.ts:179-189`, and is called by nothing else in
+`ui/src`. It is a second way to ask the same question, which is how the two drift:
+a fifth rule added to `passwordRules` changes the screen and leaves this predicate
+silently weaker for whoever picks it up later.
+
+`SessionStore.signOut` at `session.store.ts:56` is in the same position, also
+called only from its spec, but the spec's Out of scope and Open questions record
+sign-out as a deliberate deferral to feature 14, so that one is a documented stub
+rather than an accident. This one is not mentioned anywhere.
+**Suggested fix:** either delete `passwordMeetsRules` and its describe block, or
+use it at `accept-invitation.ts:58` in place of `ruleList().every(...)` so the
+gate and the helper are the same code. The second is the smaller change and
+removes the drift rather than the function.
 **Resolution:**

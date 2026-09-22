@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { seedQuery, stubMacroApi } from './stub-api';
+import { signIn, seedQuery, stubMacroApi } from './stub-api';
 
 /**
  * The paging footer puts its state text and its Prev/Next controls on one row,
@@ -11,6 +11,7 @@ import { seedQuery, stubMacroApi } from './stub-api';
  */
 test('keeps the paging state and its controls on one row', async ({ page }) => {
   await stubMacroApi(page);
+  await signIn(page);
   await page.goto('/series');
   await seedQuery(page);
 

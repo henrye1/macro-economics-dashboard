@@ -5,6 +5,7 @@ import { Router, provideRouter } from '@angular/router';
 
 import { App } from './app';
 import { routes } from './app.routes';
+import { provideSignedInSession } from './core/fixtures/signed-in-session';
 import { FixtureMacroDataProvider } from './core/fixtures/fixture-macro-data.provider';
 import { MACRO_DATA } from './core/macro-data.provider';
 
@@ -30,6 +31,7 @@ describe('App routing', () => {
         // it wherever a route can reach that page.
         provideHttpClient(),
         provideHttpClientTesting(),
+        provideSignedInSession(),
         { provide: MACRO_DATA, useClass: FixtureMacroDataProvider }
       ]
     }).compileComponents();

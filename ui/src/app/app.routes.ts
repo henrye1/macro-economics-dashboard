@@ -6,7 +6,12 @@ import { OverviewPage } from './overview/overview';
 import { RequestBuilderPage } from './request-builder/request-builder';
 import { SavedQueriesPage } from './saved-queries/saved-queries';
 import { SeriesPage } from './series/series';
+import { AuthLayout } from './auth/auth-layout';
 import { ConsoleShell } from './shell/console-shell';
+import { AcceptInvitationPage } from './auth/accept-invitation';
+import { ResetPasswordPage } from './auth/reset-password';
+import { SignInPage } from './auth/sign-in';
+import { sessionGuard } from './auth/session.guard';
 import { VintagesPage } from './vintages/vintages';
 
 /**
@@ -15,11 +20,23 @@ import { VintagesPage } from './vintages/vintages';
  * than inside it.
  */
 export const routes: Routes = [
+  // Ahead of both layouts: two pathless parents cannot both answer for the
+  // bare path, and the redirect has to run before either claims it.
+  { path: '', pathMatch: 'full', redirectTo: 'overview' },
+  {
+    path: '',
+    component: AuthLayout,
+    children: [
+      { path: 'sign-in', component: SignInPage },
+      { path: 'reset-password', component: ResetPasswordPage },
+      { path: 'accept-invite/:token', component: AcceptInvitationPage }
+    ]
+  },
   {
     path: '',
     component: ConsoleShell,
+    canActivate: [sessionGuard],
     children: [
-      { path: '', pathMatch: 'full', redirectTo: 'overview' },
       { path: 'overview', component: OverviewPage },
       { path: 'countries-indicators', component: CountriesIndicatorsPage },
       { path: 'series', component: SeriesPage },

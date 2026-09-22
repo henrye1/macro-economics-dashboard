@@ -1,0 +1,95 @@
+@use './auth-form.scss';
+
+/* The invitation panel the reference draws above the form: two columns of
+   label over value on the block accent, so the invitee can check who invited
+   them and as what before setting a password. */
+.invite {
+  display: grid;
+  /* Measured off the reference: the panel is inset 15px and its two columns
+     nearly meet, which is what lets a full email address sit on one line in a
+     391px form column. A wider gutter wraps it. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-4) var(--space-2);
+  margin: var(--space-5) 0 0;
+  padding: var(--space-4);
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+
+  div {
+    min-width: 0;
+  }
+
+  dt {
+    font-size: var(--text-sm);
+    color: var(--muted);
+  }
+
+  dd {
+    margin: 2px 0 0;
+    font-size: var(--text-base);
+    font-weight: var(--weight-bold);
+    overflow-wrap: anywhere;
+  }
+}
+
+.rules {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 5px;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    font-size: var(--text-base);
+    color: var(--muted);
+  }
+
+  /* Colour is not the only signal: the rule text is also read out as met or
+     not met, which is what the visually hidden span beside it carries. */
+  .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: var(--radius-pill);
+    background: var(--cl-grey-color-light);
+    flex: none;
+  }
+
+  .met {
+    color: var(--accent-link);
+
+    .dot {
+      background: var(--accent);
+    }
+  }
+}
+
+/* The dead-end screen. The reference states the reason in an error surface
+   rather than as body copy, and gives it a full-width outlined action rather
+   than the small text link the reset screen uses for its secondary escape.
+   `--cl-error-background-color` has been in the token set since the port with
+   nothing reading it; this is what it was for. */
+.alert {
+  margin: var(--space-5) 0 0;
+  padding: var(--space-4) var(--space-5);
+  background: var(--cl-error-background-color);
+  color: var(--cl-error-color);
+  font-size: var(--text-base);
+  line-height: 1.6;
+}
+
+.btn.wide {
+  display: flex;
+  width: 100%;
+  margin-top: var(--space-5);
+  min-height: var(--control-height);
+  font-size: 15px;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: none;
+  }
+}

@@ -1,5 +1,8 @@
 import type { Page, Route } from '@playwright/test';
 
+import { FIXTURE_SESSION } from '../src/app/core/fixtures/fixture-auth.provider';
+import { SESSION_KEY } from '../src/app/core/session.store';
+
 /**
  * Canned `/api/macro` answers.
  *
@@ -108,6 +111,25 @@ export async function stubMacroApi(page: Page): Promise<void> {
       body: JSON.stringify({ error: 'Not stubbed', path })
     });
   });
+}
+
+/**
+ * Seed a session before anything loads.
+ *
+ * The console routes sit behind `sessionGuard`, so a spec that deep-links to a
+ * tab is redirected to sign-in without this. An init script rather than a
+ * click-through: these specs are about what the console renders, not about how
+ * a visitor got in, and signing in through the form on every one of them would
+ * be slower and would fail for a reason unrelated to what they assert.
+ */
+export async function signIn(page: Page): Promise<void> {
+  // Key and shape imported, not copied. The key's own comment says feature 14
+  // will bump it, and a copy here would fail four specs on a missing topbar
+  // rather than on the session.
+  await page.addInitScript(
+    ([key, session]) => window.localStorage.setItem(key, session),
+    [SESSION_KEY, JSON.stringify(FIXTURE_SESSION)] as const
+  );
 }
 
 /** Build the minimum working query the Series tab needs to fetch. */

@@ -1,0 +1,46 @@
+<h2>Sign in</h2>
+<p class="sub">Use the email address your invitation was sent to.</p>
+
+<form class="auth-form" (submit)="submit($event)">
+  <label class="auth-field">
+    <span class="auth-label">Email address</span>
+    <input
+      type="email"
+      name="email"
+      autocomplete="username"
+      [value]="email()"
+      [attr.aria-invalid]="denied() ? 'true' : null"
+      [attr.aria-describedby]="problem() ? 'sign-in-problem' : null"
+      (input)="onEmail($event)"
+    >
+  </label>
+
+  <label class="auth-field">
+    <span class="auth-label row">
+      Password
+      <a class="link" routerLink="/reset-password">Forgot password?</a>
+    </span>
+    <input
+      type="password"
+      name="password"
+      autocomplete="current-password"
+      [value]="password()"
+      [attr.aria-invalid]="denied() ? 'true' : null"
+      [attr.aria-describedby]="problem() ? 'sign-in-problem' : null"
+      (input)="onPassword($event)"
+    >
+  </label>
+
+  <!-- Always present so it is not a region appearing under assistive
+       technology mid-flow; empty until there is something to say. -->
+  <p class="problem" id="sign-in-problem" role="status">{{ problem() }}</p>
+
+  <button type="submit" class="auth-submit" [disabled]="busy()">
+    {{ busy() ? 'Signing in…' : 'Sign in' }}
+  </button>
+</form>
+
+<p class="note">
+  No account? This environment does not allow self-registration. Ask an
+  administrator in your organisation to invite you.
+</p>

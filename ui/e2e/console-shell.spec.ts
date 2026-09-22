@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { stubMacroApi } from './stub-api';
+import { signIn, stubMacroApi } from './stub-api';
 
 /**
  * The seven tabs are children of a pathless parent that supplies the chrome.
@@ -11,6 +11,7 @@ import { stubMacroApi } from './stub-api';
  */
 test('renders the console chrome around a deep-linked tab', async ({ page }) => {
   await stubMacroApi(page);
+  await signIn(page);
   await page.goto('/vintages');
 
   await expect(page.locator('.topbar .wordmark')).toHaveText('CyteMacro Data');

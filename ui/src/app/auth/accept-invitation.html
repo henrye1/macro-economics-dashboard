@@ -1,0 +1,67 @@
+@switch (state()) {
+  @case ('loading') {
+    <p class="sub" role="status">Checking your invitation&hellip;</p>
+  }
+
+  @case ('valid') {
+    @if (invitation(); as invite) {
+      <h2>Accept your invitation</h2>
+      <p class="sub">Set a password to activate your account.</p>
+
+      <dl class="invite">
+        <div><dt>Invited address</dt><dd>{{ invite.email }}</dd></div>
+        <div><dt>Organisation</dt><dd>{{ invite.organisation }}</dd></div>
+        <div><dt>Role</dt><dd>{{ invite.role }}</dd></div>
+        <div><dt>Invited by</dt><dd>{{ invite.invitedBy }}</dd></div>
+      </dl>
+
+      <form class="auth-form" (submit)="submit($event)">
+        <label class="auth-field">
+          <span class="auth-label">Full name</span>
+          <input name="fullName" autocomplete="name" [value]="fullName()" (input)="onName($event)">
+        </label>
+
+        <label class="auth-field">
+          <span class="auth-label">Password</span>
+          <input
+            type="password"
+            name="password"
+            autocomplete="new-password"
+            aria-describedby="password-rules"
+            [value]="password()"
+            (input)="onPassword($event)"
+          >
+        </label>
+
+        <ul class="rules" id="password-rules">
+          @for (rule of ruleList(); track rule.label) {
+            <li [class.met]="rule.met">
+              <span class="dot" aria-hidden="true"></span>
+              {{ rule.label }}
+              <span class="sr-only">{{ rule.met ? ' met' : ' not met yet' }}</span>
+            </li>
+          }
+        </ul>
+
+        <p class="problem" id="accept-problem" role="status">{{ problem() }}</p>
+
+        <button type="submit" class="auth-submit" [disabled]="!canSubmit()">
+          {{ busy() ? 'Activating…' : 'Accept invitation' }}
+        </button>
+      </form>
+    }
+  }
+
+  @default {
+    <h2>This invitation is no longer valid</h2>
+
+    <p class="alert" role="status">{{ deadEnd() }}</p>
+
+    <p class="note">
+      Ask an administrator in your organisation to send a new invitation. The
+      link above cannot be reused once it has expired or been revoked.
+    </p>
+
+    <a class="btn outline-green wide" routerLink="/sign-in">Back to sign in</a>
+  }
+}

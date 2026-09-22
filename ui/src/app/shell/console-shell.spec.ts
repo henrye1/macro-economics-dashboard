@@ -7,6 +7,7 @@ import { Observable, of, throwError } from 'rxjs';
 import { App } from '../app';
 import { routes } from '../app.routes';
 import { MacroRequestError } from '../core/http/macro-error';
+import { provideSignedInSession } from '../core/fixtures/signed-in-session';
 import { FixtureMacroDataProvider } from '../core/fixtures/fixture-macro-data.provider';
 import { FIXTURE_ATTRIBUTION } from '../core/fixtures/macro-fixtures';
 import type { Envelope, Vintage } from '../core/macro-contracts';
@@ -39,6 +40,7 @@ async function mount(provider: unknown, landing = '/overview'): Promise<Componen
       // it wherever a route can reach that page.
       provideHttpClient(),
       provideHttpClientTesting(),
+      provideSignedInSession(),
       { provide: MACRO_DATA, useValue: provider }
     ]
   }).compileComponents();

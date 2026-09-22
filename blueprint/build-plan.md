@@ -51,7 +51,7 @@
   the whole done-when. Its own feature because it moves `app.ts`, `app.html`,
   `app.scss` and `app.spec.ts` wholesale and is the one change that can break
   every existing tab at once.
-- [ ] 19. **Auth screens** - sign in, reset password, and accept invitation
+- [x] 19. **Auth screens** - sign in, reset password, and accept invitation
   including its expired state, built against a typed auth provider seam backed
   by fixtures, the way feature 1 built the console before feature 8 wired live
   data. Adds the route guard that sends a visitor with no session to sign-in.

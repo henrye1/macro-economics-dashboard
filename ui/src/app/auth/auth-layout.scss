@@ -1,0 +1,100 @@
+/* Measured off the export at 1440px: a 960px navy panel and a 480px form panel,
+   the navy inset by 52/56 and the form column 391px wide inside its own 44px.
+   The ratio is expressed in fr so the split holds at other widths, and it
+   collapses to one column before the form column would have to shrink. */
+
+:host {
+  display: block;
+  min-height: 100%;
+}
+
+.auth {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  min-height: 100vh;
+}
+
+.pitch {
+  background: var(--navy);
+  color: var(--navy-ink);
+  padding: 52px 56px;
+  display: grid;
+  /* Wordmark at the top, footer at the bottom, the lead on the optical centre
+     rather than the true one, as the export has it. */
+  grid-template-rows: auto 1fr auto;
+}
+
+.wordmark {
+  font-size: var(--text-md);
+  font-weight: var(--weight-bold);
+
+  .product {
+    color: var(--accent-bright);
+    margin-left: var(--space-2);
+  }
+}
+
+.lead {
+  align-self: center;
+  max-width: 460px;
+
+  h1 {
+    margin: 0;
+    font-size: 32px;
+    line-height: 40px;
+    font-weight: var(--weight-heavy);
+    color: var(--navy-ink);
+  }
+
+  p {
+    margin: var(--space-4) 0 0;
+    font-size: 15px;
+    line-height: 23px;
+    color: var(--cl-primary-100);
+  }
+}
+
+.foot {
+  align-self: end;
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  color: var(--cl-primary-100);
+}
+
+.panel {
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 44px;
+}
+
+.form-column {
+  width: 100%;
+  max-width: 391px;
+}
+
+/* One column before the form column would have to give up width. The navy
+   panel keeps its wordmark and its footer and drops the lead, which is
+   decoration once the screen is this narrow. */
+@media (max-width: 900px) {
+  .auth {
+    grid-template-columns: 1fr;
+  }
+
+  .pitch {
+    min-height: auto;
+    padding: var(--space-5) var(--space-6);
+    grid-template-rows: auto;
+  }
+
+  .lead,
+  .foot {
+    display: none;
+  }
+
+  .panel {
+    padding: var(--space-6) var(--space-5);
+    align-items: start;
+  }
+}
