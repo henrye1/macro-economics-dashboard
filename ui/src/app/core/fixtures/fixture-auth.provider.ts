@@ -20,8 +20,21 @@ export const FIXTURE_SESSION: Session = {
   role: 'Administrator'
 };
 
-/** The address the reset screen refuses, so its error state is reachable. */
+/**
+ * The three inputs that exist only so a failure state can be reached.
+ *
+ * Every screen has a denied path and an unexpected-error path, and a fixture
+ * that can only succeed leaves half of each screen unreachable and untested.
+ * Feature 14 makes those the ordinary paths, which is the wrong moment to run
+ * them for the first time.
+ */
 export const FIXTURE_UNREACHABLE_EMAIL = 'unreachable@cyte.co.za';
+
+/** Signing in with this address fails the way a service outage would. */
+export const FIXTURE_FAILING_EMAIL = 'outage@cyte.co.za';
+
+/** Resolves as a valid invitation and is then refused on acceptance. */
+export const FIXTURE_REFUSED_TOKEN = 'refused-token';
 
 /**
  * One invitation per outcome, so every state the accept screen has to render
@@ -49,6 +62,16 @@ export const FIXTURE_INVITATIONS: readonly Invitation[] = [
     status: 'expired'
   },
   {
+    token: FIXTURE_REFUSED_TOKEN,
+    email: 'k.botha@cyte.co.za',
+    organisation: 'Treasury Risk',
+    role: 'Member',
+    invitedBy: 'Thandi Mokoena',
+    sentAt: '2026-09-20T09:00:00.000Z',
+    expiresAt: '2026-09-27T09:00:00.000Z',
+    status: 'valid'
+  },
+  {
     token: 'revoked-token',
     email: 'p.naidoo@cyte.co.za',
     organisation: 'Treasury Risk',
@@ -71,10 +94,15 @@ export const FIXTURE_INVITATIONS: readonly Invitation[] = [
 @Injectable()
 export class FixtureAuthProvider implements AuthProvider {
   signIn(email: string, password: string): Observable<Session | AuthFailure> {
-    const matches =
-      email.trim().toLowerCase() === FIXTURE_EMAIL && password === FIXTURE_PASSWORD;
+    const address = email.trim().toLowerCase();
 
-    return of(matches ? FIXTURE_SESSION : 'denied');
+    if (address === FIXTURE_FAILING_EMAIL) {
+      return new Observable((subscriber) => subscriber.error(new Error('auth service down')));
+    }
+
+    return of(address === FIXTURE_EMAIL && password === FIXTURE_PASSWORD
+      ? FIXTURE_SESSION
+      : 'denied');
   }
 
   requestPasswordReset(email: string): Observable<void> {
@@ -103,6 +131,12 @@ export class FixtureAuthProvider implements AuthProvider {
 
     if (found === undefined || found.status !== 'valid') {
       return of('denied');
+    }
+
+    // Valid when it was read, refused when it was used. The window between the
+    // two is where an administrator revoking an invitation actually lands.
+    if (found.token === FIXTURE_REFUSED_TOKEN) {
+      return of('unavailable');
     }
 
     return of({

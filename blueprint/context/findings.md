@@ -798,7 +798,7 @@ layout as part of its scope, or annotate line 18 with "auth layout deferred to
 19". One clause either way.
 **Resolution:**
 
-### F-86 [P2] open - safeReturnUrl still lets a foreign origin through, because the URL parser strips the character it inspects
+### F-86 [P2] fixed - safeReturnUrl still lets a foreign origin through, because the URL parser strips the character it inspects
 
 **File:** ui/src/app/auth/session.guard.ts:43
 **Found:** 2026-09-21 by /audit independent (scope: current; lens: security)
@@ -831,9 +831,9 @@ the positional test, for example reject when `/[\t\n\r]/.test(candidate)` or
 normalise them out first, then apply the existing check. Add
 `'/\n/evil.test'` and `'/\t/evil.test'` to the hostile list at
 `sign-in.spec.ts:164`. One predicate and two strings.
-**Resolution:**
+**Resolution:** Tab, newline and carriage return are rejected before the positional test, so the function no longer depends on the parser leaving the inspected character alone. The comment claiming the guarantee is rewritten to say what it actually covers, and it now states that the result is router-safe rather than a sanitiser for anything taking a full URL. Four more strings in the hostile list at `sign-in.spec.ts`. Marked `fixed`; a review has not looked at it yet.
 
-### F-87 [P2] open - The denied and unexpected-error states the spec puts in scope are unreachable from the fixture on two of the three forms, and untested
+### F-87 [P2] fixed - The denied and unexpected-error states the spec puts in scope are unreachable from the fixture on two of the three forms, and untested
 
 **File:** ui/src/app/auth/sign-in.ts:84
 **Found:** 2026-09-21 by /audit independent (scope: current; lens: tests)
@@ -860,9 +860,9 @@ whose acceptance is refused after resolving as valid. Then assert the two
 messages. Roughly two fixture constants and three specs, and it makes the
 `'unavailable'` arm of `AuthFailure` mean something rather than being a type with
 no producer.
-**Resolution:**
+**Resolution:** `FIXTURE_FAILING_EMAIL` makes `signIn` error and `FIXTURE_REFUSED_TOKEN` resolves valid then refuses on acceptance, so both screens reach the paths the spec put in scope. Two specs assert the wording, and `'unavailable'` now has a producer. Marked `fixed`; a review has not looked at it yet.
 
-### F-88 [P3] open - The accept-invitation form declares a message id that nothing points at, unlike the sign-in form beside it
+### F-88 [P3] fixed - The accept-invitation form declares a message id that nothing points at, unlike the sign-in form beside it
 
 **File:** ui/src/app/auth/accept-invitation.html:46
 **Found:** 2026-09-21 by /audit independent (scope: current; lens: quality)
@@ -882,9 +882,9 @@ attribute.
 **Suggested fix:** bind `[attr.aria-describedby]` on both inputs the way sign-in
 does, appending `accept-problem` to the password field's existing
 `password-rules`. Two attributes.
-**Resolution:**
+**Resolution:** The password input describes `password-rules accept-problem`, and a spec asserts every id in that list resolves to an element. Marked `fixed`; a review has not looked at it yet.
 
-### F-89 [P3] open - passwordMeetsRules has no caller outside its own spec
+### F-89 [P3] fixed - passwordMeetsRules has no caller outside its own spec
 
 **File:** ui/src/app/core/password-rules.ts:37
 **Found:** 2026-09-21 by /audit independent (scope: current; lens: quality)
@@ -904,4 +904,4 @@ rather than an accident. This one is not mentioned anywhere.
 use it at `accept-invitation.ts:58` in place of `ruleList().every(...)` so the
 gate and the helper are the same code. The second is the smaller change and
 removes the drift rather than the function.
-**Resolution:**
+**Resolution:** `accept-invitation.ts:58` gates on `passwordMeetsRules` instead of re-deriving with `ruleList().every(...)`. The helper is kept rather than deleted: the screen needs the question answered and this is where it belongs. Marked `fixed`; a review has not looked at it yet.

@@ -8,6 +8,7 @@ import { routes } from '../app.routes';
 import { AUTH } from '../core/auth.provider';
 import {
   FIXTURE_EMAIL,
+  FIXTURE_FAILING_EMAIL,
   FIXTURE_PASSWORD,
   FixtureAuthProvider
 } from '../core/fixtures/fixture-auth.provider';
@@ -111,6 +112,21 @@ describe('Sign in', () => {
     expect(after.querySelector<HTMLInputElement>('input[name="password"]')!.value).toBe('');
   });
 
+  it('reports an unexpected failure as unavailable, not as a wrong password', async () => {
+    el(fixture);
+    type(fixture, 'email', FIXTURE_FAILING_EMAIL);
+    type(fixture, 'password', FIXTURE_PASSWORD);
+    submit(fixture);
+    await fixture.whenStable();
+
+    const problem = el(fixture).querySelector('.problem');
+
+    expect(problem?.textContent?.trim()).toBe(
+      'Sign-in is unavailable. Try again in a moment.'
+    );
+    expect(TestBed.inject(SessionStore).signedIn()).toBeFalse();
+  });
+
   it('signs in and lands on Overview', async () => {
     el(fixture);
     type(fixture, 'email', FIXTURE_EMAIL);
@@ -168,6 +184,12 @@ describe('safeReturnUrl', () => {
       // Angular's serialiser reads it as a path character.
       '/\\evil.test',
       '/\\\\evil.test',
+      // Stripped by the URL parser before it parses, so the character
+      // this function inspects is not the one the parser sees.
+      '/\n/evil.test',
+      '/\t/evil.test',
+      '/\r/evil.test',
+      '/\n\\evil.test',
       'https://evil.test',
       'http://evil.test/x',
       'javascript:alert(1)',

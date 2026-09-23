@@ -6,7 +6,10 @@ import { Router, provideRouter } from '@angular/router';
 import { App } from '../app';
 import { routes } from '../app.routes';
 import { AUTH } from '../core/auth.provider';
-import { FixtureAuthProvider } from '../core/fixtures/fixture-auth.provider';
+import {
+  FIXTURE_REFUSED_TOKEN,
+  FixtureAuthProvider
+} from '../core/fixtures/fixture-auth.provider';
 import { FixtureMacroDataProvider } from '../core/fixtures/fixture-macro-data.provider';
 import { provideNoSession } from '../core/fixtures/signed-in-session';
 import { MACRO_DATA } from '../core/macro-data.provider';
@@ -79,6 +82,19 @@ describe('Accept invitation', () => {
       expect(button().disabled).withContext('all rules met').toBeFalse();
     });
 
+    it('points the password field at both its rules and its message', () => {
+      const described = host(fixture)
+        .querySelector('input[name="password"]')
+        ?.getAttribute('aria-describedby')
+        ?.split(' ');
+
+      expect(described).toContain('password-rules');
+      expect(described).toContain('accept-problem');
+      for (const id of described ?? []) {
+        expect(host(fixture).querySelector('#' + id)).withContext(id).toBeTruthy();
+      }
+    });
+
     it('marks each rule as it is met, in text as well as colour', () => {
       type(fixture, 'password', 'correcthorse');
 
@@ -101,6 +117,25 @@ describe('Accept invitation', () => {
       expect(TestBed.inject(SessionStore).session()?.role).toBe('Member');
       expect(TestBed.inject(Router).url).toBe('/overview');
     });
+  });
+
+  it('reports a refusal at acceptance without losing the form', async () => {
+    const fixture = await open(FIXTURE_REFUSED_TOKEN);
+    type(fixture, 'fullName', 'Kabelo Botha');
+    type(fixture, 'password', 'Correct-horse-1');
+    host(fixture).querySelector<HTMLFormElement>('form')!.dispatchEvent(new Event('submit'));
+    await fixture.whenStable();
+
+    const after = host(fixture);
+
+    expect(after.querySelector('.problem')?.textContent?.trim()).toBe(
+      'We could not activate your account just now. Try again in a moment.'
+    );
+    // The form stays, the password does not: the invitee can try again without
+    // re-reading the link, but not with a password the screen still shows.
+    expect(after.querySelector('form')).toBeTruthy();
+    expect(after.querySelector<HTMLInputElement>('input[name="password"]')!.value).toBe('');
+    expect(TestBed.inject(SessionStore).signedIn()).toBeFalse();
   });
 
   describe('a dead end', () => {

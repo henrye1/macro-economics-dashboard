@@ -3,7 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import { AUTH, type Invitation, type InvitationStatus } from '../core/auth.provider';
-import { passwordRules } from '../core/password-rules';
+import { passwordMeetsRules, passwordRules } from '../core/password-rules';
 import { SessionStore } from '../core/session.store';
 
 const DENIED = 'This invitation could not be accepted. Ask for a new one.';
@@ -55,7 +55,7 @@ export class AcceptInvitationPage {
   });
 
   protected readonly canSubmit = computed(
-    () => !this.busy() && this.fullName().trim() !== '' && this.ruleList().every((r) => r.met)
+    () => !this.busy() && this.fullName().trim() !== '' && passwordMeetsRules(this.password())
   );
 
   /** The dead-end sentence, which differs by how the invitation died. */

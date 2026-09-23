@@ -30,16 +30,27 @@ export const sessionGuard: CanActivateFn = (_route, state) => {
  * Only a path on this origin is allowed through. `//evil.test` and
  * `https://evil.test` are both valid relative-looking URLs to a browser, and
  * either would turn our own sign-in form into an open redirect.
+ *
+ * The result is safe to hand to the router. It is not a sanitiser for anything
+ * that takes a full URL: this decides between an in-app path and the default
+ * landing tab, and a caller with other plans should say so here first.
  */
 export function safeReturnUrl(candidate: string | null | undefined): string {
   if (typeof candidate !== 'string') {
     return '/overview';
   }
 
-  // A backslash counts as an authority separator to the URL parser, so
-  // `/\\evil.test` is a foreign origin to anything that resolves it even though
-  // Angular's own serialiser reads it as a path segment. Rejecting both slashes
-  // keeps the guarantee in this function rather than in the router's wildcard.
+  // Tab, newline and carriage return are stripped by the URL parser before it
+  // parses, so a positional test on the raw string inspects a character the
+  // parser will never see: `/<LF>/evil.test` reaches it as `//evil.test` and
+  // resolves to a foreign origin. Reject them outright rather than try to
+  // predict what is left after the strip.
+  if (/[\t\n\r]/.test(candidate)) {
+    return '/overview';
+  }
+
+  // Both slashes, because a backslash is an authority separator to the parser
+  // even though Angular's own serialiser reads it as a path character.
   const second = candidate.charAt(1);
   const isOwnPath = candidate.startsWith('/') && second !== '/' && second !== '\\';
 
