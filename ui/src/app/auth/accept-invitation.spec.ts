@@ -106,16 +106,18 @@ describe('Accept invitation', () => {
       expect(items[1]?.textContent).toContain('not met yet');
     });
 
-    it('activates the account and lands on Overview', async () => {
+    it('activates the account and sends the visitor to sign in', async () => {
       type(fixture, 'fullName', 'Lerato Khumalo');
       type(fixture, 'password', 'Correct-horse-1');
       host(fixture).querySelector<HTMLFormElement>('form')!.dispatchEvent(new Event('submit'));
       await fixture.whenStable();
       fixture.detectChanges();
 
-      expect(TestBed.inject(SessionStore).session()?.email).toBe('lerato.khumalo@cyte.co.za');
-      expect(TestBed.inject(SessionStore).session()?.role).toBe('Member');
-      expect(TestBed.inject(Router).url).toBe('/overview');
+      // Not into the console. Acceptance is still answered by the fixture, so
+      // there is no Supabase session behind it and every macro request would
+      // answer 401. The notice on sign-in explains the hand-off.
+      expect(TestBed.inject(Router).url).toBe('/sign-in?accepted=1');
+      expect(TestBed.inject(SessionStore).signedIn()).toBeFalse();
     });
   });
 

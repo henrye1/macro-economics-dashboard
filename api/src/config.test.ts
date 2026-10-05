@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { isMacroConfigured, type MacroSettings } from './config.js';
+import { isAuthConfigured, isMacroConfigured, type MacroSettings } from './config.js';
 
 const complete: MacroSettings = {
   auth0Domain: 'cyte.eu.auth0.com',
@@ -35,5 +35,19 @@ describe('isMacroConfigured', () => {
         coreApiBaseUrl: '',
       }),
     ).toBe(false);
+  });
+});
+
+describe('isAuthConfigured', () => {
+  it('is true once the project URL has a value', () => {
+    expect(isAuthConfigured({ supabaseUrl: 'https://project.supabase.co' })).toBe(true);
+  });
+
+  it('is false when the project URL is blank', () => {
+    expect(isAuthConfigured({ supabaseUrl: '' })).toBe(false);
+  });
+
+  it('treats whitespace as blank, so a stray space is not a project', () => {
+    expect(isAuthConfigured({ supabaseUrl: '   ' })).toBe(false);
   });
 });

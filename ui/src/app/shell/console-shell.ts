@@ -1,10 +1,11 @@
 import { Component, computed, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
 
 import { macroErrorMessage } from '../core/http/macro-error';
 import { MACRO_DATA } from '../core/macro-data.provider';
+import { SessionStore } from '../core/session.store';
 
 type ShellState =
   | { ok: true; labels: readonly string[]; attribution: readonly string[] }
@@ -32,6 +33,21 @@ export class ConsoleShell {
   ] as const;
 
   private readonly macro = inject(MACRO_DATA);
+  private readonly sessionStore = inject(SessionStore);
+  private readonly router = inject(Router);
+
+  /** The visitor, for the topbar. Null while signed out, which the guard prevents. */
+  protected readonly session = this.sessionStore.session;
+
+  /**
+   * Ends the session and shows the screen that can start another one.
+   * Navigating rather than leaving the guard to do it keeps the console from
+   * painting a frame of signed-out chrome on the way out.
+   */
+  protected signOut(): void {
+    this.sessionStore.signOut();
+    void this.router.navigate(['/sign-in']);
+  }
 
   /**
    * One request feeds both the header vintage strip and the attribution footer,

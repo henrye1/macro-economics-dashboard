@@ -1,26 +1,32 @@
 import { inject } from '@angular/core';
 import { Router, type CanActivateFn } from '@angular/router';
+import { from, map } from 'rxjs';
 
 import { SessionStore } from '../core/session.store';
 
 /**
  * Sends a visitor with no session to sign-in, carrying where they were going.
  *
- * **This is not access control.** It reads a `localStorage` entry the visitor
- * can write, and the API behind `/api/macro` checks nothing either. It decides
- * which screen to show, and feature 14 is where a session starts meaning
- * something.
+ * **This is still not access control**, and it is no longer the only thing
+ * standing there either. Every `/api/macro` request carries a token the API
+ * verifies, so what this decides is which screen to show, not what may be read.
+ * A visitor who defeats it reaches seven tabs that answer 401.
+ *
+ * It waits for the store's first answer before deciding. Supabase restores a
+ * persisted session asynchronously, and deciding early would bounce every
+ * signed-in visitor who reloaded a tab.
  */
 export const sessionGuard: CanActivateFn = (_route, state) => {
   const router = inject(Router);
+  const store = inject(SessionStore);
 
-  if (inject(SessionStore).signedIn()) {
-    return true;
-  }
-
-  return router.createUrlTree(['/sign-in'], {
-    queryParams: { returnUrl: state.url }
-  });
+  return from(store.ready).pipe(
+    map(() =>
+      store.signedIn()
+        ? true
+        : router.createUrlTree(['/sign-in'], { queryParams: { returnUrl: state.url } })
+    )
+  );
 };
 
 /**

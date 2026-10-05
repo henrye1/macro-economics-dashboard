@@ -1,7 +1,6 @@
 import type { Page, Route } from '@playwright/test';
 
-import { FIXTURE_SESSION } from '../src/app/core/fixtures/fixture-auth.provider';
-import { SESSION_KEY } from '../src/app/core/session.store';
+import { FIXTURE_PASSWORD, FIXTURE_SESSION } from '../src/app/core/fixtures/fixture-auth.provider';
 
 /**
  * Canned `/api/macro` answers.
@@ -114,22 +113,131 @@ export async function stubMacroApi(page: Page): Promise<void> {
 }
 
 /**
- * Seed a session before anything loads.
+ * The project the e2e build points at, per `environment.e2e.ts`. Nothing here
+ * reaches the network: every `/auth/v1` call is answered below.
+ */
+const AUTH_HOST = 'https://stub.supabase.co';
+
+/**
+ * An access token shaped like the real thing.
  *
- * The console routes sit behind `sessionGuard`, so a spec that deep-links to a
- * tab is redirected to sign-in without this. An init script rather than a
- * click-through: these specs are about what the console renders, not about how
- * a visitor got in, and signing in through the form on every one of them would
- * be slower and would fail for a reason unrelated to what they assert.
+ * Unsigned and unverified, which is exactly what it needs to be: the Supabase
+ * client reads the payload for an expiry and never checks a signature, and the
+ * API that does check one is not in this suite. It expires far enough out that
+ * the client never tries to refresh mid-test.
+ */
+function accessToken(): string {
+  const payload = {
+    sub: '00000000-0000-4000-8000-000000000001',
+    email: FIXTURE_SESSION.email,
+    aud: 'authenticated',
+    role: 'authenticated',
+    exp: Math.floor(Date.now() / 1000) + 3600,
+    app_metadata: { role: FIXTURE_SESSION.role, organisation: FIXTURE_SESSION.organisation },
+    user_metadata: { full_name: FIXTURE_SESSION.fullName }
+  };
+
+  const encode = (value: object): string =>
+    Buffer.from(JSON.stringify(value)).toString('base64url');
+
+  return `${encode({ alg: 'none', typ: 'JWT' })}.${encode(payload)}.stub`;
+}
+
+/** The session body GoTrue answers a password grant with. */
+function tokenResponse(): object {
+  const token = accessToken();
+
+  return {
+    access_token: token,
+    token_type: 'bearer',
+    expires_in: 3600,
+    expires_at: Math.floor(Date.now() / 1000) + 3600,
+    refresh_token: 'stub-refresh-token',
+    user: {
+      id: '00000000-0000-4000-8000-000000000001',
+      aud: 'authenticated',
+      email: FIXTURE_SESSION.email,
+      // Where the console really reads the role and the organisation from. A
+      // stub that put them in `user_metadata` would pass while the product
+      // showed nothing.
+      app_metadata: { role: FIXTURE_SESSION.role, organisation: FIXTURE_SESSION.organisation },
+      user_metadata: { full_name: FIXTURE_SESSION.fullName },
+      created_at: '2026-09-01T09:00:00.000Z'
+    }
+  };
+}
+
+/**
+ * Answer every Supabase Auth call locally.
+ *
+ * Install it before the page loads. A password grant succeeds for the fixture
+ * password and is refused for anything else, so the refusal path is reachable
+ * in a browser too.
+ */
+export async function stubAuth(page: Page): Promise<void> {
+  await page.route(`${AUTH_HOST}/auth/v1/**`, async (route) => {
+    const url = new URL(route.request().url());
+
+    if (url.pathname.endsWith('/token')) {
+      const body = route.request().postDataJSON() as { password?: string } | null;
+      const refused = url.searchParams.get('grant_type') === 'password'
+        && body?.password !== FIXTURE_PASSWORD;
+
+      return refused
+        ? route.fulfill({
+            status: 400,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              code: 400,
+              error_code: 'invalid_credentials',
+              msg: 'Invalid login credentials'
+            })
+          })
+        : route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            // Raw, not through `json()`: that wraps a payload in the macro
+            // envelope, and GoTrue answers a bare session object.
+            body: JSON.stringify(tokenResponse())
+          });
+    }
+
+    if (url.pathname.endsWith('/logout') || url.pathname.endsWith('/recover')) {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+    }
+
+    // Loud, like the macro stub: a call this suite does not know about is a
+    // change in the console, not an empty result.
+    return route.fulfill({
+      status: 501,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'Not stubbed', path: url.pathname })
+    });
+  });
+}
+
+/**
+ * Sign in, through the form a visitor uses.
+ *
+ * Feature 19's version wrote a `localStorage` entry and skipped the screen,
+ * because a session was a display shape the store read from storage. Feature 14
+ * moved that truth into the Supabase client, which persists its own session
+ * under its own key, so the honest way in is the real one. Every call is
+ * stubbed, so this costs one navigation and no network.
+ *
+ * Call it before the spec's own `goto`: the session persists for the rest of
+ * the page context, exactly as it does for a visitor.
  */
 export async function signIn(page: Page): Promise<void> {
-  // Key and shape imported, not copied. The key's own comment says feature 14
-  // will bump it, and a copy here would fail four specs on a missing topbar
-  // rather than on the session.
-  await page.addInitScript(
-    ([key, session]) => window.localStorage.setItem(key, session),
-    [SESSION_KEY, JSON.stringify(FIXTURE_SESSION)] as const
-  );
+  await stubAuth(page);
+  await page.goto('/sign-in');
+  await page.locator('input[name="email"]').fill(FIXTURE_SESSION.email);
+  await page.locator('input[name="password"]').fill(FIXTURE_PASSWORD);
+  await page.locator('.auth-submit').click();
+
+  // The console, not the form. Waiting here means a spec that follows fails on
+  // its own assertion rather than on a half-finished sign-in.
+  await page.waitForURL(/\/overview$/);
 }
 
 /** Build the minimum working query the Series tab needs to fetch. */

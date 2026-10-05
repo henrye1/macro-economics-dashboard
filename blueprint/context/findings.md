@@ -7,6 +7,7 @@
 > finding is `open` or `fixed`, then archives resolved findings with the work
 > and resets this file.
 
+
 ### F-02 [P2] open - Neither upstream fetch has a timeout, and a stalled token request wedges every macro route
 
 **File:** api/src/macro/token-provider.ts:48
@@ -798,110 +799,73 @@ layout as part of its scope, or annotate line 18 with "auth layout deferred to
 19". One clause either way.
 **Resolution:**
 
-### F-86 [P2] fixed - safeReturnUrl still lets a foreign origin through, because the URL parser strips the character it inspects
+### F-92 [P3] open - The production build ships blank Supabase settings and the setup note points at the development file
 
-**File:** ui/src/app/auth/session.guard.ts:43
-**Found:** 2026-09-21 by /audit independent (scope: current; lens: security)
-**Why it matters:** The repaired predicate reads the second character and rejects
-`/` and `\`. The WHATWG URL parser removes ASCII tab, newline and carriage return
-from a URL before it parses it, so the second character is not the one the parser
-sees. Verified in Node against a `http://localhost:4300/sign-in` base:
-`new URL('/\n/evil.test', base).href`, and the tab and carriage-return forms,
-all resolve to `http://evil.test/`. `safeReturnUrl('/\n/evil.test')` returns the
-candidate unchanged, so the function hands back a string that is a foreign origin
-to anything that resolves it.
+**File:** api/.env.example:23
+**Found:** 2026-10-05 by /audit independent (scope: current; lens: quality)
+**Why it matters:** `angular.json` replaces `environment.ts` with
+`environment.production.ts` for the default `production` build, and that file holds
+blank `supabaseUrl` and `supabaseAnonKey`, so `npm run build` produces a console with
+no Supabase client that reports sign-in as unavailable. `.env.example` tells the
+operator to set the values in `ui/src/environments/environment.ts`, which a
+production build never reads. Nothing is deployed yet, so nothing is broken today;
+`/release render` would ship a console nobody can sign in to by following the note.
+**Suggested fix:** point the note at `environment.production.ts` (or both files), or
+fill the production file with the same publishable values.
+**Resolution:** Re-confirmed open 2026-10-05 by the independent review of `51625fb`: `environment.production.ts` still blank, `.env.example:23` still names `environment.ts`.
 
-That string is reachable: the router decodes `?returnUrl=%2F%0A%2Fevil.test` into
-exactly it before `sign-in.ts:81` reads it.
+### F-93 [P3] open - Set password reports a rejected password as an outage
 
-There is no open redirect today, for the same downstream reason F-83 recorded.
-Verified against the running app at `bb371bc`: signing in from
-`/sign-in?returnUrl=%2F%0A%2Fevil.test` and from the tab form both land on
-`/overview`, because `navigateByUrl` parses through `DefaultUrlSerializer`, which
-does not strip control characters and does not leave the origin.
+**File:** ui/src/app/core/supabase/supabase-auth.provider.ts:102
+**Found:** 2026-10-05 by /audit independent (scope: current; lens: quality)
+**Why it matters:** `setPassword` maps only missing-session errors to `'denied'` and
+rethrows everything else, which the screen renders as "We could not set your
+password just now. Try again in a moment." Supabase answers `422` with
+`same_password` when the visitor reuses their old password, and `weak_password`
+when the project's policy (for example leaked-password protection) is stricter than
+the screen's three rules. Both are the visitor's to fix, and the screen tells them to
+wait and clears the field. This is the inverse of the `isRefusal` rule `signIn`
+follows. No spec covers either code.
+**Suggested fix:** map `same_password` and `weak_password` to a field-level message
+on the form, and add one provider spec per code.
+**Resolution:** Re-confirmed open 2026-10-05 by the independent review of `51625fb`: unchanged at `supabase-auth.provider.ts:100`. See also F-96.
 
-What makes this worth its own entry rather than a note on F-83 is the comment the
-repair added: "Rejecting both slashes keeps the guarantee in this function rather
-than in the router's wildcard." The guarantee is not in the function. A later
-caller that hands this output to `location.assign`, `window.open` or an `href`,
-or a real 404 page replacing the `**` redirect, turns it into a live open
-redirect, and the comment tells that author the check has already been done.
-**Suggested fix:** strip or reject ASCII tab, newline and carriage return before
-the positional test, for example reject when `/[\t\n\r]/.test(candidate)` or
-normalise them out first, then apply the existing check. Add
-`'/\n/evil.test'` and `'/\t/evil.test'` to the hostile list at
-`sign-in.spec.ts:164`. One predicate and two strings.
-**Resolution:** Tab, newline and carriage return are rejected before the positional test, so the function no longer depends on the parser leaving the inspected character alone. The comment claiming the guarantee is rewritten to say what it actually covers, and it now states that the result is router-safe rather than a sanitiser for anything taking a full URL. Four more strings in the hostile list at `sign-in.spec.ts`. Marked `fixed`; a review has not looked at it yet.
+### F-94 [P3] unverified - Local-only sign-out leaves the refresh token valid, and the comment says it expires on its own
 
-### F-87 [P2] fixed - The denied and unexpected-error states the spec puts in scope are unreachable from the fixture on two of the three forms, and untested
+**File:** ui/src/app/core/session.store.ts:102
+**Found:** 2026-10-05 by /audit independent (scope: current; lens: security)
+**Why it matters:** `signOut({ scope: 'local' })` clears this browser only. The
+comment says "The refresh token is revoked by its own expiry", but Supabase refresh
+tokens do not expire by default (they are single-use, and only a configured
+inactivity or session time-box ends them), so a refresh token copied before sign-out
+keeps minting access tokens. Choosing local scope so a network failure cannot
+leave the visitor looking signed in is reasonable; the comment overstates what it
+buys. Unverified because the project's session settings were not inspected.
+**Suggested fix:** call the default (`global` or `others`) scope and fall back to
+local on failure, or correct the comment to say the refresh token stays valid
+server-side until the project's session limits end it.
+**Resolution:**
 
-**File:** ui/src/app/auth/sign-in.ts:84
-**Found:** 2026-09-21 by /audit independent (scope: current; lens: tests)
-**Why it matters:** The spec's In scope lists "Every state each screen needs:
-idle, submitting, field-invalid, denied, and unexpected error". The reset screen
-has a fixture address built for exactly this, `FIXTURE_UNREACHABLE_EMAIL`, and
-`reset-password.spec.ts:236` asserts the error state. The other two forms have no
-equivalent.
+### F-95 [P2] open - sessionGuard has no spec, so the hydration wait step 4 exists for is unproved
 
-`FixtureAuthProvider.signIn` only ever answers `FIXTURE_SESSION` or `'denied'`,
-and `acceptInvitation` only ever answers a session or `'denied'`. Neither can
-error and neither can return `'unavailable'`. So three branches in the delta can
-never run and are asserted nowhere: the `error` handler and `UNAVAILABLE` message
-at `sign-in.ts:84-90`, the `'unavailable'` arm at `sign-in.ts:69`, and the whole
-denied-and-error block at `accept-invitation.ts:118-134`. The `DENIED` constant at
-`accept-invitation.ts:9` is never rendered by any test either.
+**File:** ui/src/app/auth/session.guard.ts:19
+**Found:** 2026-10-05 by /audit independent (scope: current; lens: tests)
+**Why it matters:** Step 4 rewrote the guard to await `SessionStore.ready` so a signed-in visitor who reloads is not bounced to sign-in, and its Done when requires "a guard that waits rather than redirecting mid hydration". No `session.guard.spec.ts` exists and no spec calls `sessionGuard`; the only guard evidence is route specs whose stub `getSession()` resolves immediately and the e2e signed-out deep link. Reverting the guard to a synchronous `signedIn()` read (the reload bounce) would keep every suite green. The spec's Testing section also lists "sessionGuard: waits for hydration, allows a hydrated session, redirects with returnUrl otherwise".
+**Suggested fix:** add `session.guard.spec.ts` with a stub client whose `getSession()` is held on a deferred promise: assert the guard emits nothing before it settles, `true` after it settles with a session, and a `/sign-in?returnUrl=` tree after it settles with none.
+**Resolution:**
 
-This is not hypothetical dead weight: feature 14 puts HTTP behind `AUTH`, at
-which point both paths become the common ones, and the first evidence that they
-work will be a real outage.
-**Suggested fix:** give the fixture one reachable failure per screen, in the shape
-the reset screen already uses: an address that makes `signIn` error, and a token
-whose acceptance is refused after resolving as valid. Then assert the two
-messages. Roughly two fixture constants and three specs, and it makes the
-`'unavailable'` arm of `AuthFailure` mean something rather than being a type with
-no producer.
-**Resolution:** `FIXTURE_FAILING_EMAIL` makes `signIn` error and `FIXTURE_REFUSED_TOKEN` resolves valid then refuses on acceptance, so both screens reach the paths the spec put in scope. Two specs assert the wording, and `'unavailable'` now has a producer. Marked `fixed`; a review has not looked at it yet.
+### F-96 [P3] open - SupabaseAuthProvider.setPassword, the one real call the set-password screen makes, has no provider spec
 
-### F-88 [P3] fixed - The accept-invitation form declares a message id that nothing points at, unlike the sign-in form beside it
+**File:** ui/src/app/core/supabase/supabase-auth.provider.ts:89
+**Found:** 2026-10-05 by /audit independent (scope: current; lens: tests)
+**Why it matters:** `supabase-auth.provider.spec.ts` covers `signIn`, `requestPasswordReset` and the two fixture delegations, and never calls `setPassword` or stubs `updateUser`. `isSessionMissing` (`:168`) decides between the screen's expired-link dead end and its outage message, and the null-user and unconfigured branches are likewise unexercised. `set-password.spec.ts` drives the screen against a fake `AUTH`, so it cannot catch a wrong mapping here.
+**Suggested fix:** add a `setPassword` describe with a stubbed `updateUser`: success maps the user, `status: 401` and `session_not_found` answer `'denied'`, an unrecognised code raises, and a null client raises.
+**Resolution:**
 
-**File:** ui/src/app/auth/accept-invitation.html:46
-**Found:** 2026-09-21 by /audit independent (scope: current; lens: quality)
-**Why it matters:** `<p class="problem" id="accept-problem" role="status">` gives
-the message an id, and no element carries `aria-describedby="accept-problem"`.
-`sign-in.html:13` and `sign-in.html:29` wire their inputs to `sign-in-problem`,
-and `reset-password.html:23` wires its input to `reset-problem`, so this is the
-one form of the three that does not. The spec's Notes for the AI ask to
-"associate each field with its label and its message".
+### F-97 [P3] open - Step 6 is checked for a $MACRO_TOKEN Request-builder header the delta never adds
 
-The consequence is small, because `role="status"` still announces the text when it
-arrives, but a visitor who moves back to the password field afterwards is not told
-what went wrong there, and the unused id reads as an oversight rather than a
-choice. The password input already carries
-`aria-describedby="password-rules"`, so the fix is a token list rather than a new
-attribute.
-**Suggested fix:** bind `[attr.aria-describedby]` on both inputs the way sign-in
-does, appending `accept-problem` to the password field's existing
-`password-rules`. Two attributes.
-**Resolution:** The password input describes `password-rules accept-problem`, and a spec asserts every id in that list resolves to an element. Marked `fixed`; a review has not looked at it yet.
-
-### F-89 [P3] fixed - passwordMeetsRules has no caller outside its own spec
-
-**File:** ui/src/app/core/password-rules.ts:37
-**Found:** 2026-09-21 by /audit independent (scope: current; lens: quality)
-**Why it matters:** The screen that needs the rules uses `passwordRules` through
-`accept-invitation.ts:47`, and derives its submit gate from the same computed at
-`accept-invitation.ts:57`. `passwordMeetsRules` is exported, carries eight
-assertions in `password-rules.spec.ts:179-189`, and is called by nothing else in
-`ui/src`. It is a second way to ask the same question, which is how the two drift:
-a fifth rule added to `passwordRules` changes the screen and leaves this predicate
-silently weaker for whoever picks it up later.
-
-`SessionStore.signOut` at `session.store.ts:56` is in the same position, also
-called only from its spec, but the spec's Out of scope and Open questions record
-sign-out as a deliberate deferral to feature 14, so that one is a documented stub
-rather than an accident. This one is not mentioned anywhere.
-**Suggested fix:** either delete `passwordMeetsRules` and its describe block, or
-use it at `accept-invitation.ts:58` in place of `ruleList().every(...)` so the
-gate and the helper are the same code. The second is the smaller change and
-removes the drift rather than the function.
-**Resolution:** `accept-invitation.ts:58` gates on `passwordMeetsRules` instead of re-deriving with `ruleList().every(...)`. The helper is kept rather than deleted: the screen needs the question answered and this is where it belongs. Marked `fixed`; a review has not looked at it yet.
+**File:** blueprint/context/current-feature.md:174
+**Found:** 2026-10-05 by /audit independent (scope: current; lens: quality)
+**Why it matters:** The spec's In scope item and step 6 say the Request builder renders `Authorization: Bearer $MACRO_TOKEN` and adds `401` to its status reference, and Files/areas lists `request-builder.ts`, `.html` and spec. None of those files change in `f3411e0..51625fb`: `request-text.ts:81` already emitted `Bearer $TOKEN` and `request-builder.ts:29` already listed `401`. The property that matters, a placeholder and never the live token, holds, so nothing is broken; the spec records work and a placeholder name that do not match the code, and a later reader trusting it will look for `$MACRO_TOKEN`.
+**Suggested fix:** correct the spec's step 6 and In scope text to say the builder already carried a `$TOKEN` placeholder and `401`, or rename the placeholder if `$MACRO_TOKEN` was the decision.
+**Resolution:**

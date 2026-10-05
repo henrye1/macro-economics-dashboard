@@ -4,7 +4,6 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import { AUTH, type Invitation, type InvitationStatus } from '../core/auth.provider';
 import { passwordMeetsRules, passwordRules } from '../core/password-rules';
-import { SessionStore } from '../core/session.store';
 
 const DENIED = 'This invitation could not be accepted. Ask for a new one.';
 const UNAVAILABLE = 'We could not activate your account just now. Try again in a moment.';
@@ -34,7 +33,6 @@ const DATE_FORMAT = new Intl.DateTimeFormat('en-GB', {
 export class AcceptInvitationPage {
   private readonly auth = inject(AUTH);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly session = inject(SessionStore);
   private readonly router = inject(Router);
 
   protected readonly invitation = signal<Invitation | null>(null);
@@ -124,8 +122,12 @@ export class AcceptInvitationPage {
           return;
         }
 
-        this.session.signIn(result);
-        void this.router.navigateByUrl('/overview');
+        // Not into the console. Accepting an invitation is still answered by
+        // the fixture, so `result` is a display shape with no Supabase session
+        // behind it, and `/api/macro` would answer 401 to every request the
+        // first tab made. Sign-in is where an account becomes usable, and
+        // feature 20 is where an accepted invitation becomes a real account.
+        void this.router.navigate(['/sign-in'], { queryParams: { accepted: '1' } });
       },
       error: () => {
         this.busy.set(false);

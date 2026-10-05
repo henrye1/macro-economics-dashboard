@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { request as httpRequest, type Server } from 'node:http';
+import type { RequestHandler } from 'express';
 
 import { createApp } from '../app.js';
 import type { MacroClient, UpstreamResponse } from '../macro/macro-client.js';
@@ -43,11 +44,20 @@ const failingClient: MacroClient = {
   },
 };
 
+/**
+ * Admits every request, so these tests stay about relaying. Admission itself is
+ * proved in middleware/auth.test.ts against locally signed tokens, and the
+ * last describe here proves the real seam is still wired ahead of these routes.
+ */
+const openSeam: RequestHandler = (_req, _res, next) => {
+  next();
+};
+
 const servers: Server[] = [];
 
 /** Boots the app on an ephemeral port and returns a fetch bound to it. */
 async function serve(deps?: Parameters<typeof createApp>[0]) {
-  const app = createApp(deps);
+  const app = createApp({ authSeam: openSeam, ...deps });
 
   const server = await new Promise<Server>((resolve) => {
     const started = app.listen(0, () => resolve(started));
@@ -353,7 +363,7 @@ describe('/api/macro conditional requests, over raw HTTP', () => {
     path: string,
     headers: Record<string, string> = {},
   ): Promise<{ status: number; body: string; headers: Record<string, string | string[]> }> {
-    const app = createApp(deps);
+    const app = createApp({ authSeam: openSeam, ...deps });
     const server = await new Promise<Server>((resolve) => {
       const started = app.listen(0, () => resolve(started));
     });
@@ -457,5 +467,47 @@ describe('/api/macro conditional requests, over raw HTTP', () => {
     expect(response.status).toBe(304);
     expect(response.body).toBe('');
     expect(response.headers['etag']).toBe('W/"v14"');
+  });
+});
+
+/**
+ * The seam as `createApp` really mounts it, with no override.
+ *
+ * Every other test here replaces it, so without this block the whole suite
+ * could stay green while `app.ts` stopped mounting auth at all. The real seam
+ * reads `SUPABASE_URL` from a gitignored `.env`, so it is unconfigured on a
+ * clean checkout (503) and configured on a developer's (401). Either way the
+ * thing being proved is that it refuses rather than falls open, so the test
+ * accepts both and never depends on the machine it runs on.
+ */
+describe('the real auth seam, mounted', () => {
+  const realServers: Server[] = [];
+
+  afterEach(async () => {
+    await Promise.all(realServers.splice(0).map((server) => new Promise((done) => server.close(done))));
+  });
+
+  async function get(path: string): Promise<number> {
+    const app = createApp({ macroClient: stubClient().client, macroConfigured: true });
+    const server = await new Promise<Server>((resolve) => {
+      const started = app.listen(0, () => resolve(started));
+    });
+    realServers.push(server);
+
+    const address = server.address();
+    if (address === null || typeof address === 'string') {
+      throw new Error('expected a TCP address');
+    }
+
+    const response = await fetch(`http://127.0.0.1:${address.port}${path}`);
+    return response.status;
+  }
+
+  it('refuses an unauthenticated macro request even with the upstream configured', async () => {
+    expect([401, 503]).toContain(await get('/api/macro/countries'));
+  });
+
+  it('leaves the health check answering, so the service can still be deployed', async () => {
+    expect(await get('/api/health')).toBe(200);
   });
 });

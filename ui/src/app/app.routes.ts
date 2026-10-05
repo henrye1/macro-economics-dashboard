@@ -10,6 +10,7 @@ import { AuthLayout } from './auth/auth-layout';
 import { ConsoleShell } from './shell/console-shell';
 import { AcceptInvitationPage } from './auth/accept-invitation';
 import { ResetPasswordPage } from './auth/reset-password';
+import { SetPasswordPage } from './auth/set-password';
 import { SignInPage } from './auth/sign-in';
 import { sessionGuard } from './auth/session.guard';
 import { VintagesPage } from './vintages/vintages';
@@ -29,7 +30,10 @@ export const routes: Routes = [
     children: [
       { path: 'sign-in', component: SignInPage },
       { path: 'reset-password', component: ResetPasswordPage },
-      { path: 'accept-invite/:token', component: AcceptInvitationPage }
+      { path: 'accept-invite/:token', component: AcceptInvitationPage },
+      // Where the reset email lands. No token segment: Supabase puts its
+      // recovery token in the fragment and its client consumes it on load.
+      { path: 'set-password', component: SetPasswordPage }
     ]
   },
   {

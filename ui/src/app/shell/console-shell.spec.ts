@@ -12,6 +12,7 @@ import { FixtureMacroDataProvider } from '../core/fixtures/fixture-macro-data.pr
 import { FIXTURE_ATTRIBUTION } from '../core/fixtures/macro-fixtures';
 import type { Envelope, Vintage } from '../core/macro-contracts';
 import { MACRO_DATA, type MacroDataProvider } from '../core/macro-data.provider';
+import { SessionStore } from '../core/session.store';
 
 /**
  * The chrome is a routed parent, so every case here mounts the real root and
@@ -320,4 +321,44 @@ describe('Console shell', () => {
       expect(lines).toContain('Source: IMF World Economic Outlook database');
     });
   });
+});
+
+/**
+ * The visitor's own session in the topbar, and the way out of it.
+ *
+ * Feature 19 built the sign-in screens and deliberately left sign-out to this
+ * feature, so that the service-token pill's meaning and the account control
+ * beside it would be settled once rather than twice.
+ */
+describe('the account control', () => {
+  let fixture: ComponentFixture<App>;
+
+  beforeEach(async () => {
+    fixture = await mount(new FixtureMacroDataProvider());
+  });
+
+  it('names the visitor and their role', () => {
+    const account = rendered(fixture).querySelector('.account');
+
+    expect(account?.textContent).toContain('Thandi Mokoena');
+    expect(account?.textContent).toContain('Administrator');
+  });
+
+  it('leaves the service-token pill saying what it always said', () => {
+    const pill = rendered(fixture).querySelector('.token-pill');
+
+    // It reports the server's M2M client, not the visitor. Now that there is a
+    // visitor to confuse it with, that distinction matters more, not less.
+    expect(pill?.textContent).toContain('Service token');
+    expect(pill?.getAttribute('title')).toContain('not your session');
+  });
+
+  it('signs out and shows the screen that can start a session', async () => {
+    rendered(fixture).querySelector<HTMLButtonElement>('.sign-out')!.click();
+    await fixture.whenStable();
+
+    expect(TestBed.inject(SessionStore).signedIn()).toBeFalse();
+    expect(TestBed.inject(Router).url).toBe('/sign-in');
+  });
+
 });

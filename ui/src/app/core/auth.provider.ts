@@ -56,6 +56,17 @@ export interface AuthProvider {
   signIn(email: string, password: string): Observable<Session | AuthFailure>;
   requestPasswordReset(email: string): Observable<void>;
   invitation(token: string): Observable<Invitation>;
+  /**
+   * Set a new password for the visitor the reset link signed in.
+   *
+   * Separate from `acceptInvitation` because it changes a password on an
+   * account that already exists, and the screen that calls it has no
+   * invitation, only a recovery session the service established from the
+   * emailed link. A link that has expired or been used is a refusal, not an
+   * error: the screen has a dead end to render for it.
+   */
+  setPassword(password: string): Observable<Session | AuthFailure>;
+
   acceptInvitation(
     token: string,
     fullName: string,

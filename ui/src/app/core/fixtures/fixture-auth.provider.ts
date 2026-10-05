@@ -116,6 +116,15 @@ export class FixtureAuthProvider implements AuthProvider {
     return of(undefined);
   }
 
+  /**
+   * Accepts any password that reaches it, because there is no recovery session
+   * to check against. The screen's own rules list is what a visitor sees here,
+   * and Supabase is what enforces anything in feature 14.
+   */
+  setPassword(_password: string): Observable<Session | AuthFailure> {
+    return of(FIXTURE_SESSION);
+  }
+
   invitation(token: string): Observable<Invitation> {
     const found = FIXTURE_INVITATIONS.find((invitation) => invitation.token === token);
 

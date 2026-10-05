@@ -15,15 +15,17 @@ export default defineConfig({
   retries: 0,
   reporter: process.env['CI'] ? 'line' : [['list']],
   use: {
-    baseURL: 'http://localhost:4200',
+    baseURL: 'http://localhost:4201',
     trace: 'on-first-retry'
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
-    command: 'npm start',
-    url: 'http://localhost:4200',
-    // A dev server is often already up while working; reuse it rather than
-    // failing on the port or starting a second one.
+    command: 'npm run start:e2e',
+    url: 'http://localhost:4201',
+    // Its own port and its own build configuration. A plain `npm start` serves
+    // the developer's environment file, where the Supabase project is whatever
+    // they put in it, and the suite must never sign in against that. Port 4201
+    // lets both servers be up at once, and reuse still applies to this one.
     reuseExistingServer: !process.env['CI'],
     timeout: 120_000
   }

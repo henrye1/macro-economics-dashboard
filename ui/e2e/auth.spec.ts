@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { signIn, stubMacroApi } from './stub-api';
+import { signIn, stubAuth, stubMacroApi } from './stub-api';
 
 /**
  * The auth screens are a second top-level layout, and everything that can go
@@ -43,6 +43,7 @@ test('stacks to one column on a narrow window', async ({ page }) => {
 
 test('sends a signed-out deep link to sign-in and back again', async ({ page }) => {
   await stubMacroApi(page);
+  await stubAuth(page);
   await page.goto('/vintages');
 
   await expect(page).toHaveURL(/\/sign-in\?returnUrl=%2Fvintages$/);
@@ -77,4 +78,27 @@ test('keeps the console attribution footer at the bottom on a short page', async
   // at the bottom of it rather than partway up.
   expect(scrollHeight).toBeLessThanOrEqual(901);
   expect(Math.round(footer!.y + footer!.height)).toBeGreaterThanOrEqual(880);
+});
+
+/**
+ * Sign-out is the control feature 19 deferred to feature 14, and the first one
+ * that takes a visitor from the console back out to the auth layout. What can
+ * go wrong with it is routing and chrome rather than logic, which is this
+ * suite's half.
+ */
+test('signs out from the topbar and returns to the auth layout', async ({ page }) => {
+  await stubMacroApi(page);
+  await signIn(page);
+  await page.goto('/observations');
+
+  await expect(page.locator('.account')).toContainText('Thandi Mokoena');
+  await page.locator('.sign-out').click();
+
+  await expect(page).toHaveURL(/\/sign-in$/);
+  await expect(page.locator('.tabs')).toHaveCount(0);
+  await expect(page.locator('.pitch .wordmark')).toBeVisible();
+
+  // The session is really gone, not just off screen: a deep link now bounces.
+  await page.goto('/vintages');
+  await expect(page).toHaveURL(/\/sign-in\?returnUrl=%2Fvintages$/);
 });

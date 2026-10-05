@@ -8,7 +8,8 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test --watch=false --browsers=ChromeHeadless",
     "test:watch": "ng test",
-    "test:browser": "playwright test"
+    "test:browser": "playwright test",
+    "start:e2e": "ng serve --configuration e2e --port 4201"
   },
   "prettier": {
     "printWidth": 100,
@@ -32,6 +33,7 @@
     "@angular/material": "^20.2.14",
     "@angular/platform-browser": "^20.3.0",
     "@angular/router": "^20.3.0",
+    "@supabase/supabase-js": "^2.117.2",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
     "zone.js": "~0.15.0"

@@ -30,6 +30,16 @@ export class SignInPage {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
+  /**
+   * Shown when the visitor arrives from accepting an invitation, which now
+   * ends here rather than in the console. Read once from the address bar: it is
+   * a one-time notice about how they got here, not state.
+   */
+  protected readonly notice =
+    this.route.snapshot.queryParamMap.get('accepted') === '1'
+      ? 'Your account is ready. Sign in to continue.'
+      : '';
+
   protected readonly email = signal('');
   protected readonly password = signal('');
   protected readonly busy = signal(false);

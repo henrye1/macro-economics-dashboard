@@ -1,6 +1,10 @@
 <h2>Sign in</h2>
 <p class="sub">Use the email address your invitation was sent to.</p>
 
+@if (notice) {
+  <p class="notice" role="status">{{ notice }}</p>
+}
+
 <form class="auth-form" (submit)="submit($event)">
   <label class="auth-field">
     <span class="auth-label">Email address</span>

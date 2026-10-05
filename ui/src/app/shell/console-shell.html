@@ -18,6 +18,21 @@
     <div class="token-pill" title="State of the console's server-side M2M client, not your session">
       <span class="dot"></span> Service token &middot; M2M client
     </div>
+
+    <!-- The visitor's own session, which the pill above is deliberately not
+         about. Feature 19 left sign-out to this feature so the two would be
+         named once, together, rather than twice. -->
+    @if (session(); as who) {
+      <div class="account">
+        <span class="who">
+          {{ who.fullName }}
+          @if (who.role) {
+            <span class="role">{{ who.role }}</span>
+          }
+        </span>
+        <button type="button" class="sign-out" (click)="signOut()">Sign out</button>
+      </div>
+    }
   </div>
 </header>
 

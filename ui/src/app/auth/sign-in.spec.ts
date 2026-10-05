@@ -204,3 +204,24 @@ describe('safeReturnUrl', () => {
     expect(safeReturnUrl(undefined)).toBe('/overview');
   });
 });
+
+describe('the notice after accepting an invitation', () => {
+  it('is shown when the visitor arrives from acceptance', async () => {
+    const fixture = await mount();
+    await TestBed.inject(Router).navigateByUrl('/sign-in?accepted=1');
+
+    const notice = el(fixture).querySelector('.notice');
+
+    expect(notice?.textContent?.trim()).toBe('Your account is ready. Sign in to continue.');
+    // Announced, because the visitor arrives here mid-flow having asked for
+    // something else.
+    expect(notice?.getAttribute('role')).toBe('status');
+  });
+
+  it('is absent on an ordinary visit, so it is not a permanent banner', async () => {
+    const fixture = await mount();
+    await TestBed.inject(Router).navigateByUrl('/sign-in');
+
+    expect(el(fixture).querySelector('.notice')).toBeNull();
+  });
+});

@@ -35,7 +35,7 @@
 
 ## Post-MVP
 
-- [ ] 14. **Authentication** - Supabase Auth sign-in behind the existing auth middleware
+- [x] 14. **Authentication** - Supabase Auth sign-in behind the existing auth middleware
   seam, replacing feature 19's fixture auth provider
 - [ ] 15. **Roles** - role checks on the routes that need them
 - [ ] 16. **Saved query accounts** - move saved queries to Supabase, keyed by user, with a

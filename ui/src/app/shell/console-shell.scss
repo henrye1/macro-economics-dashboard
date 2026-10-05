@@ -78,6 +78,46 @@
   }
 }
 
+
+.account {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  padding-left: var(--space-5);
+  border-left: 1px solid rgb(255 255 255 / 25%);
+
+  .who {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+  }
+
+  .role {
+    opacity: 0.7;
+  }
+
+  /* Square, like every other control in the console. */
+  .sign-out {
+    padding: 6px 12px;
+    border: 1px solid rgb(255 255 255 / 40%);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: var(--text-sm);
+    cursor: pointer;
+  }
+
+  .sign-out:hover {
+    background: rgb(255 255 255 / 12%);
+  }
+
+  .sign-out:focus-visible {
+    outline: 2px solid var(--accent-bright);
+    outline-offset: 2px;
+  }
+}
+
 /* ---------- tab bar ---------- */
 
 .tabs {

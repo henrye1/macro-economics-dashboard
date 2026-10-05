@@ -34,6 +34,26 @@ export function isMacroConfigured(settings: MacroSettings): boolean {
   ].every((value) => value.trim() !== '');
 }
 
+/** What the API needs to verify a visitor's own Supabase session. */
+export interface AuthSettings {
+  /** Supabase project origin, scheme included and no trailing path. */
+  supabaseUrl: string;
+}
+
+/**
+ * True when the API is able to verify a token at all.
+ *
+ * This reads like `isMacroConfigured` and means the opposite kind of thing. A
+ * missing macro credential costs a feature; a missing auth setting would cost
+ * the only check standing between the public internet and the M2M quota. So
+ * `false` here must never resolve to "let everyone through": the macro routes
+ * answer 503 while it holds, and `/api/health` still answers with no `.env` at
+ * all.
+ */
+export function isAuthConfigured(settings: AuthSettings): boolean {
+  return settings.supabaseUrl.trim() !== '';
+}
+
 const macro: MacroSettings = {
   auth0Domain: process.env.AUTH0_DOMAIN ?? '',
   auth0ClientId: process.env.AUTH0_CLIENT_ID ?? '',
@@ -42,10 +62,16 @@ const macro: MacroSettings = {
   coreApiBaseUrl: process.env.CORE_API_BASE_URL ?? '',
 };
 
+const auth: AuthSettings = {
+  supabaseUrl: process.env.SUPABASE_URL ?? '',
+};
+
 export const config = {
   port: Number(process.env.PORT ?? 3000),
   nodeEnv: process.env.NODE_ENV ?? 'development',
   corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:4200',
   ...macro,
   macroConfigured: isMacroConfigured(macro),
+  ...auth,
+  authConfigured: isAuthConfigured(auth),
 } as const;
