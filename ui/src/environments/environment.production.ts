@@ -14,7 +14,7 @@
 export const environment = {
   production: true,
   /** Project origin, scheme included, no trailing slash. */
-  supabaseUrl: '',
+  supabaseUrl: 'https://vphjbpespgidksqifeab.supabase.co',
   /** The project's publishable anon key. */
-  supabaseAnonKey: ''
+  supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwaGpicGVzcGdpZGtzcWlmZWFiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA2NzUxNDUsImV4cCI6MjEwNjI1MTE0NX0.AMLSYYSBcMoi2r77Av075Be-7xnW5jMANPSVMIo1lQo'
 } as const;

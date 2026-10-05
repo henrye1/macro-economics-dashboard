@@ -30,7 +30,7 @@
   the CSV open correctly in Excel, which was the format's main reason to exist.
 - [x] 12. **Request builder** - live URL and curl for the working query, real response
   envelope and headers, and the status code reference
-- [ ] 13. **Deployment readiness** - configure both Render services, env vars, health
+- [x] 13. **Deployment readiness** - configure both Render services, env vars, health
   check and CORS, and verify the production build (run via `/release render`)
 
 ## Post-MVP

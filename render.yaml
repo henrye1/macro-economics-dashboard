@@ -1,0 +1,62 @@
+# Render Blueprint for both services. Two services, one repository, no root
+# package.json: each service runs its commands from its own root directory.
+#
+# Secrets are declared `sync: false`, so Render asks for each value when the
+# Blueprint is first applied and nothing secret ever lives in this file.
+services:
+  # The Express passthrough. Public on purpose: a static site's rewrite can only
+  # reach a publicly accessible URL, never a private service's internal address.
+  - type: web
+    name: macro-economics-api
+    runtime: node
+    rootDir: api
+    # NODE_ENV=production below would make a plain `npm ci` skip dev
+    # dependencies, and the build needs `typescript` from them.
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: node dist/index.js
+    healthCheckPath: /api/health
+    plan: free
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NODE_ENV
+        value: production
+      # The console's origin. The browser never calls the API cross-origin
+      # (the console's /api/* rewrite proxies instead), so this is a backstop,
+      # not the thing keeping other origins out.
+      - key: CORS_ORIGIN
+        value: https://macro-economics-console.onrender.com
+      - key: AUTH0_DOMAIN
+        sync: false
+      - key: AUTH0_CLIENT_ID
+        sync: false
+      - key: AUTH0_CLIENT_SECRET
+        sync: false
+      - key: AUTH0_AUDIENCE
+        sync: false
+      - key: CORE_API_BASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+
+  # The Angular console.
+  - type: web
+    name: macro-economics-console
+    runtime: static
+    rootDir: ui
+    # No NODE_ENV here: the build needs the Angular CLI from dev dependencies.
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist/ui/browser
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+    routes:
+      # Order matters: the API rewrite must win over the client-side fallback.
+      # Routes cannot reference another service, so this names the API's URL as
+      # text. If Render gives the API a different hostname, change it here.
+      - type: rewrite
+        source: /api/*
+        destination: https://macro-economics-api.onrender.com/api/*
+      - type: rewrite
+        source: /*
+        destination: /index.html

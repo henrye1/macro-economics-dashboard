@@ -7,7 +7,7 @@ this file, so there is a single source of truth.
 
 ## What this is
 
-**Micro Economics** is a two-package monorepo that serves annual macroeconomic
+**Macro Economics** is a two-package monorepo that serves annual macroeconomic
 data by country from public sources (IMF World Economic Outlook and World Bank
 World Development Indicators) so that downstream consumers, such as IFRS 9
 forward-looking-information models, can pull realised history and forecast paths

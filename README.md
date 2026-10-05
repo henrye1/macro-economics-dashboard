@@ -1,4 +1,4 @@
-# Micro Economics
+# Macro Economics
 
 Monorepo with an Angular front end and a Node/Express API.
 

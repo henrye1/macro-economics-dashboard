@@ -9,6 +9,7 @@
 
 
 
+
 ### F-02 [P2] open - Neither upstream fetch has a timeout, and a stalled token request wedges every macro route
 
 **File:** api/src/macro/token-provider.ts:48
@@ -325,7 +326,7 @@ constants to find rather than the one the comment promises.
 **Suggested fix:** have `request-text.ts` export the base and the provider import
 it, or the reverse — one owner either way — and rewrite the comment to record the
 rewrite decision rather than the TODO it replaced.
-**Resolution:**
+**Resolution:** Fixed 2026-10-05 by /implement (feature 13 step 3). The `BASE` comment in `http-macro-data.provider.ts` no longer calls a production base URL an open TODO: it records that `proxy.conf.json` in development and the `render.yaml` `/api/*` rewrite in production keep the path relative, so there is one base path and no setting. Awaiting re-review. Re-opened 2026-10-05 by the independent review of `adb93db`: the stale-TODO half is gone (`http-macro-data.provider.ts:23-29` now records the rewrite decision and claims no uniqueness), but the duplication half is not. The literal is now declared three times: `BASE` at `http-macro-data.provider.ts:30`, `PROXY_BASE` at `request-text.ts:15` and `RELAY` at `auth.interceptor.ts:13`, so "one base path" is not what the code holds. Stays open until one owner exports it.
 
 ### F-41 [P3] open - The plan now makes CORS unexercised while still describing it as the lock
 
@@ -751,7 +752,7 @@ hardening a relay is much cheaper before either.
 **Suggested fix:** `app.disable('x-powered-by')`, and drop `express.json()` until
 a route needs a body. Add `helmet` when feature 13 configures the deployment, or
 set the three headers by hand if the dependency is not wanted.
-**Resolution:**
+**Resolution:** Re-examined 2026-10-05 by the independent review of `adb93db`: feature 13 configured the deployment without touching `app.ts`, so all three gaps stand. Stays open; the console-side equivalent is F-99.
 
 ### F-76 [P3] open - A non-numeric PORT silently binds a random port instead of failing
 
@@ -800,21 +801,6 @@ layout as part of its scope, or annotate line 18 with "auth layout deferred to
 19". One clause either way.
 **Resolution:**
 
-### F-92 [P3] open - The production build ships blank Supabase settings and the setup note points at the development file
-
-**File:** api/.env.example:23
-**Found:** 2026-10-05 by /audit independent (scope: current; lens: quality)
-**Why it matters:** `angular.json` replaces `environment.ts` with
-`environment.production.ts` for the default `production` build, and that file holds
-blank `supabaseUrl` and `supabaseAnonKey`, so `npm run build` produces a console with
-no Supabase client that reports sign-in as unavailable. `.env.example` tells the
-operator to set the values in `ui/src/environments/environment.ts`, which a
-production build never reads. Nothing is deployed yet, so nothing is broken today;
-`/release render` would ship a console nobody can sign in to by following the note.
-**Suggested fix:** point the note at `environment.production.ts` (or both files), or
-fill the production file with the same publishable values.
-**Resolution:** Re-confirmed open 2026-10-05 by the independent review of `51625fb`: `environment.production.ts` still blank, `.env.example:23` still names `environment.ts`.
-
 ### F-94 [P3] unverified - Local-only sign-out leaves the refresh token valid, and the comment says it expires on its own
 
 **File:** ui/src/app/core/session.store.ts:102
@@ -846,3 +832,27 @@ server-side until the project's session limits end it.
 **Why it matters:** The spec's In scope item and step 6 say the Request builder renders `Authorization: Bearer $MACRO_TOKEN` and adds `401` to its status reference, and Files/areas lists `request-builder.ts`, `.html` and spec. None of those files change in `f3411e0..51625fb`: `request-text.ts:81` already emitted `Bearer $TOKEN` and `request-builder.ts:29` already listed `401`. The property that matters, a placeholder and never the live token, holds, so nothing is broken; the spec records work and a placeholder name that do not match the code, and a later reader trusting it will look for `$MACRO_TOKEN`.
 **Suggested fix:** correct the spec's step 6 and In scope text to say the builder already carried a `$TOKEN` placeholder and `401`, or rename the placeholder if `$MACRO_TOKEN` was the decision.
 **Resolution:** Re-examined 2026-10-05 by the independent review of `94a4f64`: the cited spec has since been archived, so `current-feature.md:174` now points at the F-93 fix spec. The text this finding is about lives in `blueprint/history/features/14-authentication.md` (still names `$MACRO_TOKEN`). Stays open against that file.
+
+### F-98 [P2] open - The deploy checklist never turns off Supabase self sign-up, and the API admits any verified user of the project
+
+**File:** blueprint/context/current-feature.md:211
+**Found:** 2026-10-05 by /audit independent (scope: current; lens: security)
+**Why it matters:** This feature ships the project URL and anon key in the production bundle (correctly, they are publishable) and publishes the API on a public `onrender.com` URL. `createAuthSeam` (`api/src/middleware/auth.ts:140`) admits any token the project signed with audience `authenticated` and a `sub`; it reads no role or invitation claim (role checks are feature 15). The product is invitation only (feature 14, Out of scope), but Supabase's email provider allows new sign-ups by default, and anonymous sign-ins, if enabled, also mint `authenticated` tokens. Anyone holding the shipped anon key can call the project's sign-up endpoint directly, get a token, and spend the M2M quota through the API, which is what the auth gate exists to stop. The deploy checklist (step 5, item 5) covers Site URL and the redirect allowlist only. Not P1 because the project's current auth settings were not inspected; if sign-ups are already off, the gap is the missing checklist line.
+**Suggested fix:** add to the checklist's Supabase item: Authentication, Sign In / Providers, turn off "Allow new users to sign up" and confirm anonymous sign-ins are off, before the deploy goes public. Feature 15's role check is the code-side backstop.
+**Resolution:**
+
+### F-99 [P3] open - The console static site declares no response headers, so the sign-in screens can be framed
+
+**File:** render.yaml:43
+**Found:** 2026-10-05 by /audit independent (scope: current; lens: security)
+**Why it matters:** The console service declares `routes` but no `headers`, so Render serves the sign-in and set-password screens with no `X-Frame-Options` or `frame-ancestors`, no `X-Content-Type-Options` and no `Referrer-Policy`. A page that takes a password can be framed by any site for clickjacking. F-75 records the API-side equivalent and expected feature 13 to add headers; neither service gets any here. Low risk, cheap to close.
+**Suggested fix:** add a `headers` block to the console service for `path: /*` setting `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` and `Referrer-Policy: strict-origin-when-cross-origin`; a CSP can follow later.
+**Resolution:**
+
+### F-100 [P3] open - The CORS comment says the console is cross-origin in production, which this feature makes false
+
+**File:** api/src/app.ts:29
+**Found:** 2026-10-05 by /audit independent (scope: current; lens: quality)
+**Why it matters:** `app.ts:29` justifies `exposedHeaders` with "The console is served from a different origin in production". This delta's `render.yaml` and the rewritten `http-macro-data.provider.ts:23-29` comment both say the browser only ever talks to the console's own origin and never crosses an origin. Two code comments now contradict each other on the deployment shape, and the wrong one sits on security-relevant middleware. Distinct from F-41, which is the plan's sentence.
+**Suggested fix:** reword to say the exposed headers matter only if the console ever calls the API directly; the production rewrite keeps requests same-origin.
+**Resolution:**

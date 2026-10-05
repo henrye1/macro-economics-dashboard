@@ -21,10 +21,11 @@ import { toMacroRequestError } from './macro-error';
 import { toMacroParams } from './macro-params';
 
 /**
- * Relative on purpose. The console is served from the same origin as the
- * Express passthrough in development (through `ui/proxy.conf.json`) and in the
- * container. A configurable production base URL is feature 13's open TODO, and
- * inventing one here would be a second source of truth to unpick later.
+ * Relative on purpose, in every environment. The browser only ever talks to
+ * the console's own origin: in development `ui/proxy.conf.json` forwards `/api`
+ * to the Express passthrough, and in production the static site's `/api/*`
+ * rewrite in `render.yaml` does the same. That is why there is no base URL
+ * setting, and why the request never crosses an origin.
  */
 const BASE = '/api/macro';
 
