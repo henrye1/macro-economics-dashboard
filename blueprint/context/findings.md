@@ -846,13 +846,13 @@ local on failure, or correct the comment to say the refresh token stays valid
 server-side until the project's session limits end it.
 **Resolution:**
 
-### F-95 [P2] open - sessionGuard has no spec, so the hydration wait step 4 exists for is unproved
+### F-95 [P2] fixed - sessionGuard has no spec, so the hydration wait step 4 exists for is unproved
 
 **File:** ui/src/app/auth/session.guard.ts:19
 **Found:** 2026-10-05 by /audit independent (scope: current; lens: tests)
 **Why it matters:** Step 4 rewrote the guard to await `SessionStore.ready` so a signed-in visitor who reloads is not bounced to sign-in, and its Done when requires "a guard that waits rather than redirecting mid hydration". No `session.guard.spec.ts` exists and no spec calls `sessionGuard`; the only guard evidence is route specs whose stub `getSession()` resolves immediately and the e2e signed-out deep link. Reverting the guard to a synchronous `signedIn()` read (the reload bounce) would keep every suite green. The spec's Testing section also lists "sessionGuard: waits for hydration, allows a hydrated session, redirects with returnUrl otherwise".
 **Suggested fix:** add `session.guard.spec.ts` with a stub client whose `getSession()` is held on a deferred promise: assert the guard emits nothing before it settles, `true` after it settles with a session, and a `/sign-in?returnUrl=` tree after it settles with none.
-**Resolution:**
+**Resolution:** Fixed 2026-10-05 by /implement (fix/test-that-the-session-guard-waits-for-hydration). New `ui/src/app/auth/session.guard.spec.ts` runs the guard against a stand-in store whose `ready` the test settles by hand: nothing emitted before it settles, `true` after it settles with a session, a `/sign-in?returnUrl=` tree after it settles without one. Swapping `from(store.ready)` for an immediate `of(null)` turns 2 of 3 red, including the wait case. Awaiting re-review.
 
 ### F-96 [P3] open - SupabaseAuthProvider.setPassword, the one real call the set-password screen makes, has no provider spec
 
