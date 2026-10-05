@@ -8,6 +8,7 @@
 > and resets this file.
 
 
+
 ### F-02 [P2] open - Neither upstream fetch has a timeout, and a stalled token request wedges every macro route
 
 **File:** api/src/macro/token-provider.ts:48
@@ -814,22 +815,6 @@ production build never reads. Nothing is deployed yet, so nothing is broken toda
 fill the production file with the same publishable values.
 **Resolution:** Re-confirmed open 2026-10-05 by the independent review of `51625fb`: `environment.production.ts` still blank, `.env.example:23` still names `environment.ts`.
 
-### F-93 [P3] open - Set password reports a rejected password as an outage
-
-**File:** ui/src/app/core/supabase/supabase-auth.provider.ts:102
-**Found:** 2026-10-05 by /audit independent (scope: current; lens: quality)
-**Why it matters:** `setPassword` maps only missing-session errors to `'denied'` and
-rethrows everything else, which the screen renders as "We could not set your
-password just now. Try again in a moment." Supabase answers `422` with
-`same_password` when the visitor reuses their old password, and `weak_password`
-when the project's policy (for example leaked-password protection) is stricter than
-the screen's three rules. Both are the visitor's to fix, and the screen tells them to
-wait and clears the field. This is the inverse of the `isRefusal` rule `signIn`
-follows. No spec covers either code.
-**Suggested fix:** map `same_password` and `weak_password` to a field-level message
-on the form, and add one provider spec per code.
-**Resolution:** Re-confirmed open 2026-10-05 by the independent review of `51625fb`: unchanged at `supabase-auth.provider.ts:100`. See also F-96.
-
 ### F-94 [P3] unverified - Local-only sign-out leaves the refresh token valid, and the comment says it expires on its own
 
 **File:** ui/src/app/core/session.store.ts:102
@@ -854,18 +839,10 @@ server-side until the project's session limits end it.
 **Suggested fix:** add `session.guard.spec.ts` with a stub client whose `getSession()` is held on a deferred promise: assert the guard emits nothing before it settles, `true` after it settles with a session, and a `/sign-in?returnUrl=` tree after it settles with none.
 **Resolution:** Fixed 2026-10-05 by /implement (fix/test-that-the-session-guard-waits-for-hydration). New `ui/src/app/auth/session.guard.spec.ts` runs the guard against a stand-in store whose `ready` the test settles by hand: nothing emitted before it settles, `true` after it settles with a session, a `/sign-in?returnUrl=` tree after it settles without one. Swapping `from(store.ready)` for an immediate `of(null)` turns 2 of 3 red, including the wait case. Awaiting re-review.
 
-### F-96 [P3] open - SupabaseAuthProvider.setPassword, the one real call the set-password screen makes, has no provider spec
-
-**File:** ui/src/app/core/supabase/supabase-auth.provider.ts:89
-**Found:** 2026-10-05 by /audit independent (scope: current; lens: tests)
-**Why it matters:** `supabase-auth.provider.spec.ts` covers `signIn`, `requestPasswordReset` and the two fixture delegations, and never calls `setPassword` or stubs `updateUser`. `isSessionMissing` (`:168`) decides between the screen's expired-link dead end and its outage message, and the null-user and unconfigured branches are likewise unexercised. `set-password.spec.ts` drives the screen against a fake `AUTH`, so it cannot catch a wrong mapping here.
-**Suggested fix:** add a `setPassword` describe with a stubbed `updateUser`: success maps the user, `status: 401` and `session_not_found` answer `'denied'`, an unrecognised code raises, and a null client raises.
-**Resolution:**
-
 ### F-97 [P3] open - Step 6 is checked for a $MACRO_TOKEN Request-builder header the delta never adds
 
 **File:** blueprint/context/current-feature.md:174
 **Found:** 2026-10-05 by /audit independent (scope: current; lens: quality)
 **Why it matters:** The spec's In scope item and step 6 say the Request builder renders `Authorization: Bearer $MACRO_TOKEN` and adds `401` to its status reference, and Files/areas lists `request-builder.ts`, `.html` and spec. None of those files change in `f3411e0..51625fb`: `request-text.ts:81` already emitted `Bearer $TOKEN` and `request-builder.ts:29` already listed `401`. The property that matters, a placeholder and never the live token, holds, so nothing is broken; the spec records work and a placeholder name that do not match the code, and a later reader trusting it will look for `$MACRO_TOKEN`.
 **Suggested fix:** correct the spec's step 6 and In scope text to say the builder already carried a `$TOKEN` placeholder and `401`, or rename the placeholder if `$MACRO_TOKEN` was the decision.
-**Resolution:**
+**Resolution:** Re-examined 2026-10-05 by the independent review of `94a4f64`: the cited spec has since been archived, so `current-feature.md:174` now points at the F-93 fix spec. The text this finding is about lives in `blueprint/history/features/14-authentication.md` (still names `$MACRO_TOKEN`). Stays open against that file.

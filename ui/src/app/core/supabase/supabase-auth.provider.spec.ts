@@ -28,6 +28,7 @@ function authError(code: string, message = 'refused'): AuthError {
 interface ClientStub {
   signInWithPassword: jasmine.Spy;
   resetPasswordForEmail: jasmine.Spy;
+  updateUser: jasmine.Spy;
 }
 
 function make(stub: Partial<ClientStub> = {}, origin = 'https://console.cyte.co.za') {
@@ -38,6 +39,9 @@ function make(stub: Partial<ClientStub> = {}, origin = 'https://console.cyte.co.
     resetPasswordForEmail: jasmine
       .createSpy('resetPasswordForEmail')
       .and.resolveTo({ data: {}, error: null }),
+    updateUser: jasmine
+      .createSpy('updateUser')
+      .and.resolveTo({ data: { user: user() }, error: null }),
     ...stub
   };
 
@@ -229,6 +233,51 @@ describe('SupabaseAuthProvider', () => {
       await expectAsync(
         firstValueFrom(makeUnconfigured().requestPasswordReset('a@b.co'))
       ).toBeRejected();
+    });
+  });
+
+  describe('setPassword', () => {
+    function refusing(code: string, status = 422) {
+      return make({
+        updateUser: jasmine
+          .createSpy('updateUser')
+          .and.resolveTo({ data: { user: null }, error: { ...authError(code), status } })
+      }).provider;
+    }
+
+    it('changes the password of whoever the recovery link signed in', async () => {
+      const { client, provider } = make();
+
+      const result = (await firstValueFrom(provider.setPassword('N3w-passphrase!'))) as Session;
+
+      expect(client.updateUser).toHaveBeenCalledWith({ password: 'N3w-passphrase!' });
+      expect(result.email).toBe('thandi.mokoena@cyte.co.za');
+    });
+
+    it('answers same-password when the visitor reuses the one they have', async () => {
+      expect(await firstValueFrom(refusing('same_password').setPassword('pw'))).toBe('same-password');
+    });
+
+    it('answers weak-password when the project policy is stricter than the screen', async () => {
+      expect(await firstValueFrom(refusing('weak_password').setPassword('pw'))).toBe('weak-password');
+    });
+
+    it('answers denied when there is no session to change a password for', async () => {
+      expect(await firstValueFrom(refusing('session_not_found', 403).setPassword('pw'))).toBe('denied');
+    });
+
+    it('answers denied for any 401, whatever the code says', async () => {
+      expect(await firstValueFrom(refusing('bad_jwt', 401).setPassword('pw'))).toBe('denied');
+    });
+
+    it('raises on a code it does not recognise, rather than blaming the password', async () => {
+      await expectAsync(
+        firstValueFrom(refusing('unexpected_failure', 500).setPassword('pw'))
+      ).toBeRejected();
+    });
+
+    it('raises when there is no project configured', async () => {
+      await expectAsync(firstValueFrom(makeUnconfigured().setPassword('pw'))).toBeRejected();
     });
   });
 

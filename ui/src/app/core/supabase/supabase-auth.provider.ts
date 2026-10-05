@@ -2,7 +2,13 @@ import { DOCUMENT, Injectable, inject } from '@angular/core';
 import type { AuthError as SupabaseAuthError } from '@supabase/supabase-js';
 import { Observable, from, map } from 'rxjs';
 
-import type { AuthFailure, AuthProvider, Invitation, Session } from '../auth.provider';
+import type {
+  AuthFailure,
+  AuthProvider,
+  Invitation,
+  PasswordRejection,
+  Session
+} from '../auth.provider';
 import { FixtureAuthProvider } from '../fixtures/fixture-auth.provider';
 import { SUPABASE_CLIENT } from './supabase.client';
 import { toSession } from './session-mapping';
@@ -86,7 +92,7 @@ export class SupabaseAuthProvider implements AuthProvider {
     );
   }
 
-  setPassword(password: string): Observable<Session | AuthFailure> {
+  setPassword(password: string): Observable<Session | AuthFailure | PasswordRejection> {
     const client = this.client;
 
     if (client === null) {
@@ -99,7 +105,11 @@ export class SupabaseAuthProvider implements AuthProvider {
     return from(client.auth.updateUser({ password })).pipe(
       map(({ data, error }) => {
         if (error !== null) {
-          return isSessionMissing(error) ? 'denied' : rethrow(error);
+          if (isSessionMissing(error)) {
+            return 'denied';
+          }
+
+          return passwordRejection(error) ?? rethrow(error);
         }
 
         if (data.user === null) {
@@ -172,6 +182,25 @@ function isSessionMissing(error: SupabaseAuthError): boolean {
     error.code === 'session_expired' ||
     error.code === 'no_authorization'
   );
+}
+
+/**
+ * Whether Supabase considered the new password and refused it, which the
+ * visitor fixes by choosing another, as opposed to failing to consider it.
+ *
+ * Matched on the code, as `isRefusal` is. `weak_password` covers whatever the
+ * project's policy adds beyond the screen's three rules, leaked-password
+ * protection included.
+ */
+function passwordRejection(error: SupabaseAuthError): PasswordRejection | null {
+  switch (error.code) {
+    case 'same_password':
+      return 'same-password';
+    case 'weak_password':
+      return 'weak-password';
+    default:
+      return null;
+  }
 }
 
 /** Narrows a map callback that cannot return, so the failure keeps one shape. */

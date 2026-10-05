@@ -2,11 +2,18 @@ import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink } from '@angular/router';
 
-import { AUTH } from '../core/auth.provider';
+import { AUTH, type PasswordRejection } from '../core/auth.provider';
 import { passwordMeetsRules, passwordRules } from '../core/password-rules';
 import { SessionStore } from '../core/session.store';
 
 const UNAVAILABLE = 'We could not set your password just now. Try again in a moment.';
+
+/** What to change, for each password the service considered and refused. */
+const REJECTED: Record<PasswordRejection, string> = {
+  'same-password': 'That is already your password. Choose a different one.',
+  'weak-password':
+    'That password is too easy to guess, or has appeared in a known data breach. Choose a different one.'
+};
 
 /** The form, or the dead end a spent link lands on. */
 type ScreenState = 'form' | 'expired';
@@ -87,6 +94,14 @@ export class SetPasswordPage {
           if (result === 'unavailable') {
             this.password.set('');
             this.problem.set(UNAVAILABLE);
+            return;
+          }
+
+          if (result === 'same-password' || result === 'weak-password') {
+            // The link is good and the service is up; the password is what to
+            // change, so the form stays and says so beside the field.
+            this.password.set('');
+            this.problem.set(REJECTED[result]);
             return;
           }
 

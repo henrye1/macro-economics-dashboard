@@ -6,7 +6,13 @@ import { Observable, of } from 'rxjs';
 
 import { App } from '../app';
 import { routes } from '../app.routes';
-import { AUTH, type AuthFailure, type AuthProvider, type Session } from '../core/auth.provider';
+import {
+  AUTH,
+  type AuthFailure,
+  type AuthProvider,
+  type PasswordRejection,
+  type Session
+} from '../core/auth.provider';
 import { FIXTURE_SESSION, FixtureAuthProvider } from '../core/fixtures/fixture-auth.provider';
 import { FixtureMacroDataProvider } from '../core/fixtures/fixture-macro-data.provider';
 import { provideNoSession } from '../core/fixtures/signed-in-session';
@@ -15,23 +21,21 @@ import { SessionStore } from '../core/session.store';
 
 const GOOD_PASSWORD = 'Correct-horse-1-battery';
 
+type Answer = Session | AuthFailure | PasswordRejection | 'raise';
+
 /** The fixture with only `setPassword` swapped, so every other path is the real one. */
-function providerAnswering(
-  answer: Session | AuthFailure | 'raise'
-): AuthProvider {
+function providerAnswering(answer: Answer): AuthProvider {
   const fixture = new FixtureAuthProvider();
 
   return Object.assign(Object.create(Object.getPrototypeOf(fixture) as object), fixture, {
-    setPassword: (): Observable<Session | AuthFailure> =>
+    setPassword: (): Observable<Session | AuthFailure | PasswordRejection> =>
       answer === 'raise'
         ? new Observable<Session>((subscriber) => subscriber.error(new Error('down')))
         : of(answer)
   }) as AuthProvider;
 }
 
-async function open(
-  answer: Session | AuthFailure | 'raise' = FIXTURE_SESSION
-): Promise<ComponentFixture<App>> {
+async function open(answer: Answer = FIXTURE_SESSION): Promise<ComponentFixture<App>> {
   await TestBed.configureTestingModule({
     imports: [App],
     providers: [
@@ -146,6 +150,30 @@ describe('Set password', () => {
     expect(page.querySelector('form')).toBeTruthy();
     expect(page.querySelector<HTMLInputElement>('input[name="password"]')?.value).toBe('');
   });
+
+  for (const [rejection, message] of [
+    ['same-password', 'That is already your password. Choose a different one.'],
+    [
+      'weak-password',
+      'That password is too easy to guess, or has appeared in a known data breach. Choose a different one.'
+    ]
+  ] as const) {
+    it(`keeps the form and says what to change when the service answers ${rejection}`, async () => {
+      const fixture = await open(rejection);
+      type(fixture, GOOD_PASSWORD);
+      submit(fixture);
+      await fixture.whenStable();
+
+      const page = host(fixture);
+
+      // The visitor's to fix, so neither the outage copy nor the dead end.
+      expect(page.querySelector('.problem')?.textContent?.trim()).toBe(message);
+      expect(page.querySelector('form')).toBeTruthy();
+      expect(page.querySelector('h2')?.textContent).toBe('Set a new password');
+      expect(page.querySelector<HTMLInputElement>('input[name="password"]')?.value).toBe('');
+      expect(TestBed.inject(SessionStore).signedIn()).toBeFalse();
+    });
+  }
 
   it('reports an unexpected failure the same way, rather than leaving the button spinning', async () => {
     const fixture = await open('raise');

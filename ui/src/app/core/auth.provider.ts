@@ -19,6 +19,13 @@ export interface Session {
 /** Why a sign-in or an acceptance did not happen. */
 export type AuthFailure = 'denied' | 'unavailable';
 
+/**
+ * Why the service refused a new password it was able to consider: it is the one
+ * the visitor already has, or the project's policy is stricter than the screen's
+ * rules. The visitor's to fix, so an answer, never an outage.
+ */
+export type PasswordRejection = 'same-password' | 'weak-password';
+
 export type InvitationStatus = 'valid' | 'expired' | 'revoked' | 'unknown';
 
 /**
@@ -65,7 +72,7 @@ export interface AuthProvider {
    * emailed link. A link that has expired or been used is a refusal, not an
    * error: the screen has a dead end to render for it.
    */
-  setPassword(password: string): Observable<Session | AuthFailure>;
+  setPassword(password: string): Observable<Session | AuthFailure | PasswordRejection>;
 
   acceptInvitation(
     token: string,
