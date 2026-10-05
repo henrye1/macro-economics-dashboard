@@ -50,6 +50,20 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "24"
+    # Nothing in the console is meant to be embedded, and its sign-in screens
+    # take a password, so no other site may frame it. A CSP with
+    # frame-ancestors would say the same but is a separate decision: it must
+    # also allow the two Google Fonts origins index.html loads from.
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
     routes:
       # Order matters: the API rewrite must win over the client-side fallback.
       # Routes cannot reference another service, so this names the API's URL as

@@ -26,10 +26,11 @@ export function createApp(deps: AppDeps = {}) {
   app.use(
     cors({
       origin: config.corsOrigin,
-      // The console is served from a different origin in production, so these
-      // have to be exposed explicitly or the browser cannot read them. The
-      // request builder shows all three, and ETag is the whole point of the
-      // caching demo.
+      // Only a cross-origin caller needs these exposed, and the console is
+      // never one: `ui/proxy.conf.json` in development and the `/api/*`
+      // rewrite in `render.yaml` in production keep its requests on its own
+      // origin. They stay exposed so a direct caller can still read the three
+      // headers the request builder shows, ETag above all.
       exposedHeaders: ['ETag', 'Cache-Control', 'X-Total-Count'],
     }),
   );

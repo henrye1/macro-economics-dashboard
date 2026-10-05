@@ -10,6 +10,7 @@
 
 
 
+
 ### F-02 [P2] open - Neither upstream fetch has a timeout, and a stalled token request wedges every macro route
 
 **File:** api/src/macro/token-provider.ts:48
@@ -839,20 +840,4 @@ server-side until the project's session limits end it.
 **Found:** 2026-10-05 by /audit independent (scope: current; lens: security)
 **Why it matters:** This feature ships the project URL and anon key in the production bundle (correctly, they are publishable) and publishes the API on a public `onrender.com` URL. `createAuthSeam` (`api/src/middleware/auth.ts:140`) admits any token the project signed with audience `authenticated` and a `sub`; it reads no role or invitation claim (role checks are feature 15). The product is invitation only (feature 14, Out of scope), but Supabase's email provider allows new sign-ups by default, and anonymous sign-ins, if enabled, also mint `authenticated` tokens. Anyone holding the shipped anon key can call the project's sign-up endpoint directly, get a token, and spend the M2M quota through the API, which is what the auth gate exists to stop. The deploy checklist (step 5, item 5) covers Site URL and the redirect allowlist only. Not P1 because the project's current auth settings were not inspected; if sign-ups are already off, the gap is the missing checklist line.
 **Suggested fix:** add to the checklist's Supabase item: Authentication, Sign In / Providers, turn off "Allow new users to sign up" and confirm anonymous sign-ins are off, before the deploy goes public. Feature 15's role check is the code-side backstop.
-**Resolution:**
-
-### F-99 [P3] open - The console static site declares no response headers, so the sign-in screens can be framed
-
-**File:** render.yaml:43
-**Found:** 2026-10-05 by /audit independent (scope: current; lens: security)
-**Why it matters:** The console service declares `routes` but no `headers`, so Render serves the sign-in and set-password screens with no `X-Frame-Options` or `frame-ancestors`, no `X-Content-Type-Options` and no `Referrer-Policy`. A page that takes a password can be framed by any site for clickjacking. F-75 records the API-side equivalent and expected feature 13 to add headers; neither service gets any here. Low risk, cheap to close.
-**Suggested fix:** add a `headers` block to the console service for `path: /*` setting `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` and `Referrer-Policy: strict-origin-when-cross-origin`; a CSP can follow later.
-**Resolution:**
-
-### F-100 [P3] open - The CORS comment says the console is cross-origin in production, which this feature makes false
-
-**File:** api/src/app.ts:29
-**Found:** 2026-10-05 by /audit independent (scope: current; lens: quality)
-**Why it matters:** `app.ts:29` justifies `exposedHeaders` with "The console is served from a different origin in production". This delta's `render.yaml` and the rewritten `http-macro-data.provider.ts:23-29` comment both say the browser only ever talks to the console's own origin and never crosses an origin. Two code comments now contradict each other on the deployment shape, and the wrong one sits on security-relevant middleware. Distinct from F-41, which is the plan's sentence.
-**Suggested fix:** reword to say the exposed headers matter only if the console ever calls the API directly; the production rewrite keeps requests same-origin.
 **Resolution:**
