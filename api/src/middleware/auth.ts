@@ -45,7 +45,7 @@ class AuthError extends Error {
   }
 }
 
-const NO_SESSION = 'This request carried no valid session.';
+export const NO_SESSION = 'This request carried no valid session.';
 const NOT_CONFIGURED =
   'The service is not configured for authentication. Set the Supabase environment variables.';
 const UNVERIFIABLE = 'The session could not be verified.';
