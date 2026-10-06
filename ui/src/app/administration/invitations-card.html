@@ -1,0 +1,86 @@
+<section class="card invitations">
+  @if (store.confirmation(); as message) {
+    <p class="confirm" role="status">{{ message }}</p>
+  }
+  <div class="card-head">
+    <h2>Invitations</h2>
+    <span class="meta">Not yet accepted</span>
+  </div>
+
+  @switch (store.status()) {
+    @case ('loading') {
+      <p class="state" role="status">Loading invitations…</p>
+    }
+    @case ('failed') {
+      <p class="state" role="status">Could not load invitations.</p>
+    }
+    @default {
+      @if (store.isEmpty()) {
+        <p class="state" role="status">No invitations waiting.</p>
+      } @else {
+        <table class="grid">
+          <caption class="visually-hidden">
+            Invitations not yet accepted, newest first, with when each link expires.
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Email</th>
+              <th scope="col">Role</th>
+              <th scope="col">Sent</th>
+              <th scope="col">Expires</th>
+              <th scope="col">Status</th>
+              <th scope="col"><span class="visually-hidden">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (invitation of store.invitations(); track track(invitation)) {
+              <tr>
+                <!-- Emails were typed by an administrator. Interpolation only. -->
+                <td>{{ invitation.email }}</td>
+                <td>{{ invitation.role }}</td>
+                <td class="stamp">{{ date(invitation.sentAt) }}</td>
+                <td class="stamp">{{ stamp(invitation.expiresAt) }}</td>
+                <td>
+                  @if (invitation.status === 'pending') {
+                    <span class="badge pending">Pending</span>
+                  } @else {
+                    <span class="badge expired">Expired</span>
+                  }
+                </td>
+                <td class="actions">
+                  @if (store.activityOf(invitation) === 'confirming-revoke') {
+                    <span class="ask">Revoke the invitation to {{ invitation.email }}?</span>
+                    <div class="row-actions">
+                      <button type="button" class="btn outline-muted" (click)="store.keep(invitation)">Keep</button>
+                      <button type="button" class="btn navy" (click)="store.revoke(invitation)">Revoke</button>
+                    </div>
+                  } @else {
+                    <div class="row-actions">
+                      @if (invitation.status === 'expired') {
+                        <button
+                          type="button"
+                          class="btn outline-green"
+                          [disabled]="store.isBusy(invitation)"
+                          (click)="store.resend(invitation)"
+                        >{{ store.activityOf(invitation) === 'resending' ? 'Sending…' : 'Resend' }}</button>
+                      }
+                      <button
+                        type="button"
+                        class="btn outline-muted"
+                        [disabled]="store.isBusy(invitation)"
+                        (click)="store.askToRevoke(invitation)"
+                      >{{ store.activityOf(invitation) === 'revoking' ? 'Revoking…' : 'Revoke' }}</button>
+                    </div>
+                  }
+                  @if (store.errorOf(invitation); as error) {
+                    <p class="row-error" role="alert">{{ error }}</p>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    }
+  }
+</section>

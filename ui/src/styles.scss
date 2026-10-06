@@ -130,6 +130,10 @@
   --change-up: var(--cl-positive-color);
   --change-down: var(--cl-error-color);
 
+  /* Form validation, from the Administration mockup's two tokens. */
+  --invalid: var(--cl-error-color);
+  --invalid-bg: var(--cl-error-background-color);
+
   /* code surfaces */
   --code-bg: var(--navy);
   --code-ink: #ffffff;

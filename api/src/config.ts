@@ -73,6 +73,22 @@ export function isSavedQueriesConfigured(settings: SavedQuerySettings): boolean 
   return settings.supabaseUrl.trim() !== '' && settings.supabaseServiceKey.trim() !== '';
 }
 
+/** Where an invitation email's link returns: the console origin, no trailing slash. */
+export function parseConsoleUrl(value: string | undefined): string {
+  const trimmed = (value ?? '').trim().replace(/\/+$/, '');
+  return trimmed === '' ? 'http://localhost:4200' : trimmed;
+}
+
+/**
+ * How long the project's invite links last, in hours. It describes the
+ * Supabase setting so the console can show an expiry; Supabase is what refuses
+ * an expired link. Anything that is not a positive number falls back to 24.
+ */
+export function parseInviteLinkTtlHours(value: string | undefined): number {
+  const hours = Number(value);
+  return Number.isFinite(hours) && hours > 0 ? hours : 24;
+}
+
 const macro: MacroSettings = {
   auth0Domain: process.env.AUTH0_DOMAIN ?? '',
   auth0ClientId: process.env.AUTH0_CLIENT_ID ?? '',
@@ -103,4 +119,6 @@ export const config = {
   // The admin routes read the user directory with the same service role key,
   // so they are usable exactly when the saved-query routes are.
   adminConfigured: isSavedQueriesConfigured(savedQueries),
+  consoleUrl: parseConsoleUrl(process.env.CONSOLE_URL),
+  inviteLinkTtlHours: parseInviteLinkTtlHours(process.env.INVITE_LINK_TTL_HOURS),
 } as const;

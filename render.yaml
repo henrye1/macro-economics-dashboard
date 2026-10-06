@@ -42,6 +42,13 @@ services:
       # level security, so it is set here only and never in the console build.
       - key: SUPABASE_SERVICE_KEY
         sync: false
+      # Where invitation links return. Also add <CONSOLE_URL>/accept-invite to
+      # the Supabase Auth redirect allowlist.
+      - key: CONSOLE_URL
+        value: https://macro-economics-console.onrender.com
+      # Must match the Supabase email link expiry; display only.
+      - key: INVITE_LINK_TTL_HOURS
+        value: "24"
 
   # The Angular console.
   - type: web

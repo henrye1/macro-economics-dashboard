@@ -3,7 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 
-import { ADMIN_USERS_URL, type AdminUser } from '../core/admin-directory';
+import { ADMIN_INVITATIONS_URL, ADMIN_USERS_URL, type AdminUser } from '../core/admin-directory';
 import type { Session } from '../core/auth.provider';
 import { SESSION_STORAGE, SessionStore } from '../core/session.store';
 import { SUPABASE_CLIENT } from '../core/supabase/supabase.client';
@@ -69,13 +69,17 @@ describe('AdministrationPage', () => {
   }
 
   afterEach(() => {
+    // The Invitations card loads on its own; its specs live beside it.
+    for (const request of httpMock.match(ADMIN_INVITATIONS_URL)) {
+      request.flush({ data: [], expiresInHours: 24 });
+    }
     httpMock.verify();
     TestBed.resetTestingModule();
   });
 
   const el = () => fixture.nativeElement as HTMLElement;
   const states = () =>
-    Array.from(el().querySelectorAll('[role="status"]')).map((n) => n.textContent?.trim());
+    Array.from(el().querySelectorAll('.users [role="status"]')).map((n) => n.textContent?.trim());
   const rows = () => Array.from(el().querySelectorAll('tbody tr'));
   const cells = (row: Element) =>
     Array.from(row.querySelectorAll('td')).map((td) => td.textContent?.replace(/\s+/g, ' ').trim());
@@ -340,5 +344,50 @@ describe('AdministrationPage', () => {
 
       expect(row(1).querySelector('[role="alert"]')).toBeNull();
     });
+  });
+});
+
+describe('AdministrationPage layout', () => {
+  let httpMock: HttpTestingController;
+
+  function setUp(session: Session = ADMIN): ComponentFixture<AdministrationPage> {
+    TestBed.configureTestingModule({
+      imports: [AdministrationPage],
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: SUPABASE_CLIENT, useValue: null },
+        { provide: SESSION_STORAGE, useValue: null }
+      ]
+    });
+
+    httpMock = TestBed.inject(HttpTestingController);
+    TestBed.inject(SessionStore).signIn(session);
+    const fixture = TestBed.createComponent(AdministrationPage);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  afterEach(() => TestBed.resetTestingModule());
+
+  it('shows the Invitations card and the invite form to an Administrator', () => {
+    const fixture = setUp();
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(el.querySelector('app-invitations-card')).not.toBeNull();
+    expect(el.querySelector('app-invite-form')).not.toBeNull();
+    httpMock.expectOne(ADMIN_USERS_URL).flush({ data: [] });
+    httpMock.expectOne(ADMIN_INVITATIONS_URL).flush({ data: [], expiresInHours: 24 });
+    httpMock.verify();
+  });
+
+  it('shows a Member neither, and asks for no invitations', () => {
+    const fixture = setUp({ ...ADMIN, role: 'Member' });
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(el.querySelector('app-invitations-card')).toBeNull();
+    expect(el.querySelector('app-invite-form')).toBeNull();
+    httpMock.verify();
   });
 });

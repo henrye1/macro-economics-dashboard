@@ -1,0 +1,59 @@
+<section class="card invite">
+  <div class="card-head">
+    <h2>Invite someone</h2>
+    <span class="meta">To your organisation</span>
+  </div>
+
+  @if (confirmation(); as message) {
+    <p class="confirm" role="status">{{ message }}</p>
+  }
+
+  <form class="invite-body" novalidate (submit)="send($event)">
+    <div>
+      <label class="field-label" for="invite-email">Email address</label>
+      <input
+        #emailInput
+        id="invite-email"
+        class="input"
+        type="email"
+        autocomplete="off"
+        [value]="email()"
+        [disabled]="sending()"
+        [attr.aria-invalid]="fieldError() ? 'true' : null"
+        [attr.aria-describedby]="fieldError() ? 'invite-email-error' : null"
+        (input)="setEmail($any($event.target).value)"
+      />
+      @if (fieldError(); as error) {
+        <div id="invite-email-error" class="error">{{ error }}</div>
+      }
+    </div>
+
+    <fieldset class="roles" [disabled]="sending()">
+      <legend class="field-label">Role</legend>
+      <div class="segmented">
+        @for (option of roles; track option) {
+          <label class="seg" [class.on]="role() === option">
+            <input
+              type="radio"
+              name="invite-role"
+              [value]="option"
+              [checked]="role() === option"
+              (change)="setRole(option)"
+            />
+            {{ option }}
+          </label>
+        }
+      </div>
+    </fieldset>
+
+    <button type="submit" class="btn primary" [disabled]="sending()">
+      {{ sending() ? 'Sending…' : 'Send invitation' }}
+    </button>
+
+    @if (refusal(); as message) {
+      <p class="refusal" role="alert">{{ message }}</p>
+    }
+
+    <p class="hint">{{ hint() }}</p>
+  </form>
+</section>

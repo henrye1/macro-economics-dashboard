@@ -24,8 +24,32 @@ export interface AdminUser {
  * every user in the project, so the organisation filter here is the tenant
  * boundary. Routes pass `req.auth.organisation` and nothing else.
  */
+/**
+ * A pending invitation: the invited user who has not yet accepted. There is no
+ * invitations table; `app_metadata` and `invited_at` hold all of this.
+ */
+export interface Invitation {
+  readonly id: string;
+  readonly email: string;
+  readonly role: Role;
+  /** The inviter's name when they are in the same organisation, else ''. */
+  readonly invitedBy: string;
+  readonly sentAt: string;
+  readonly expiresAt: string;
+  readonly status: 'pending' | 'expired';
+}
+
 export interface UserDirectory {
+  /** Everyone in the organisation except pending invitees. */
   listOrganisation(organisation: string): Promise<AdminUser[]>;
+  /** The organisation's pending invitations, newest first. */
+  listInvitations(organisation: string): Promise<Invitation[]>;
+  /** Supabase sends the email. Refuses an email that already has an account. */
+  invite(organisation: string, callerId: string, email: string, role: Role): Promise<Invitation>;
+  /** Deletes the pending invitee, which kills the link. */
+  revoke(organisation: string, callerId: string, id: string): Promise<void>;
+  /** Deletes and re-invites, so the answer carries a new id. */
+  resend(organisation: string, callerId: string, id: string): Promise<Invitation>;
   /**
    * Sets `targetId`'s role, after checking every rule against the directory
    * as it stands now, not against anyone's token. Throws `RoleChangeError`
@@ -34,9 +58,15 @@ export interface UserDirectory {
   setRole(organisation: string, callerId: string, targetId: string, role: Role): Promise<AdminUser>;
 }
 
-export type RoleChangeRefusal = 'caller-not-admin' | 'not-found' | 'self' | 'last-admin';
+export type RoleChangeRefusal =
+  | 'caller-not-admin'
+  | 'not-found'
+  | 'self'
+  | 'last-admin'
+  | 'already-registered'
+  | 'rate-limited';
 
-/** A role change the rules refuse. The route maps `reason` to a fixed message. */
+/** A change the rules refuse. The route maps `reason` to a fixed message. */
 export class RoleChangeError extends Error {
   constructor(readonly reason: RoleChangeRefusal) {
     super(`Role change refused: ${reason}`);
@@ -54,6 +84,20 @@ export interface AdminUsersClient {
     id: string,
     attributes: { app_metadata: Record<string, unknown> }
   ): Promise<{ data: { user: User | null }; error: unknown }>;
+  inviteUserByEmail(
+    email: string,
+    options: { redirectTo: string }
+  ): Promise<{ data: { user: User | null }; error: unknown }>;
+  deleteUser(id: string): Promise<{ error: unknown }>;
+}
+
+export interface DirectoryOptions {
+  /** The console origin, no trailing slash. Invite links return to `/accept-invite` on it. */
+  readonly consoleUrl?: string;
+  /** The project's invite link lifetime. Display only; Supabase enforces it. */
+  readonly inviteLinkTtlHours?: number;
+  /** A seam for tests. */
+  readonly now?: () => Date;
 }
 
 const PER_PAGE = 1000;
@@ -79,6 +123,62 @@ export function inOrganisation(user: User, organisation: string): boolean {
   }
 
   return readString(user.app_metadata, 'organisation') === organisation;
+}
+
+/**
+ * Invited and never accepted: no confirmed email and no sign-in. Accepting an
+ * invite confirms the email, so a confirmed user is never pending.
+ */
+export function isPendingInvitee(user: User): boolean {
+  return (
+    typeof user.invited_at === 'string' &&
+    user.invited_at !== '' &&
+    !user.email_confirmed_at &&
+    !user.last_sign_in_at
+  );
+}
+
+export function toInvitation(
+  user: User,
+  invitedByName: string,
+  ttlHours: number,
+  now: Date,
+): Invitation {
+  const sent = new Date(user.invited_at ?? user.created_at);
+  const expires = new Date(sent.getTime() + ttlHours * 3_600_000);
+
+  return {
+    id: user.id,
+    email: user.email ?? '',
+    role: resolveRole({
+      userId: user.id,
+      email: user.email ?? '',
+      role: readString(user.app_metadata, 'role'),
+      organisation: readString(user.app_metadata, 'organisation'),
+    }),
+    invitedBy: invitedByName,
+    sentAt: sent.toISOString(),
+    expiresAt: expires.toISOString(),
+    status: now.getTime() < expires.getTime() ? 'pending' : 'expired',
+  };
+}
+
+/** A Supabase error that says the project's email rate limit was hit. */
+function isRateLimited(error: unknown): boolean {
+  return (error as { status?: unknown } | null)?.status === 429;
+}
+
+function check(error: unknown): void {
+  if (error === null || error === undefined) {
+    return;
+  }
+
+  if (isRateLimited(error)) {
+    throw new RoleChangeError('rate-limited');
+  }
+
+  // Logged by the route, never returned.
+  throw error;
 }
 
 export function toAdminUser(user: User): AdminUser {
@@ -127,7 +227,14 @@ async function everyUser(client: AdminUsersClient): Promise<User[]> {
   }
 }
 
-export function createDirectory(client: AdminUsersClient): UserDirectory {
+export function createDirectory(
+  client: AdminUsersClient,
+  options: DirectoryOptions = {},
+): UserDirectory {
+  const consoleUrl = options.consoleUrl ?? 'http://localhost:4200';
+  const ttlHours = options.inviteLinkTtlHours ?? 24;
+  const now = options.now ?? (() => new Date());
+
   /**
    * The tail of each organisation's queue of role changes. One at a time per
    * organisation in this process, so two Administrators demoting each other
@@ -149,6 +256,72 @@ export function createDirectory(client: AdminUsersClient): UserDirectory {
     });
 
     return next;
+  }
+
+  /** The organisation's users, refusing unless the caller is a live Administrator there. */
+  async function asAdministrator(organisation: string, callerId: string) {
+    const everyone = await everyUser(client);
+    const members = everyone.filter((user) => inOrganisation(user, organisation));
+    const caller = members.find((user) => user.id === callerId);
+
+    if (caller === undefined || toAdminUser(caller).role !== 'Administrator') {
+      throw new RoleChangeError('caller-not-admin');
+    }
+
+    return { everyone, members };
+  }
+
+  function invitationOf(user: User, members: readonly User[]): Invitation {
+    const inviterId = readString(user.app_metadata, 'invited_by');
+    const inviter = members.find((member) => member.id === inviterId);
+
+    return toInvitation(user, inviter === undefined ? '' : toAdminUser(inviter).fullName, ttlHours, now());
+  }
+
+  /** The pending invitee `id` in `members`, or a not-found refusal. */
+  function pendingIn(members: readonly User[], id: string): User {
+    const target = members.find((user) => user.id === id);
+
+    if (target === undefined || !isPendingInvitee(target)) {
+      throw new RoleChangeError('not-found');
+    }
+
+    return target;
+  }
+
+  /**
+   * Sends the invite, then stamps role, organisation and inviter. If stamping
+   * fails the new user is deleted, so an invitee never lingers without an
+   * organisation.
+   */
+  async function sendInvite(
+    organisation: string,
+    callerId: string,
+    email: string,
+    role: Role,
+    members: User[],
+  ): Promise<Invitation> {
+    const invited = await client.inviteUserByEmail(email, {
+      redirectTo: `${consoleUrl}/accept-invite`,
+    });
+    check(invited.error);
+
+    const user = invited.data.user;
+    if (user === null) {
+      throw new Error('Supabase returned no invited user.');
+    }
+
+    const stamped = await client.updateUserById(user.id, {
+      app_metadata: { ...(user.app_metadata ?? {}), role, organisation, invited_by: callerId },
+    });
+
+    if ((stamped.error !== null && stamped.error !== undefined) || stamped.data.user === null) {
+      await client.deleteUser(user.id);
+      check(stamped.error);
+      throw new Error('Supabase returned no user after stamping the invitation.');
+    }
+
+    return invitationOf(stamped.data.user, members);
   }
 
   async function changeRole(
@@ -218,9 +391,63 @@ export function createDirectory(client: AdminUsersClient): UserDirectory {
       const users = await everyUser(client);
 
       return users
-        .filter((user) => inOrganisation(user, organisation))
+        .filter((user) => inOrganisation(user, organisation) && !isPendingInvitee(user))
         .map(toAdminUser)
         .sort(byName);
+    },
+
+    async listInvitations(organisation) {
+      const members = (await everyUser(client)).filter((user) => inOrganisation(user, organisation));
+
+      return members
+        .filter(isPendingInvitee)
+        .map((user) => invitationOf(user, members))
+        .sort((a, b) => b.sentAt.localeCompare(a.sentAt) || a.email.localeCompare(b.email));
+    },
+
+    invite(organisation, callerId, email, role) {
+      return serialized(organisation, async () => {
+        const { everyone, members } = await asAdministrator(organisation, callerId);
+        const wanted = email.toLowerCase();
+
+        // Unique across the whole project, not just this organisation.
+        if (everyone.some((user) => (user.email ?? '').toLowerCase() === wanted)) {
+          throw new RoleChangeError('already-registered');
+        }
+
+        return sendInvite(organisation, callerId, email, role, members);
+      });
+    },
+
+    revoke(organisation, callerId, id) {
+      return serialized(organisation, async () => {
+        const { members } = await asAdministrator(organisation, callerId);
+        const target = pendingIn(members, id);
+
+        const { error } = await client.deleteUser(target.id);
+        check(error);
+      });
+    },
+
+    resend(organisation, callerId, id) {
+      return serialized(organisation, async () => {
+        const { members } = await asAdministrator(organisation, callerId);
+        const target = pendingIn(members, id);
+        const role = toAdminUser(target).role;
+
+        // Delete first: the old link dies with the old user. If the re-invite
+        // then fails, the administrator can simply invite again.
+        const deleted = await client.deleteUser(target.id);
+        check(deleted.error);
+
+        return sendInvite(
+          organisation,
+          callerId,
+          target.email ?? '',
+          role,
+          members.filter((user) => user.id !== target.id),
+        );
+      });
     },
 
     setRole(organisation, callerId, targetId, role) {
@@ -229,10 +456,14 @@ export function createDirectory(client: AdminUsersClient): UserDirectory {
   };
 }
 
-export function createSupabaseDirectory(url: string, serviceKey: string): UserDirectory {
+export function createSupabaseDirectory(
+  url: string,
+  serviceKey: string,
+  options: DirectoryOptions = {},
+): UserDirectory {
   const client = createClient(url, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  return createDirectory(client.auth.admin);
+  return createDirectory(client.auth.admin, options);
 }

@@ -64,7 +64,7 @@ ETag and vintage-pinning habits actually get taught.
 19. **Auth screens** (built) - sign in, reset password, and accept invitation with its expired state, against a typed auth provider seam backed by fixtures, plus the guard that sends a visitor with no session to sign-in.
 20. **Administration** - split into three, built in order:
     - 20a. **Admin page and user list** (built) - a topbar user menu, an admin-only `/administration` page, and the users in the administrator's own organisation; a Member sees a not-permitted card.
-    - 20b. **Role assignment** - Member or Administrator; never your own role, never leaving an organisation without an Administrator.
+    - 20b. **Role assignment** (built) - Member or Administrator; never your own role, never leaving an organisation without an Administrator.
     - 20c. **Invitations** - issue, revoke and resend through Supabase's invite email, valid for 7 days, and a real accept-invitation screen.
 
 **Out of scope for MVP:** logins, roles, user accounts, merchandised browsing of

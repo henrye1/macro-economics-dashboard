@@ -68,6 +68,9 @@
   - [x] 20b. **Role assignment** - change a user's role between Member and
     Administrator, never your own, and never leaving the organisation without an
     Administrator
-  - [ ] 20c. **Invitations** - issue, revoke and resend invitations through
-    Supabase's invite email with a 7-day lifetime, and make the accept-invitation
-    screen real
+  - [x] 20c. **Invitations** - issue, revoke and resend invitations through
+    Supabase's invite email, valid for the project's email-link lifetime, with
+    the Invitations card and invite form on the Administration page
+  - [ ] 20d. **Accept invitation** - the accept-invitation screen reads the real
+    invitation from Supabase's link, including its expired state, and accepting
+    sets the name and password

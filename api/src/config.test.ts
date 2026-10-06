@@ -4,6 +4,8 @@ import {
   isAuthConfigured,
   isMacroConfigured,
   isSavedQueriesConfigured,
+  parseConsoleUrl,
+  parseInviteLinkTtlHours,
   type MacroSettings,
 } from './config.js';
 
@@ -71,5 +73,28 @@ describe('isSavedQueriesConfigured', () => {
 
   it('treats whitespace as blank', () => {
     expect(isSavedQueriesConfigured({ ...both, supabaseServiceKey: '   ' })).toBe(false);
+  });
+});
+
+describe('parseConsoleUrl', () => {
+  it('trims trailing slashes and whitespace', () => {
+    expect(parseConsoleUrl(' https://console.example/ ')).toBe('https://console.example');
+    expect(parseConsoleUrl('https://console.example//')).toBe('https://console.example');
+  });
+
+  it('defaults to the local console', () => {
+    expect(parseConsoleUrl(undefined)).toBe('http://localhost:4200');
+    expect(parseConsoleUrl('  ')).toBe('http://localhost:4200');
+  });
+});
+
+describe('parseInviteLinkTtlHours', () => {
+  it('reads a positive number of hours', () => {
+    expect(parseInviteLinkTtlHours('1')).toBe(1);
+    expect(parseInviteLinkTtlHours('0.5')).toBe(0.5);
+  });
+
+  it.each([undefined, '', '0', '-3', 'a day'])('falls back to 24 for %j', (value) => {
+    expect(parseInviteLinkTtlHours(value)).toBe(24);
   });
 });

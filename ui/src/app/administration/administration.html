@@ -19,6 +19,8 @@
     <a routerLink="/overview" class="back">Back to the console</a>
   </div>
 
+  <div class="admin-layout">
+  <div class="admin-main">
   <section class="card users">
     @if (confirmation(); as message) {
       <p class="confirm" role="status">{{ message }}</p>
@@ -130,4 +132,16 @@
       }
     }
   </section>
+
+  @if (kind() !== 'no-organisation') {
+    <app-invitations-card />
+  }
+  </div>
+
+  @if (kind() !== 'no-organisation') {
+    <div class="admin-side">
+      <app-invite-form />
+    </div>
+  }
+  </div>
 }

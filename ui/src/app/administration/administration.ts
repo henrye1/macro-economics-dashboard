@@ -6,6 +6,9 @@ import { EMPTY, catchError, map, of, startWith } from 'rxjs';
 
 import { AdminDirectory, type AdminUser } from '../core/admin-directory';
 import { SessionStore } from '../core/session.store';
+import { InvitationsCard } from './invitations-card';
+import { InvitationsStore } from './invitations.store';
+import { InviteForm } from './invite-form';
 
 /** The API's fixed message for an Administrator with no organisation. */
 const NO_ORGANISATION = 'This account has no organisation to administer.';
@@ -41,7 +44,10 @@ type UsersState =
  */
 @Component({
   selector: 'app-administration',
-  imports: [RouterLink],
+  imports: [RouterLink, InvitationsCard, InviteForm],
+  // One store per page, shared by the card that lists invitations and the
+  // form that adds to them.
+  providers: [InvitationsStore],
   templateUrl: './administration.html',
   styleUrl: './administration.scss'
 })

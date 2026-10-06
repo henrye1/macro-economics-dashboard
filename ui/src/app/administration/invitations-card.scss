@@ -1,0 +1,61 @@
+:host {
+  display: block;
+}
+
+.card-head .meta {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.invitations tbody td {
+  white-space: nowrap;
+}
+
+.stamp {
+  font-family: var(--font-mono);
+}
+
+/* The two invitation states, from the theme's published and draft pairs. */
+.badge.pending {
+  background: var(--badge-latest-bg);
+  color: var(--badge-latest-ink);
+}
+
+.badge.expired {
+  background: var(--badge-superseded-bg);
+  color: var(--badge-superseded-ink);
+}
+
+.actions {
+  text-align: right;
+}
+
+.row-actions {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: flex-end;
+}
+
+.ask {
+  display: block;
+  margin-bottom: var(--space-2);
+  font-size: var(--text-sm);
+  white-space: normal;
+}
+
+.row-error {
+  margin: var(--space-2) 0 0;
+  color: var(--invalid);
+  font-size: var(--text-sm);
+  white-space: normal;
+}
+
+.confirm {
+  margin: 0;
+  padding: var(--space-3) var(--cell-x);
+  background: var(--badge-actual-bg);
+  color: var(--badge-actual-ink);
+  font-size: var(--text-sm);
+  border-bottom: 1px solid var(--border);
+}

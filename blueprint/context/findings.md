@@ -900,7 +900,7 @@ the fixed `NO_SESSION` message, plus that the repository was never called.
 **Found:** 2026-10-06 by /audit independent (scope: current; lens: performance)
 **Why it matters:** `listOrganisation` pages through every user in the Supabase project (all tenants), then filters, on each `GET /api/admin/users`, with no cache and no request timeout. Cost grows with the whole project, not the caller's organisation. The loop ends when a page returns fewer than 1000 users; if the auth server capped `per_page` below 1000, the first page would come back "short" and the list would be silently truncated (no cross-tenant leak, since filtering still applies). Unverified: the GoTrue cap was not checked against the live service and project size is unknown. The spec accepts listing everyone with no paging.
 **Suggested fix:** confirm the server-side `per_page` cap; if it is lower, stop on an empty page (or use the response's `nextPage`/`total`) instead of `length < PER_PAGE`. Revisit caching or a per-organisation store if the project grows.
-**Resolution:** Still unverified at 4e203f2 (independent review, 2026-10-06). `setRole` now reuses the same `everyUser` scan inside its per-organisation lock (`api/src/admin/user-directory.ts:160`), so each role change also reads the whole project. A truncated page would fail safe there: a missing caller answers `caller-not-admin` and a missing target `not-found`; no write happens. Cap still not checked against the live service.
+**Resolution:** Still unverified at 4e203f2 (independent review, 2026-10-06). `setRole` now reuses the same `everyUser` scan inside its per-organisation lock (`api/src/admin/user-directory.ts:160`), so each role change also reads the whole project. A truncated page would fail safe there: a missing caller answers `caller-not-admin` and a missing target `not-found`; no write happens. Cap still not checked against the live service. Still unverified at 064e755 (independent review, 2026-10-06): `listInvitations`, `invite`, `revoke` and `resend` each run the same whole-project `everyUser` scan, so every invitation action now reads all tenants too. A truncated page would still fail safe for revoke and resend (`not-found`), but could let `invite` miss an existing email and fall through to Supabase's own duplicate error, answered as a `502`.
 
 ### F-104 [P3] open - Other rows stay clickable while a role save is in flight, and the reply then closes or overwrites the row opened meanwhile
 
@@ -916,4 +916,52 @@ the fixed `NO_SESSION` message, plus that the repository was never called.
 **Found:** 2026-10-06 by /audit independent (scope: current; lens: tests)
 **Why it matters:** Spec step 2 asks the route tests to cover "the no-op". The fake directory always returns the target with the requested role, so no test shows the route answering `200 { data }` with the user unchanged. The behaviour itself is proved in `user-directory.test.ts` ("writes nothing when the role already matches") and the route passes the directory's result through unaltered, so the risk is low; it is a spec-checklist gap.
 **Suggested fix:** add a route case where the fake returns the unchanged user and assert `200` and the unchanged body, or amend the spec to place the no-op only at the directory level.
+**Resolution:**
+
+### F-106 [P2] open - The invite rollback ignores whether the delete worked, so a failed rollback leaves an org-less invitee nobody can see or remove
+
+**File:** api/src/admin/user-directory.ts:319
+**Found:** 2026-10-06 by /audit independent (scope: current; lens: quality, security)
+**Why it matters:** When stamping fails, `sendInvite` calls `await client.deleteUser(user.id)` and discards the result. If that delete also fails, the invited user stays in the project with no `organisation`, and the email has already been sent. That user is in no organisation's list, so no administrator can revoke it; its email now answers `already-registered` everywhere, so it can never be invited again; and nothing logs that a rollback failed (only the stamp error reaches the route's single log line). If `deleteUser` rejects instead of returning `{ error }`, its error also replaces the stamp error. The spec says the rollback "never leaves an invitee without an organisation". A double failure cannot be fully prevented, but it can be made visible. Not P1: it needs two consecutive Supabase failures, and the stub test covers the single-failure path.
+**Suggested fix:** check the delete's `error` (and catch a rejection); when it fails, `console.error` a distinct line naming the orphaned user id for an operator, then rethrow the original stamp error. Add a stub case with `{ stamp: true, delete: true }` (the stub already supports `delete`).
+**Resolution:**
+
+### F-107 [P2] open - The queue test passes without the queue, so the shared per-organisation serialisation is unproved
+
+**File:** api/src/admin/user-directory.test.ts:604
+**Found:** 2026-10-06 by /audit independent (scope: current; lens: tests)
+**Why it matters:** "serialises an invite against a revoke in the same organisation" expects `delete:pending`, `invite:...`, `update:new-1`. That order also occurs with no serialisation at all: both calls make the same number of awaits before their first write, so the revoke always writes first. Reproduced by running the same two calls against two different organisations (separate queues, so no serialisation): the call log was identical, `["delete:p","invite:k@x.co","update:new-1"]`. Removing `serialized(...)` from `invite` and `revoke` would keep the suite green. The spec lists "the queue serialising an invite against a revoke" as required coverage, and the queue is what makes the shared directory in `routes/index.ts:17` matter.
+**Suggested fix:** hold the first operation's write on a deferred promise in the stub (for example, block `deleteUser` until released) and assert the second operation's `listUsers` or `inviteUserByEmail` is not called until it is released. Optionally add a route-level test that `/admin/users` and `/admin/invitations` receive the same directory instance.
+**Resolution:**
+
+### F-108 [P2] open - The invite form's email error is silent to screen readers when submitted with Enter from the field
+
+**File:** ui/src/app/administration/invite-form.ts:72
+**Found:** 2026-10-06 by /audit independent (scope: current; lens: quality)
+**Why it matters:** On an invalid address, `send()` sets `fieldError` and calls `focus()` in the same tick, before change detection renders `aria-invalid`, `aria-describedby` and the error element, so focus lands on an input that does not yet carry its description. The usual submit path is pressing Enter in the field; the input already has focus, so `focus()` does nothing and nothing is re-announced. The error `div` has no live role. A screen-reader user pressing Enter on `name@company` hears nothing and the invitation is not sent. The spec test checks `document.activeElement` and the attributes after `detectChanges`, so it passes. The prototype's invalid-email drawing is the state this misses.
+**Suggested fix:** give the error element `role="alert"` (or put it in an always-present `aria-live="assertive"` container), or move focus after render (for example with `afterNextRender`), or both. Add a spec that submits while the input is already focused and asserts the alert.
+**Resolution:**
+
+### F-109 [P3] open - The role-change route still reaches pending invitees that the Users list now hides
+
+**File:** api/src/admin/user-directory.ts:344
+**Found:** 2026-10-06 by /audit independent (scope: current; lens: quality)
+**Why it matters:** `listOrganisation` now excludes pending invitees, but `changeRole` finds its target among all organisation members, invitees included. `PUT /api/admin/users/<invitee id>/role` therefore succeeds on someone the Users card says does not exist, while `DELETE /api/admin/invitations/<confirmed id>` answers `not-found`. It stays inside the caller's organisation and does not weaken the tenant boundary, and changing an invitee's role is arguably harmless, so this is consistency rather than security. The two admin surfaces disagree about who a "user" is.
+**Suggested fix:** in `changeRole`, treat a pending invitee as `not-found` (`members.find((u) => u.id === targetId && !isPendingInvitee(u))`), with a directory test; or record in the spec that invitees' roles are deliberately changeable through the Users route.
+**Resolution:**
+
+### F-110 [P3] open - Focus is dropped by the inline revoke confirm and by the sending state, and confirmations rely on live regions inserted with their text
+
+**File:** ui/src/app/administration/invitations-card.html:71
+**Found:** 2026-10-06 by /audit independent (scope: current; lens: quality)
+**Why it matters:** Clicking `Revoke` replaces the focused button with the confirm row, and `Keep` or the confirmed `Revoke` replaces it again, so keyboard focus falls to `body` each time and the question `Revoke the invitation to ...?` is not announced. In the form, `[disabled]="sending()"` disables the focused submit button, so focus is lost there too and is not restored after the answer. Both confirmation lines (`invitations-card.html:3`, `invite-form.html:8`) are `role="status"` elements created inside `@if` together with their message; several screen readers do not announce a live region that appears already filled. The Users card's role editor in feature 20b restores focus deliberately, so this is drift from the page's own pattern.
+**Suggested fix:** move focus to the confirm row's `Keep` button when asking, and back to the row's `Revoke` (or the status line) afterwards; keep the form's button enabled-but-inert while sending or refocus the input after the answer; render the `role="status"` containers unconditionally and change only their text.
+**Resolution:**
+
+### F-111 [P3] open - Resend has no test refusing an invitee in another organisation, although step 2 lists it
+
+**File:** api/src/admin/user-directory.test.ts:596
+**Found:** 2026-10-06 by /audit independent (scope: current; lens: tests)
+**Why it matters:** Step 2 asks for "revoke and resend refusing confirmed users and other organisations (`not-found`)". Revoke covers confirmed, other-organisation and missing ids; resend covers only a confirmed user. Resend is the more destructive of the two (it deletes, then creates), so the other-organisation case is the one worth pinning. Both share `pendingIn`, so the risk today is low; the test is what keeps a later refactor of resend from skipping it.
+**Suggested fix:** extend the resend not-found case with an invitee in another organisation and a missing id, asserting `calls` stays empty.
 **Resolution:**

@@ -5,9 +5,21 @@ import {
   RoleChangeError,
   createDirectory,
   inOrganisation,
+  isPendingInvitee,
   toAdminUser,
+  toInvitation,
   type AdminUsersClient,
 } from './user-directory.js';
+
+/** For stubs that never invite or delete: calling either is a test failure. */
+const unusedInviteMethods = {
+  async inviteUserByEmail(): Promise<never> {
+    throw new Error('not expected');
+  },
+  async deleteUser(): Promise<never> {
+    throw new Error('not expected');
+  },
+};
 
 function user(overrides: Partial<User> = {}): User {
   return {
@@ -87,6 +99,7 @@ describe('createDirectory', () => {
     const pages: number[] = [];
 
     const stub: AdminUsersClient = {
+      ...unusedInviteMethods,
       async listUsers({ page, perPage }) {
         pages.push(page);
         return { data: { users: all.slice((page - 1) * perPage, page * perPage) }, error: null };
@@ -118,6 +131,7 @@ describe('createDirectory', () => {
 
   it('throws the client error for the route to log', async () => {
     const failing: AdminUsersClient = {
+      ...unusedInviteMethods,
       async listUsers() {
         return { data: { users: [] }, error: new Error('service unavailable') };
       },
@@ -155,6 +169,7 @@ describe('setRole', () => {
     const writes: { id: string; app_metadata: Record<string, unknown> }[] = [];
 
     const stub: AdminUsersClient = {
+      ...unusedInviteMethods,
       async listUsers() {
         await Promise.resolve();
         return { data: { users: [...users.values()] }, error: null };
@@ -286,6 +301,7 @@ describe('setRole', () => {
 
   it('rethrows a client failure on write', async () => {
     const failing: AdminUsersClient = {
+      ...unusedInviteMethods,
       async listUsers() {
         return { data: { users: [person(CALLER, 'Administrator'), person('pieter', 'Member')] }, error: null };
       },
@@ -297,5 +313,307 @@ describe('setRole', () => {
     await expect(
       createDirectory(failing).setRole(ORG, CALLER, 'pieter', 'Administrator'),
     ).rejects.toThrow('rate limited');
+  });
+});
+
+describe('invitations', () => {
+  const ORG = 'Treasury Risk';
+  const ADMIN = 'aaaaaaaa-0000-4000-8000-000000000001';
+  const NOW = new Date('2026-10-06T12:00:00.000Z');
+
+  function member(id: string, overrides: Partial<User> = {}): User {
+    return user({
+      id,
+      email: `${id}@treasuryrisk.co.za`,
+      user_metadata: { full_name: id === ADMIN ? 'Thandi Mokoena' : id },
+      app_metadata: { provider: 'email', organisation: ORG, role: 'Member' },
+      email_confirmed_at: '2026-01-01T00:00:00Z',
+      last_sign_in_at: '2026-10-01T00:00:00Z',
+      ...overrides,
+    });
+  }
+
+  function invitee(id: string, invitedAt: string, overrides: Partial<User> = {}): User {
+    return user({
+      id,
+      email: `${id}@treasuryrisk.co.za`,
+      user_metadata: {},
+      app_metadata: { provider: 'email', organisation: ORG, role: 'Member', invited_by: ADMIN },
+      invited_at: invitedAt,
+      email_confirmed_at: undefined,
+      last_sign_in_at: undefined,
+      ...overrides,
+    });
+  }
+
+  const admin = () => member(ADMIN, { app_metadata: { provider: 'email', organisation: ORG, role: 'Administrator' } });
+
+  /**
+   * A stateful project. `inviteUserByEmail` creates an unconfirmed user with
+   * only provider metadata, as Supabase does; failures can be queued.
+   */
+  function project(people: User[], fail: { stamp?: boolean; invite?: unknown; delete?: boolean } = {}) {
+    const users = new Map(people.map((entry) => [entry.id, entry]));
+    const calls: string[] = [];
+    let seq = 0;
+
+    const stub: AdminUsersClient = {
+      async listUsers() {
+        await Promise.resolve();
+        return { data: { users: [...users.values()] }, error: null };
+      },
+      async updateUserById(id, { app_metadata }) {
+        calls.push(`update:${id}`);
+        if (fail.stamp) {
+          return { data: { user: null }, error: new Error('stamp failed') };
+        }
+        const updated = { ...users.get(id)!, app_metadata } as User;
+        users.set(id, updated);
+        return { data: { user: updated }, error: null };
+      },
+      async inviteUserByEmail(email, { redirectTo }) {
+        calls.push(`invite:${email}:${redirectTo}`);
+        if (fail.invite !== undefined) {
+          return { data: { user: null }, error: fail.invite };
+        }
+        seq += 1;
+        const created = user({
+          id: `new-${seq}`,
+          email,
+          user_metadata: {},
+          app_metadata: { provider: 'email' },
+          invited_at: NOW.toISOString(),
+          email_confirmed_at: undefined,
+          last_sign_in_at: undefined,
+        });
+        users.set(created.id, created);
+        return { data: { user: created }, error: null };
+      },
+      async deleteUser(id) {
+        calls.push(`delete:${id}`);
+        if (fail.delete) {
+          return { error: new Error('delete failed') };
+        }
+        users.delete(id);
+        return { error: null };
+      },
+    };
+
+    const directory = createDirectory(stub, {
+      consoleUrl: 'https://console.example',
+      inviteLinkTtlHours: 24,
+      now: () => NOW,
+    });
+
+    return { directory, users, calls };
+  }
+
+  async function refusal(promise: Promise<unknown>): Promise<string | undefined> {
+    try {
+      await promise;
+      return undefined;
+    } catch (error) {
+      expect(error).toBeInstanceOf(RoleChangeError);
+      return (error as RoleChangeError).reason;
+    }
+  }
+
+  describe('isPendingInvitee', () => {
+    it('is an invited user who has neither confirmed nor signed in', () => {
+      expect(isPendingInvitee(invitee('x', '2026-10-06T00:00:00Z'))).toBe(true);
+    });
+
+    it('is not a confirmed or signed-in user, nor one never invited', () => {
+      expect(isPendingInvitee(invitee('x', '2026-10-06T00:00:00Z', { email_confirmed_at: '2026-10-06T01:00:00Z' }))).toBe(false);
+      expect(isPendingInvitee(invitee('x', '2026-10-06T00:00:00Z', { last_sign_in_at: '2026-10-06T01:00:00Z' }))).toBe(false);
+      expect(isPendingInvitee(member('y'))).toBe(false);
+    });
+  });
+
+  describe('toInvitation', () => {
+    it('maps to exactly the documented fields, expiring after the TTL', () => {
+      expect(toInvitation(invitee('x', '2026-10-06T00:00:00Z'), 'Thandi Mokoena', 24, NOW)).toEqual({
+        id: 'x',
+        email: 'x@treasuryrisk.co.za',
+        role: 'Member',
+        invitedBy: 'Thandi Mokoena',
+        sentAt: '2026-10-06T00:00:00.000Z',
+        expiresAt: '2026-10-07T00:00:00.000Z',
+        status: 'pending',
+      });
+    });
+
+    it('is expired at exactly the expiry instant and after', () => {
+      const sent = '2026-10-05T12:00:00.000Z';
+      expect(toInvitation(invitee('x', sent), '', 24, NOW).status).toBe('expired');
+      expect(toInvitation(invitee('x', sent), '', 24, new Date(NOW.getTime() - 1)).status).toBe('pending');
+    });
+  });
+
+  describe('listing', () => {
+    it('keeps pending invitees out of the Users list', async () => {
+      const { directory } = project([admin(), invitee('pending', '2026-10-06T00:00:00Z')]);
+
+      expect((await directory.listOrganisation(ORG)).map((u) => u.id)).toEqual([ADMIN]);
+    });
+
+    it('lists the organisation’s invitations newest first, naming the inviter', async () => {
+      const { directory } = project([
+        admin(),
+        invitee('older', '2026-10-05T00:00:00Z'),
+        invitee('newer', '2026-10-06T06:00:00Z'),
+        invitee('elsewhere', '2026-10-06T07:00:00Z', {
+          app_metadata: { organisation: 'Elsewhere', role: 'Member', invited_by: ADMIN },
+        }),
+      ]);
+
+      const listed = await directory.listInvitations(ORG);
+
+      expect(listed.map((i) => [i.id, i.status, i.invitedBy])).toEqual([
+        ['newer', 'pending', 'Thandi Mokoena'],
+        ['older', 'expired', 'Thandi Mokoena'],
+      ]);
+    });
+
+    it('names no inviter who is outside the organisation', async () => {
+      const { directory } = project([
+        admin(),
+        member('stranger', { app_metadata: { organisation: 'Elsewhere', role: 'Administrator' } }),
+        invitee('x', '2026-10-06T06:00:00Z', {
+          app_metadata: { organisation: ORG, role: 'Member', invited_by: 'stranger' },
+        }),
+      ]);
+
+      expect((await directory.listInvitations(ORG))[0]?.invitedBy).toBe('');
+    });
+  });
+
+  describe('invite', () => {
+    it('sends Supabase’s invite back to the console, then stamps role, organisation and inviter', async () => {
+      const { directory, users, calls } = project([admin()]);
+
+      const invitation = await directory.invite(ORG, ADMIN, 'kagiso@treasuryrisk.co.za', 'Administrator');
+
+      expect(calls[0]).toBe('invite:kagiso@treasuryrisk.co.za:https://console.example/accept-invite');
+      expect(users.get(invitation.id)?.app_metadata).toEqual({
+        provider: 'email',
+        role: 'Administrator',
+        organisation: ORG,
+        invited_by: ADMIN,
+      });
+      expect(invitation).toMatchObject({ role: 'Administrator', invitedBy: 'Thandi Mokoena', status: 'pending' });
+    });
+
+    it('refuses an email that already has an account anywhere, in any case', async () => {
+      const { directory, calls } = project([
+        admin(),
+        member('someone', { email: 'Taken@Elsewhere.co.za', app_metadata: { organisation: 'Elsewhere' } }),
+      ]);
+
+      expect(await refusal(directory.invite(ORG, ADMIN, 'taken@elsewhere.co.za', 'Member'))).toBe(
+        'already-registered',
+      );
+      expect(calls).toEqual([]);
+    });
+
+    it('refuses a caller the directory no longer calls an Administrator', async () => {
+      const { directory, calls } = project([member(ADMIN)]);
+
+      expect(await refusal(directory.invite(ORG, ADMIN, 'k@treasuryrisk.co.za', 'Member'))).toBe('caller-not-admin');
+      expect(calls).toEqual([]);
+    });
+
+    it('deletes the new user when stamping fails, so no invitee lingers without an organisation', async () => {
+      const { directory, users, calls } = project([admin()], { stamp: true });
+
+      await expect(directory.invite(ORG, ADMIN, 'k@treasuryrisk.co.za', 'Member')).rejects.toThrow('stamp failed');
+
+      expect(calls.at(-1)).toBe('delete:new-1');
+      expect([...users.keys()]).toEqual([ADMIN]);
+    });
+
+    it('turns Supabase’s rate limit into a refusal', async () => {
+      const { directory } = project([admin()], { invite: { status: 429, message: 'email rate limit exceeded' } });
+
+      expect(await refusal(directory.invite(ORG, ADMIN, 'k@treasuryrisk.co.za', 'Member'))).toBe('rate-limited');
+    });
+
+    it('rethrows any other client error', async () => {
+      const { directory } = project([admin()], { invite: new Error('GoTrue down') });
+
+      await expect(directory.invite(ORG, ADMIN, 'k@treasuryrisk.co.za', 'Member')).rejects.toThrow('GoTrue down');
+    });
+  });
+
+  describe('revoke', () => {
+    it('deletes a pending invitee in the organisation', async () => {
+      const { directory, users } = project([admin(), invitee('pending', '2026-10-06T00:00:00Z')]);
+
+      await directory.revoke(ORG, ADMIN, 'pending');
+
+      expect(users.has('pending')).toBe(false);
+    });
+
+    it('answers not-found for a confirmed user, another organisation, or nobody, deleting nothing', async () => {
+      const { directory, calls } = project([
+        admin(),
+        member('confirmed'),
+        invitee('elsewhere', '2026-10-06T00:00:00Z', { app_metadata: { organisation: 'Elsewhere', role: 'Member' } }),
+      ]);
+
+      for (const id of ['confirmed', 'elsewhere', 'nobody']) {
+        expect(await refusal(directory.revoke(ORG, ADMIN, id))).toBe('not-found');
+      }
+      expect(calls).toEqual([]);
+    });
+
+    it('refuses a caller who is no longer an Administrator', async () => {
+      const { directory } = project([member(ADMIN), invitee('pending', '2026-10-06T00:00:00Z')]);
+
+      expect(await refusal(directory.revoke(ORG, ADMIN, 'pending'))).toBe('caller-not-admin');
+    });
+  });
+
+  describe('resend', () => {
+    it('replaces the invitee with a fresh invitation, same email and role, new id', async () => {
+      const { directory, users, calls } = project([
+        admin(),
+        invitee('old', '2026-10-01T00:00:00Z', {
+          app_metadata: { provider: 'email', organisation: ORG, role: 'Administrator', invited_by: ADMIN },
+        }),
+      ]);
+
+      const fresh = await directory.resend(ORG, ADMIN, 'old');
+
+      expect(calls.slice(0, 2)).toEqual([
+        'delete:old',
+        'invite:old@treasuryrisk.co.za:https://console.example/accept-invite',
+      ]);
+      expect(users.has('old')).toBe(false);
+      expect(fresh).toMatchObject({ id: 'new-1', email: 'old@treasuryrisk.co.za', role: 'Administrator', status: 'pending' });
+    });
+
+    it('answers not-found for anything but a pending invitee in the organisation', async () => {
+      const { directory, calls } = project([admin(), member('confirmed')]);
+
+      expect(await refusal(directory.resend(ORG, ADMIN, 'confirmed'))).toBe('not-found');
+      expect(calls).toEqual([]);
+    });
+  });
+
+  it('serialises an invite against a revoke in the same organisation', async () => {
+    const { directory, calls } = project([admin(), invitee('pending', '2026-10-06T00:00:00Z')]);
+
+    await Promise.all([
+      directory.revoke(ORG, ADMIN, 'pending'),
+      directory.invite(ORG, ADMIN, 'k@treasuryrisk.co.za', 'Member'),
+    ]);
+
+    // The revoke finishes before the invite starts, never interleaved.
+    expect(calls).toEqual([
+      'delete:pending',
+      'invite:k@treasuryrisk.co.za:https://console.example/accept-invite',
+      'update:new-1',
+    ]);
   });
 });

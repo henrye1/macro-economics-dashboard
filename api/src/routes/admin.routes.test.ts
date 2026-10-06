@@ -10,6 +10,14 @@ import {
   type UserDirectory,
 } from '../admin/user-directory.js';
 
+/** The invitation half of the directory, unused by these routes. */
+const noInvitations = {
+  listInvitations: () => Promise.reject(new Error('not expected')),
+  invite: () => Promise.reject(new Error('not expected')),
+  revoke: () => Promise.reject(new Error('not expected')),
+  resend: () => Promise.reject(new Error('not expected')),
+};
+
 const ADMIN_ID = 'a11ce000-0000-4000-8000-000000000001';
 
 const people: Record<string, AdminUser[]> = {
@@ -27,6 +35,7 @@ function fakeDirectory(refuse?: RoleChangeRefusal) {
   const asked: string[] = [];
   const changes: { organisation: string; callerId: string; targetId: string; role: string }[] = [];
   const directory: UserDirectory = {
+    ...noInvitations,
     async listOrganisation(organisation) {
       asked.push(organisation);
       return people[organisation] ?? [];
@@ -191,6 +200,7 @@ describe('GET /api/admin/users', () => {
     it('answers 502 when the directory fails, logging the cause and returning none of it', async () => {
       const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
       const failing: UserDirectory = {
+    ...noInvitations,
         listOrganisation: () => Promise.reject(new Error('JWT secret=abc rejected by GoTrue')),
         setRole: () => Promise.reject(new Error('not expected')),
       };
@@ -315,6 +325,7 @@ describe('PUT /api/admin/users/:id/role', () => {
   it('answers 502 when the write fails, logging once and returning nothing of it', async () => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const failing: UserDirectory = {
+    ...noInvitations,
       listOrganisation: () => Promise.resolve([]),
       setRole: () => Promise.reject(new Error('GoTrue 500 service_role key=abc')),
     };
