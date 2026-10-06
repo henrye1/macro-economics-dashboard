@@ -355,6 +355,22 @@ describe('SupabaseAuthProvider', () => {
       expect((await firstValueFrom(bare.provider.invitation(''))).status).toBe('unknown');
     });
 
+    it('shows no invitation to an invitee who has already accepted', async () => {
+      const accepted = invitee();
+      accepted.user_metadata = { full_name: 'Kagiso Molefe' };
+      const { provider } = make({ getSession: withSession(accepted) });
+
+      expect((await firstValueFrom(provider.invitation(''))).status).toBe('unknown');
+    });
+
+    it('still shows the invitation while the invitee has set no name', async () => {
+      const pending = invitee();
+      pending.user_metadata = { full_name: '   ' };
+      const { provider } = make({ getSession: withSession(pending) });
+
+      expect((await firstValueFrom(provider.invitation(''))).status).toBe('valid');
+    });
+
     it('shows no invitation to an ordinary signed-in visitor', async () => {
       const { provider } = make({ getSession: withSession(user()) });
 

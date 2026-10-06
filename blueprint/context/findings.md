@@ -918,30 +918,6 @@ the fixed `NO_SESSION` message, plus that the repository was never called.
 **Suggested fix:** add a route case where the fake returns the unchanged user and assert `200` and the unchanged body, or amend the spec to place the no-op only at the directory level.
 **Resolution:**
 
-### F-106 [P2] open - The invite rollback ignores whether the delete worked, so a failed rollback leaves an org-less invitee nobody can see or remove
-
-**File:** api/src/admin/user-directory.ts:319
-**Found:** 2026-10-06 by /audit independent (scope: current; lens: quality, security)
-**Why it matters:** When stamping fails, `sendInvite` calls `await client.deleteUser(user.id)` and discards the result. If that delete also fails, the invited user stays in the project with no `organisation`, and the email has already been sent. That user is in no organisation's list, so no administrator can revoke it; its email now answers `already-registered` everywhere, so it can never be invited again; and nothing logs that a rollback failed (only the stamp error reaches the route's single log line). If `deleteUser` rejects instead of returning `{ error }`, its error also replaces the stamp error. The spec says the rollback "never leaves an invitee without an organisation". A double failure cannot be fully prevented, but it can be made visible. Not P1: it needs two consecutive Supabase failures, and the stub test covers the single-failure path.
-**Suggested fix:** check the delete's `error` (and catch a rejection); when it fails, `console.error` a distinct line naming the orphaned user id for an operator, then rethrow the original stamp error. Add a stub case with `{ stamp: true, delete: true }` (the stub already supports `delete`).
-**Resolution:**
-
-### F-107 [P2] open - The queue test passes without the queue, so the shared per-organisation serialisation is unproved
-
-**File:** api/src/admin/user-directory.test.ts:604
-**Found:** 2026-10-06 by /audit independent (scope: current; lens: tests)
-**Why it matters:** "serialises an invite against a revoke in the same organisation" expects `delete:pending`, `invite:...`, `update:new-1`. That order also occurs with no serialisation at all: both calls make the same number of awaits before their first write, so the revoke always writes first. Reproduced by running the same two calls against two different organisations (separate queues, so no serialisation): the call log was identical, `["delete:p","invite:k@x.co","update:new-1"]`. Removing `serialized(...)` from `invite` and `revoke` would keep the suite green. The spec lists "the queue serialising an invite against a revoke" as required coverage, and the queue is what makes the shared directory in `routes/index.ts:17` matter.
-**Suggested fix:** hold the first operation's write on a deferred promise in the stub (for example, block `deleteUser` until released) and assert the second operation's `listUsers` or `inviteUserByEmail` is not called until it is released. Optionally add a route-level test that `/admin/users` and `/admin/invitations` receive the same directory instance.
-**Resolution:**
-
-### F-108 [P2] open - The invite form's email error is silent to screen readers when submitted with Enter from the field
-
-**File:** ui/src/app/administration/invite-form.ts:72
-**Found:** 2026-10-06 by /audit independent (scope: current; lens: quality)
-**Why it matters:** On an invalid address, `send()` sets `fieldError` and calls `focus()` in the same tick, before change detection renders `aria-invalid`, `aria-describedby` and the error element, so focus lands on an input that does not yet carry its description. The usual submit path is pressing Enter in the field; the input already has focus, so `focus()` does nothing and nothing is re-announced. The error `div` has no live role. A screen-reader user pressing Enter on `name@company` hears nothing and the invitation is not sent. The spec test checks `document.activeElement` and the attributes after `detectChanges`, so it passes. The prototype's invalid-email drawing is the state this misses.
-**Suggested fix:** give the error element `role="alert"` (or put it in an always-present `aria-live="assertive"` container), or move focus after render (for example with `afterNextRender`), or both. Add a spec that submits while the input is already focused and asserts the alert.
-**Resolution:**
-
 ### F-109 [P3] open - The role-change route still reaches pending invitees that the Users list now hides
 
 **File:** api/src/admin/user-directory.ts:344
@@ -964,14 +940,6 @@ the fixed `NO_SESSION` message, plus that the repository was never called.
 **Found:** 2026-10-06 by /audit independent (scope: current; lens: tests)
 **Why it matters:** Step 2 asks for "revoke and resend refusing confirmed users and other organisations (`not-found`)". Revoke covers confirmed, other-organisation and missing ids; resend covers only a confirmed user. Resend is the more destructive of the two (it deletes, then creates), so the other-organisation case is the one worth pinning. Both share `pendingIn`, so the risk today is low; the test is what keeps a later refactor of resend from skipping it.
 **Suggested fix:** extend the resend not-found case with an invitee in another organisation and a missing id, asserting `calls` stays empty.
-**Resolution:**
-
-### F-112 [P2] open - An invitee who already accepted is shown the invitation again, because `invited_by` stays on every account forever
-
-**File:** ui/src/app/core/supabase/supabase-auth.provider.ts:231
-**Found:** 2026-10-06 by /audit independent (scope: current; lens: quality, security, tests)
-**Why it matters:** `isInvited` treats any session whose `app_metadata.invited_by` is a non-empty string as an invitation. The API stamps that field at invite time and never removes it, so every account created through an invitation (that is, every account except a bootstrap administrator) keeps it after accepting. Such a user who opens `/accept-invite` while signed in with no error fragment (a bookmark, browser history, or the typed address; a spent link correctly lands on the dead end because its `otp_expired` fragment wins), sees "Accept your invitation" with their organisation and role and can re-submit a name and password. This follows the spec's literal rule but defeats its stated intent that an ordinary signed-in user is not shown an invitation. No authority is gained: the session can already change its password through `/set-password`, and organisation and role are read only from `app_metadata` via `toSession`. The provider spec's "ordinary signed-in visitor" case uses a user without `invited_by`, so it does not cover the common case.
-**Suggested fix:** also require the session to look unaccepted, for example no `user_metadata.full_name` yet, or have the API (or the accept call) clear `invited_by` / set an `accepted` marker in `app_metadata` once the password is set; add a provider spec for a signed-in user who still carries `invited_by` after accepting. Alternatively amend the spec to accept this behaviour explicitly.
 **Resolution:**
 
 ### F-113 [P3] open - The sign-in screen's `?accepted=1` notice has no caller after this feature

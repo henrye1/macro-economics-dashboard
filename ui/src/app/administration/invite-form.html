@@ -24,7 +24,9 @@
         (input)="setEmail($any($event.target).value)"
       />
       @if (fieldError(); as error) {
-        <div id="invite-email-error" class="error">{{ error }}</div>
+        <!-- An alert, so it is announced even when Enter was pressed in the
+             already focused field and focus has nowhere to move. -->
+        <div id="invite-email-error" class="error" role="alert">{{ error }}</div>
       }
     </div>
 

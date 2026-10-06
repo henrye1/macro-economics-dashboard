@@ -290,6 +290,26 @@ export function createDirectory(
   }
 
   /**
+   * Deletes a just-invited user whose stamping failed. If that fails too, the
+   * user is left with no organisation, where no administrator can see or
+   * revoke it, so an operator has to: one distinct line names it. The id stays
+   * in the server log and never reaches a response.
+   */
+  async function rollBack(id: string): Promise<void> {
+    let failure: unknown = null;
+
+    try {
+      failure = (await client.deleteUser(id)).error ?? null;
+    } catch (error) {
+      failure = error;
+    }
+
+    if (failure !== null) {
+      console.error(`Invite rollback failed; orphaned invitee ${id} has no organisation`, failure);
+    }
+  }
+
+  /**
    * Sends the invite, then stamps role, organisation and inviter. If stamping
    * fails the new user is deleted, so an invitee never lingers without an
    * organisation.
@@ -328,7 +348,7 @@ export function createDirectory(
     });
 
     if ((stamped.error !== null && stamped.error !== undefined) || stamped.data.user === null) {
-      await client.deleteUser(user.id);
+      await rollBack(user.id);
       check(stamped.error);
       throw new Error('Supabase returned no user after stamping the invitation.');
     }

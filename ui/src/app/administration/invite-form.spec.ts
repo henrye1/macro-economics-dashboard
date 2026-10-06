@@ -64,13 +64,28 @@ describe('InviteForm', () => {
     expect(text('.hint')).toBe('They get an email with a link to set a password. The link expires after 24 hours.');
   });
 
-  it('refuses an incomplete address on the field, focuses it, and sends nothing', () => {
+  it('refuses an incomplete address on the field, focuses it after render, and sends nothing', async () => {
     type('kagiso@treasuryrisk');
     send();
+    await fixture.whenStable();
 
     expect(input().getAttribute('aria-invalid')).toBe('true');
     expect(input().getAttribute('aria-describedby')).toBe('invite-email-error');
     expect(text('#invite-email-error')).toBe('Enter a full email address, like name@company.co.za.');
+    expect(document.activeElement).toBe(input());
+    httpMock.expectNone(ADMIN_INVITATIONS_URL);
+  });
+
+  it('announces the error even when Enter is pressed in the already focused field', async () => {
+    input().focus();
+    type('name@company');
+    send();
+    await fixture.whenStable();
+
+    const error = el().querySelector('#invite-email-error');
+    expect(error?.getAttribute('role')).toBe('alert');
+    expect(error?.textContent?.trim()).toBe('Enter a full email address, like name@company.co.za.');
+    expect(input().getAttribute('aria-describedby')).toBe('invite-email-error');
     expect(document.activeElement).toBe(input());
     httpMock.expectNone(ADMIN_INVITATIONS_URL);
   });

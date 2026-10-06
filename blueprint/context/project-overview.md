@@ -1,6 +1,6 @@
 # Cyte Macro Data Console - Project Overview
 
-<!-- blueprint:source-hash 460734d286553a6552111eb83f06713e6cccdad6d73fc579fc4ab5ab218e82d9 -->
+<!-- blueprint:source-hash 2d20c53dbbe17ecd2ead5fefef9adfe62506bbe3b6aa13f35a4338856f42b754 -->
 
 > A browsable console over the Cyte Core API `/api/macro` service, built to make
 > vintages, absent data and ETags tangible to anyone integrating.
@@ -62,10 +62,11 @@ ETag and vintage-pinning habits actually get taught.
 16. **Saved query accounts** (built) - saved queries in Supabase, keyed by user, with a one-time migration from localStorage.
 18. **App shell split** (built) - the shell moves into a console shell component beside an auth layout for full-bleed split-panel screens; the seven flat routes become parents with children so a route chooses its chrome. No visible change to the seven tabs.
 19. **Auth screens** (built) - sign in, reset password, and accept invitation with its expired state, against a typed auth provider seam backed by fixtures, plus the guard that sends a visitor with no session to sign-in.
-20. **Administration** - split into three, built in order:
-    - 20a. **Admin page and user list** (built) - a topbar user menu, an admin-only `/administration` page, and the users in the administrator's own organisation; a Member sees a not-permitted card.
-    - 20b. **Role assignment** (built) - Member or Administrator; never your own role, never leaving an organisation without an Administrator.
-    - 20c. **Invitations** - issue, revoke and resend through Supabase's invite email, valid for 7 days, and a real accept-invitation screen.
+20. **Administration** (built) - in four parts:
+    - 20a. **Admin page and user list** - topbar user menu, admin-only `/administration`, the administrator's own organisation; a Member sees a not-permitted card.
+    - 20b. **Role assignment** - Member or Administrator; never your own, never leaving an organisation without one.
+    - 20c. **Invitations** - issue, revoke and resend via Supabase's invite email, valid for the project's email-link lifetime; Invitations card and invite form.
+    - 20d. **Accept invitation** - the accept screen reads the real invitation from Supabase's link, including expired, and sets the name and password.
 
 **Out of scope for MVP:** logins, roles, user accounts, merchandised browsing of
 non-curated `WEO_`-prefixed factors (reachable by typing a code), regional
@@ -284,18 +285,15 @@ Contract facts, not preferences. Getting them wrong teaches the wrong habit.
 > no browser request is cross-origin, so `CORS_ORIGIN` is a backstop, not the
 > thing keeping other origins out (ledger F-41).
 
-> **Rewrite still marked unverified in the plan.** Observed live on 2026-10-05:
-> the `/api/*` rewrite forwards `Authorization: Bearer`, ETag/`304` work, and
-> sign-out returns `401`. The `API_BASE_URL` fallback is not needed; the plan's
-> note should say so.
+> **Rewrite still marked unverified in the plan.** Verified live 2026-10-05
+> (bearer forwarded, ETag/`304`, sign-out `401`); drop the `API_BASE_URL` fallback note.
 
 > **Stale stack notes (plan section 5).** "Material is not installed yet" is no
 > longer true, and the deployment now pins Node 24, not the Node 22 the plan names.
 
-> **Core API host and Auth0 tenant are unnamed in the plans.** They appear as env
-> var names only. Real values live in a git-ignored `api/.env`; nothing generated
-> from the plans may name the host, so the request builder renders
-> `https://<core-api-host>`, as `CONSUMER-GUIDE.md` does.
+> **Core API host and Auth0 tenant are unnamed in the plans** (env var names
+> only), so the request builder renders `https://<core-api-host>`, as
+> `CONSUMER-GUIDE.md` does.
 
 > **Generated API types dropped from the build plan (2026-10-06).** Project plan
 > section 5 still describes OpenAPI (Scalar) generation as a later step. Remove it

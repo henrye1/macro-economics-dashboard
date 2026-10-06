@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { User } from '@supabase/supabase-js';
 
 import {
@@ -352,13 +352,18 @@ describe('invitations', () => {
    * A stateful project. `inviteUserByEmail` creates an unconfirmed user with
    * only provider metadata, as Supabase does; failures can be queued.
    */
-  function project(people: User[], fail: { stamp?: boolean; invite?: unknown; delete?: boolean } = {}) {
+  function project(
+    people: User[],
+    fail: { stamp?: boolean; invite?: unknown; delete?: boolean | 'reject'; hold?: Promise<void> } = {},
+  ) {
     const users = new Map(people.map((entry) => [entry.id, entry]));
     const calls: string[] = [];
+    const reads = { count: 0 };
     let seq = 0;
 
     const stub: AdminUsersClient = {
       async listUsers() {
+        reads.count += 1;
         await Promise.resolve();
         return { data: { users: [...users.values()] }, error: null };
       },
@@ -391,6 +396,12 @@ describe('invitations', () => {
       },
       async deleteUser(id) {
         calls.push(`delete:${id}`);
+        // A write that waits, so a test can see whether anything else runs
+        // while it is in flight.
+        await fail.hold;
+        if (fail.delete === 'reject') {
+          throw new Error('delete rejected');
+        }
         if (fail.delete) {
           return { error: new Error('delete failed') };
         }
@@ -405,7 +416,7 @@ describe('invitations', () => {
       now: () => NOW,
     });
 
-    return { directory, users, calls };
+    return { directory, users, calls, reads };
   }
 
   async function refusal(promise: Promise<unknown>): Promise<string | undefined> {
@@ -415,6 +426,22 @@ describe('invitations', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(RoleChangeError);
       return (error as RoleChangeError).reason;
+    }
+  }
+
+  /** A promise the test resolves when it chooses. */
+  function deferred() {
+    let release!: () => void;
+    const promise = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    return { promise, release };
+  }
+
+  /** Lets every already-queued continuation run. */
+  async function drain(): Promise<void> {
+    for (let i = 0; i < 20; i += 1) {
+      await Promise.resolve();
     }
   }
 
@@ -533,6 +560,40 @@ describe('invitations', () => {
       expect([...users.keys()]).toEqual([ADMIN]);
     });
 
+    it('logs a failed rollback once, naming the orphan, and still reports the stamp error', async () => {
+      const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const { directory, users } = project([admin()], { stamp: true, delete: true });
+
+      await expect(directory.invite(ORG, ADMIN, 'k@treasuryrisk.co.za', 'Member')).rejects.toThrow('stamp failed');
+
+      expect(logged).toHaveBeenCalledTimes(1);
+      expect(String(logged.mock.calls[0]?.[0])).toBe(
+        'Invite rollback failed; orphaned invitee new-1 has no organisation',
+      );
+      expect(users.has('new-1')).toBe(true);
+      logged.mockRestore();
+    });
+
+    it('treats a rollback delete that rejects the same way, keeping the stamp error', async () => {
+      const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const { directory } = project([admin()], { stamp: true, delete: 'reject' });
+
+      await expect(directory.invite(ORG, ADMIN, 'k@treasuryrisk.co.za', 'Member')).rejects.toThrow('stamp failed');
+
+      expect(logged).toHaveBeenCalledTimes(1);
+      logged.mockRestore();
+    });
+
+    it('logs nothing when the rollback works', async () => {
+      const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const { directory } = project([admin()], { stamp: true });
+
+      await expect(directory.invite(ORG, ADMIN, 'k@treasuryrisk.co.za', 'Member')).rejects.toThrow('stamp failed');
+
+      expect(logged).not.toHaveBeenCalled();
+      logged.mockRestore();
+    });
+
     it('turns Supabase’s rate limit into a refusal', async () => {
       const { directory } = project([admin()], { invite: { status: 429, message: 'email rate limit exceeded' } });
 
@@ -604,19 +665,51 @@ describe('invitations', () => {
     });
   });
 
-  it('serialises an invite against a revoke in the same organisation', async () => {
-    const { directory, calls } = project([admin(), invitee('pending', '2026-10-06T00:00:00Z')]);
+  it('holds an invite until a revoke in the same organisation has finished writing', async () => {
+    const gate = deferred();
+    const { directory, calls, reads } = project([admin(), invitee('pending', '2026-10-06T00:00:00Z')], {
+      hold: gate.promise,
+    });
 
-    await Promise.all([
-      directory.revoke(ORG, ADMIN, 'pending'),
-      directory.invite(ORG, ADMIN, 'k@treasuryrisk.co.za', 'Member'),
-    ]);
+    const revoking = directory.revoke(ORG, ADMIN, 'pending');
+    const inviting = directory.invite(ORG, ADMIN, 'k@treasuryrisk.co.za', 'Member');
+    await drain();
 
-    // The revoke finishes before the invite starts, never interleaved.
+    // The revoke has read and is mid-write; the invite has not even read.
+    expect(calls).toEqual(['delete:pending']);
+    expect(reads.count).toBe(1);
+
+    gate.release();
+    await Promise.all([revoking, inviting]);
+
     expect(calls).toEqual([
       'delete:pending',
       'invite:k@treasuryrisk.co.za:https://console.example/accept-invite',
       'update:new-1',
     ]);
+  });
+
+  it('does not hold one organisation behind another', async () => {
+    const OTHER = 'Elsewhere';
+    const OTHER_ADMIN = 'bbbbbbbb-0000-4000-8000-000000000002';
+    const gate = deferred();
+    const { directory, calls } = project(
+      [
+        admin(),
+        invitee('pending', '2026-10-06T00:00:00Z'),
+        member(OTHER_ADMIN, { app_metadata: { provider: 'email', organisation: OTHER, role: 'Administrator' } }),
+      ],
+      { hold: gate.promise },
+    );
+
+    const revoking = directory.revoke(ORG, ADMIN, 'pending');
+    const inviting = directory.invite(OTHER, OTHER_ADMIN, 'k@elsewhere.co.za', 'Member');
+    await drain();
+
+    // The other organisation's invite went ahead while the revoke waits.
+    expect(calls).toContain('invite:k@elsewhere.co.za:https://console.example/accept-invite');
+
+    gate.release();
+    await Promise.all([revoking, inviting]);
   });
 });

@@ -227,10 +227,20 @@ function serviceFailure(error: SupabaseAuthError): Error {
   return new Error(`Supabase Auth failed: ${error.message}`);
 }
 
-/** Invited by an administrator: the API stamps `invited_by` on every invitee. */
+/**
+ * An invitation not yet accepted. The API stamps `invited_by` on every
+ * invitee and never removes it, so on its own it marks an account for life.
+ * Accepting always sets `full_name`, so an invitee who has one has accepted.
+ * `user_metadata` is the visitor's to write, but the most clearing it can do
+ * is show them their own form again, which grants nothing: `/set-password`
+ * already lets that session set a password.
+ */
 function isInvited(user: User): boolean {
   const invitedBy = user.app_metadata?.['invited_by'];
-  return typeof invitedBy === 'string' && invitedBy !== '';
+  const fullName = user.user_metadata?.['full_name'];
+  const accepted = typeof fullName === 'string' && fullName.trim() !== '';
+
+  return typeof invitedBy === 'string' && invitedBy !== '' && !accepted;
 }
 
 function stringAt(source: Record<string, unknown> | undefined, key: string): string {

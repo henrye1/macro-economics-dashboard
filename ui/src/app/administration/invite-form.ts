@@ -1,4 +1,13 @@
-import { Component, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  Injector,
+  afterNextRender,
+  computed,
+  inject,
+  signal,
+  viewChild
+} from '@angular/core';
 
 import type { Invitation } from '../core/admin-directory';
 import { InvitationsStore, utcStamp } from './invitations.store';
@@ -24,6 +33,7 @@ function looksLikeEmail(value: string): boolean {
 })
 export class InviteForm {
   protected readonly store = inject(InvitationsStore);
+  private readonly injector = inject(Injector);
 
   private readonly input = viewChild<ElementRef<HTMLInputElement>>('emailInput');
 
@@ -69,7 +79,9 @@ export class InviteForm {
 
     if (!looksLikeEmail(email)) {
       this.fieldError.set(INVALID_EMAIL);
-      this.input()?.nativeElement.focus();
+      // After render, so focus lands on an input that already carries
+      // aria-invalid and its aria-describedby.
+      afterNextRender(() => this.input()?.nativeElement.focus(), { injector: this.injector });
       return;
     }
 
