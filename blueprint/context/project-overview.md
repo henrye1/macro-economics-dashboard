@@ -1,6 +1,6 @@
 # Cyte Macro Data Console - Project Overview
 
-<!-- blueprint:source-hash 8ef80a799c203ba4b0c7dec55980111072796a8e627ac46f0e1aab5a1f84c142 -->
+<!-- blueprint:source-hash 42799ec12ce2607e17b5f69782e95b4605bcc1afaa3b48d6fcef679518e22faa -->
 
 > A browsable console over the Cyte Core API `/api/macro` service, built to make
 > vintages, absent data and ETags tangible to anyone integrating.
@@ -58,9 +58,8 @@ ETag and vintage-pinning habits actually get taught.
 ### Post-MVP
 
 14. **Authentication** (built) - Supabase Auth sign-in behind the auth middleware seam, replacing feature 19's fixture auth provider.
-15. **Roles** - role checks on the routes that need them.
-16. **Saved query accounts** - saved queries in Supabase, keyed by user, with a one-time migration from localStorage.
-17. **Generated API types** - contract types generated from the Core API OpenAPI document, once its URL and credentials exist.
+15. **Roles** (built) - role checks on the routes that need them.
+16. **Saved query accounts** (built) - saved queries in Supabase, keyed by user, with a one-time migration from localStorage.
 18. **App shell split** (built) - the shell moves into a console shell component beside an auth layout for full-bleed split-panel screens; the seven flat routes become parents with children so a route chooses its chrome. No visible change to the seven tabs.
 19. **Auth screens** (built) - sign in, reset password, and accept invitation with its expired state, against a typed auth provider seam backed by fixtures, plus the guard that sends a visitor with no session to sign-in.
 20. **Administration** - user list, invitation issue and revoke, role assignment. Not designed; needs a mockup, and 14 and 15 as real work.
@@ -78,8 +77,8 @@ from `/api/macro` on this request. No ingestion, no copy, no cache table.
 ### Upstream contract types (hand-written for v1, feature 1)
 
 These mirror the Core API and must match it exactly. **Locked shapes** - features
-5, 6, 8 to 12 depend on them. Hand-written from `CONSUMER-GUIDE.md` until feature
-17 generates them, so they are the most drift-prone thing in the project.
+5, 6, 8 to 12 depend on them. Hand-written from `CONSUMER-GUIDE.md`, with no
+generation step planned, so they are the most drift-prone thing in the project.
 
 `Envelope<T>`
 
@@ -127,17 +126,18 @@ read `detail` for the human explanation.
 - `vintage` (`'latest'`, a vintage id, or a vintage label) - default `latest`; pinning a vintage implies its source
 - `page` and `pageSize` (number) - 1 and 500
 
-### SavedQuery (browser localStorage, feature 10)
+### SavedQuery (feature 10; in Supabase from feature 16)
 
-**Locked shape** - feature 16 migrates this to Supabase as a copy, not a redesign.
+**Locked shape** - feature 16 moved it to Supabase as a copy, not a redesign.
 
 - `name` (string) - user-supplied
 - `query` (WorkingQuery) - indicators, countries, year range, source, forecast filter
 - `vintageIds` (number[]) - the `meta.vintages` ids recorded at save time, so reproduction is exact
 - `savedAt` (ISO string)
 
-Per-browser storage is honest behaviour for an anonymous console and avoids
-designing a user model before there are users.
+Feature 10 kept it in browser localStorage. Since feature 16 it is the
+`saved_queries` table, keyed by `(user_id, name)`, and localStorage entries
+move to the account on a signed-in visit.
 
 ### Server-side, in memory only
 
@@ -155,7 +155,7 @@ keyed by user id, migrated from localStorage on first sign-in.
 - **Express 5 on Node 22, TypeScript ESM** (`api/`) - a small backend-for-frontend, not a general API. `createApp()` builds the app, routes mount under `/api`, config is read only in `src/config.ts`, and one shared error handler owns the response shape.
 - **No database in v1** - Supabase Postgres and Supabase Auth are the path for logins, not before.
 - **Render** - hosting, both services.
-- **Hand-written API contract types** for v1, generated from the Core API OpenAPI document (Scalar) later.
+- **Hand-written API contract types.** The project plan still names OpenAPI generation as a later step; the build plan dropped it (see Open questions).
 
 No root workspace and no root `package.json`; npm commands run inside `api/` or
 `ui/`. In development `ng serve` proxies `/api/*` to the API via
@@ -286,10 +286,6 @@ Contract facts, not preferences. Getting them wrong teaches the wrong habit.
 > feature list. Update the project plan to say what sign-in now means for the
 > anonymous primary user.
 
-> **`SUPABASE_SERVICE_KEY` (plan section 8).** The plan expects two Supabase env
-> vars; feature 14 verifies tokens against the project's public keys and needs only
-> `SUPABASE_URL`. Drop the service key from the plan, or say what will need it.
-
 > **CORS described as the lock (plan section 8 notes).** With the `/api/*` rewrite
 > no browser request is cross-origin, so `CORS_ORIGIN` is a backstop, not the
 > thing keeping other origins out (ledger F-41).
@@ -307,8 +303,9 @@ Contract facts, not preferences. Getting them wrong teaches the wrong habit.
 > from the plans may name the host, so the request builder renders
 > `https://<core-api-host>`, as `CONSUMER-GUIDE.md` does.
 
-> **OpenAPI document URL is unknown.** Feature 17 is blocked until the Scalar
-> document's URL and credentials exist.
+> **Generated API types dropped from the build plan (2026-10-06).** Project plan
+> section 5 still describes OpenAPI (Scalar) generation as a later step. Remove it
+> there, or restore the build-plan item.
 
 > **No `Verify` command.** `AGENTS.md` declares `Test` for both packages and a
 > browser suite exists, but there is still no single `Verify` command (`/ci`).

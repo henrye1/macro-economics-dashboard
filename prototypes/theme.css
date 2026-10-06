@@ -64,6 +64,11 @@
   --change-up: #1e8e3e;
   --change-down: #d93025;
 
+  /* form validation - Administration's invite form. Reuses the change-down
+     red rather than adding a second one. */
+  --invalid: var(--change-down);
+  --invalid-bg: #fdecea;
+
   /* code surfaces */
   --code-bg: var(--navy);           /* request URL block        */
   --code-ink: #ffffff;
