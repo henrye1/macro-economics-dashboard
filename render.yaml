@@ -38,6 +38,10 @@ services:
         sync: false
       - key: SUPABASE_URL
         sync: false
+      # The service role key the saved-query routes write with. Bypasses row
+      # level security, so it is set here only and never in the console build.
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
 
   # The Angular console.
   - type: web

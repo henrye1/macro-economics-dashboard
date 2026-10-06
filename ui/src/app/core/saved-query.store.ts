@@ -1,135 +1,249 @@
-import { InjectionToken, Injectable, computed, inject, signal } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import {
+  InjectionToken,
+  Injectable,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked
+} from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 
 import type { SavedQuery } from './saved-query';
+import { SessionStore } from './session.store';
 import { DEFAULT_WORKING_QUERY, type WorkingQuery } from './working-query';
 
 /**
- * Namespaced so it cannot collide on a shared origin, and versioned so feature
- * 16's migration to Supabase has something it can recognise.
+ * Where feature 10 kept saved queries in this browser. Feature 16 only reads it,
+ * to move what is there into the account, and removes it once that worked.
  */
 export const SAVED_QUERIES_KEY = 'cyte.macro.saved-queries.v1';
+
+/** The visitor's own saved queries. The API scopes them to the verified caller. */
+export const SAVED_QUERIES_URL = '/api/saved-queries';
 
 /** The slice of `Storage` this store uses. */
 export interface SavedQueryStorage {
   getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
 }
 
 /**
  * Overridden in specs so they never touch the browser's own storage, which
  * would leak state between runs. Null means no usable storage, as a private
- * mode can produce.
+ * mode can produce, and then there is simply nothing to migrate.
  */
 export const SAVED_QUERY_STORAGE = new InjectionToken<SavedQueryStorage | null>(
   'SAVED_QUERY_STORAGE',
   { providedIn: 'root', factory: readableStorage }
 );
 
-/** `savedAt` is nondeterministic, so it comes through a seam. */
-export const SAVED_QUERY_CLOCK = new InjectionToken<() => string>('SAVED_QUERY_CLOCK', {
-  providedIn: 'root',
-  factory: () => () => new Date().toISOString()
-});
+export type SavedQueryStatus = 'idle' | 'loading' | 'ready' | 'failed';
+
+const MOVE_FAILED =
+  "Could not move this browser's saved queries to your account. They are still here and will be tried again next time.";
+export const SAVE_FAILED = 'Could not save the query. Try again.';
 
 /**
- * Saved queries, kept in this browser.
+ * Saved queries, kept in the signed-in account.
  *
- * Per-browser and anonymous, which is honest for a console with no users. The
- * overview locks the stored shape because feature 16 copies it to Supabase
- * rather than redesigning it.
+ * Loads whenever a session appears or changes hands, and empties on sign-out,
+ * so one visitor's list is never shown to the next. On each load, anything
+ * feature 10 left in this browser is copied to the account first and then
+ * removed here; the account's own version wins on a name clash, which makes a
+ * retried move harmless.
  */
 @Injectable({ providedIn: 'root' })
 export class SavedQueryStore {
+  private readonly http = inject(HttpClient);
   private readonly storage = inject(SAVED_QUERY_STORAGE);
-  private readonly now = inject(SAVED_QUERY_CLOCK);
+  private readonly session = inject(SessionStore);
 
   private readonly entries = signal<readonly SavedQuery[]>([]);
   private readonly failure = signal<string | null>(null);
+  private readonly state = signal<SavedQueryStatus>('idle');
+  private readonly writing = signal(false);
+
+  /** Who the current list belongs to, by verified email. Null when signed out. */
+  private loadedFor: string | null = null;
+
+  /** Bumped per owner, so an answer for a previous visitor is dropped. */
+  private generation = 0;
 
   /** Newest first, as the design lists them. */
   readonly saved = this.entries.asReadonly();
 
-  /** Set when storage could not be read or written. Null when all is well. */
+  /** Set when a move or a save failed. Null when all is well. */
   readonly storageProblem = this.failure.asReadonly();
+
+  readonly status = this.state.asReadonly();
+
+  readonly saving = this.writing.asReadonly();
 
   readonly isEmpty = computed(() => this.entries().length === 0);
 
   constructor() {
-    if (this.storage === null) {
-      this.failure.set('This browser is not allowing saved queries to be stored.');
-      return;
-    }
+    effect(() => {
+      const email = this.session.session()?.email ?? null;
 
-    this.entries.set(this.read(this.storage));
+      untracked(() => this.follow(email));
+    });
   }
 
   /**
    * Saves under `name`, replacing any entry already using it.
    *
-   * Replace rather than append: names are the only handle a user has and the
-   * design offers no delete, so re-saving a name means "update it". A second
-   * entry with the same name would be unreachable by any other means.
+   * The server stamps `savedAt`. True once the account holds it; false, with
+   * the list untouched and the problem set, when it does not.
    */
-  save(name: string, query: WorkingQuery, vintageIds: readonly number[]): void {
+  async save(name: string, query: WorkingQuery, vintageIds: readonly number[]): Promise<boolean> {
     const trimmed = name.trim();
-    if (trimmed === '' || this.storage === null) {
-      return;
+    if (trimmed === '' || this.state() !== 'ready' || this.writing()) {
+      return false;
     }
 
-    const entry: SavedQuery = {
-      name: trimmed,
-      query: { ...query, indicators: [...query.indicators], countries: [...query.countries] },
-      vintageIds: [...vintageIds],
-      savedAt: this.now()
-    };
-
-    const next = [entry, ...this.entries().filter((held) => held.name !== trimmed)];
+    const generation = this.generation;
+    this.writing.set(true);
 
     try {
-      this.storage.setItem(SAVED_QUERIES_KEY, JSON.stringify(next));
-    } catch {
-      // Quota, or a browser refusing writes. The page stays usable and says so
-      // rather than losing the list it already has.
-      this.failure.set('Could not save: this browser refused to store the query.');
-      return;
-    }
+      const response = await firstValueFrom(
+        this.http.put<{ data: unknown }>(SAVED_QUERIES_URL, {
+          name: trimmed,
+          query: { ...query, indicators: [...query.indicators], countries: [...query.countries] },
+          vintageIds: [...vintageIds]
+        })
+      );
 
-    this.failure.set(null);
-    this.entries.set(next);
+      if (generation !== this.generation) {
+        return false;
+      }
+
+      if (!isSavedQuery(response.data)) {
+        throw new Error('Unexpected saved query response.');
+      }
+
+      const entry = response.data;
+      this.entries.set([entry, ...this.entries().filter((held) => held.name !== entry.name)]);
+      this.failure.set(null);
+      return true;
+    } catch {
+      if (generation === this.generation) {
+        this.failure.set(SAVE_FAILED);
+      }
+      return false;
+    } finally {
+      if (generation === this.generation) {
+        this.writing.set(false);
+      }
+    }
   }
 
   /**
-   * Drops a refused-write message so the next attempt can reach storage.
+   * Drops a refused-save message so the next attempt can go.
    *
-   * Called when the user edits the name, which is the only gesture the design
-   * offers for "try that again". Without it the card latches: `save` sets
-   * `failure`, the page disables Save while `storageProblem()` is set, and the
-   * only write that could clear the flag is the one the flag prevents.
-   *
-   * No usable storage at all is a different thing and stays latched: clearing
-   * it would enable a Save that cannot ever succeed. A read that threw is
-   * cleared, because a browser that refused a read may still accept a write,
-   * and if it does not, `save` sets the message again with a current answer.
+   * Called when the user edits the name, the only "try again" gesture the
+   * design offers. A failed move stays reported: editing a name does not
+   * retry it, the next load does.
    */
   clearWriteProblem(): void {
-    if (this.storage === null) {
+    if (this.failure() === SAVE_FAILED) {
+      this.failure.set(null);
+    }
+  }
+
+  private follow(email: string | null): void {
+    if (email === this.loadedFor) {
       return;
     }
 
+    this.loadedFor = email;
+    this.generation += 1;
+    this.entries.set([]);
     this.failure.set(null);
+    this.writing.set(false);
+
+    if (email === null) {
+      this.state.set('idle');
+      return;
+    }
+
+    void this.load(this.generation);
+  }
+
+  private async load(generation: number): Promise<void> {
+    this.state.set('loading');
+
+    const local = this.readLocal();
+
+    if (local.length > 0) {
+      try {
+        const moved = await firstValueFrom(
+          this.http.post<{ data: unknown }>(`${SAVED_QUERIES_URL}/import`, { data: local })
+        );
+
+        if (generation !== this.generation) {
+          return;
+        }
+
+        this.settle(moved.data);
+
+        try {
+          this.storage?.removeItem(SAVED_QUERIES_KEY);
+        } catch {
+          // The account has them; this browser would not let go. The next
+          // load moves them again and the account's copies win.
+          this.failure.set(MOVE_FAILED);
+        }
+        return;
+      } catch {
+        if (generation !== this.generation) {
+          return;
+        }
+
+        // Kept locally for next time, and the account's list still shows.
+        this.failure.set(MOVE_FAILED);
+      }
+    }
+
+    try {
+      const listed = await firstValueFrom(this.http.get<{ data: unknown }>(SAVED_QUERIES_URL));
+
+      if (generation === this.generation) {
+        this.settle(listed.data);
+      }
+    } catch {
+      if (generation === this.generation) {
+        this.state.set('failed');
+      }
+    }
+  }
+
+  /** Our own API's answer, still checked: a half-shaped entry cannot be run. */
+  private settle(data: unknown): void {
+    if (!Array.isArray(data)) {
+      this.state.set('failed');
+      return;
+    }
+
+    this.entries.set(data.filter(isSavedQuery));
+    this.state.set('ready');
   }
 
   /**
-   * Everything in storage is untrusted: a user can edit it by hand and a future
-   * version can write a different shape. Unreadable values and malformed
-   * entries are dropped rather than thrown or half-rendered.
+   * Everything in storage is untrusted: a user can edit it by hand and an older
+   * version can have written a different shape. Unreadable values and malformed
+   * entries are left out of the move rather than sent.
    */
-  private read(storage: SavedQueryStorage): readonly SavedQuery[] {
+  private readLocal(): SavedQuery[] {
+    if (this.storage === null) {
+      return [];
+    }
+
     let raw: string | null;
     try {
-      raw = storage.getItem(SAVED_QUERIES_KEY);
+      raw = this.storage.getItem(SAVED_QUERIES_KEY);
     } catch {
-      this.failure.set('This browser is not allowing saved queries to be read.');
       return [];
     }
 
@@ -144,8 +258,25 @@ export class SavedQueryStore {
       return [];
     }
 
-    return Array.isArray(parsed) ? parsed.filter(isSavedQuery) : [];
+    return Array.isArray(parsed) ? parsed.filter(isSavedQuery).filter(isMovable) : [];
   }
+}
+
+/** `toISOString()` output, or any ISO-8601 instant with an offset, as the API requires. */
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+
+/**
+ * The few things the API checks that `isSavedQuery` does not. Feature 10 always
+ * wrote entries that pass, but storage is hand-editable, and one entry the API
+ * refuses would fail the whole move on every visit. Such an entry is left
+ * behind rather than sent.
+ */
+function isMovable(entry: SavedQuery): boolean {
+  return (
+    entry.name.trim() !== '' &&
+    ISO_INSTANT.test(entry.savedAt) &&
+    entry.vintageIds.every(Number.isSafeInteger)
+  );
 }
 
 /** Null when the browser has no usable storage, as private modes can. */
@@ -166,9 +297,10 @@ function isStringArray(value: unknown): value is string[] {
  *
  * Deliberately exhaustive over `WorkingQuery`: an entry missing a field would
  * otherwise reach the store as a partial object and produce a query the rest of
- * the console cannot run.
+ * the console cannot run. The API's schema mirrors this check, so anything that
+ * passes here is accepted there.
  */
-function isSavedQuery(value: unknown): value is SavedQuery {
+export function isSavedQuery(value: unknown): value is SavedQuery {
   if (typeof value !== 'object' || value === null) {
     return false;
   }

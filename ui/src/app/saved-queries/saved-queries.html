@@ -10,7 +10,11 @@
     <p class="state" role="status">{{ problem }}</p>
   }
 
-  @if (isEmpty()) {
+  @if (status() === 'loading' || status() === 'idle') {
+    <p class="state" role="status">Loading saved queries…</p>
+  } @else if (status() === 'failed') {
+    <p class="state" role="status">Could not load saved queries.</p>
+  } @else if (isEmpty()) {
     <p class="state" role="status">
       No saved queries yet. Build a query on Observations or Series, then name it below.
     </p>
@@ -85,6 +89,8 @@
          Editing the name clears the confirmation and the hint returns. -->
     @if (confirmation(); as message) {
       <p class="state" role="status">{{ message }}</p>
+    } @else if (status() !== 'ready') {
+      <!-- The list's own loading or failed message already says why. -->
     } @else if (saveBlockedReason(); as reason) {
       <p class="state" role="status">{{ reason }}</p>
     } @else if (recordedCount() === 0) {

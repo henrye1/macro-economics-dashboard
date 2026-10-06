@@ -54,6 +54,25 @@ export function isAuthConfigured(settings: AuthSettings): boolean {
   return settings.supabaseUrl.trim() !== '';
 }
 
+/** What the saved-query routes need to reach their table. */
+export interface SavedQuerySettings {
+  /** The same Supabase project origin the auth seam verifies against. */
+  supabaseUrl: string;
+  /**
+   * The project's service role key. A secret that bypasses row level security,
+   * so it lives only in this process and is never logged or returned.
+   */
+  supabaseServiceKey: string;
+}
+
+/**
+ * True when both are set. The saved-query routes answer `503` while this is
+ * false, the way the macro routes do without their credentials.
+ */
+export function isSavedQueriesConfigured(settings: SavedQuerySettings): boolean {
+  return settings.supabaseUrl.trim() !== '' && settings.supabaseServiceKey.trim() !== '';
+}
+
 const macro: MacroSettings = {
   auth0Domain: process.env.AUTH0_DOMAIN ?? '',
   auth0ClientId: process.env.AUTH0_CLIENT_ID ?? '',
@@ -66,6 +85,11 @@ const auth: AuthSettings = {
   supabaseUrl: process.env.SUPABASE_URL ?? '',
 };
 
+const savedQueries: SavedQuerySettings = {
+  supabaseUrl: auth.supabaseUrl,
+  supabaseServiceKey: process.env.SUPABASE_SERVICE_KEY ?? '',
+};
+
 export const config = {
   port: Number(process.env.PORT ?? 3000),
   nodeEnv: process.env.NODE_ENV ?? 'development',
@@ -74,4 +98,6 @@ export const config = {
   macroConfigured: isMacroConfigured(macro),
   ...auth,
   authConfigured: isAuthConfigured(auth),
+  supabaseServiceKey: savedQueries.supabaseServiceKey,
+  savedQueriesConfigured: isSavedQueriesConfigured(savedQueries),
 } as const;

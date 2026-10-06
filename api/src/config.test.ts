@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { isAuthConfigured, isMacroConfigured, type MacroSettings } from './config.js';
+import {
+  isAuthConfigured,
+  isMacroConfigured,
+  isSavedQueriesConfigured,
+  type MacroSettings,
+} from './config.js';
 
 const complete: MacroSettings = {
   auth0Domain: 'cyte.eu.auth0.com',
@@ -49,5 +54,22 @@ describe('isAuthConfigured', () => {
 
   it('treats whitespace as blank, so a stray space is not a project', () => {
     expect(isAuthConfigured({ supabaseUrl: '   ' })).toBe(false);
+  });
+});
+
+describe('isSavedQueriesConfigured', () => {
+  const both = { supabaseUrl: 'https://project.supabase.co', supabaseServiceKey: 'service-key' };
+
+  it('is true when the URL and the service key both have a value', () => {
+    expect(isSavedQueriesConfigured(both)).toBe(true);
+  });
+
+  it('is false when either is blank', () => {
+    expect(isSavedQueriesConfigured({ ...both, supabaseUrl: '' })).toBe(false);
+    expect(isSavedQueriesConfigured({ ...both, supabaseServiceKey: '' })).toBe(false);
+  });
+
+  it('treats whitespace as blank', () => {
+    expect(isSavedQueriesConfigured({ ...both, supabaseServiceKey: '   ' })).toBe(false);
   });
 });

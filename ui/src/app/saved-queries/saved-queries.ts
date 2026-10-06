@@ -11,7 +11,7 @@ import {
   scopeLabel,
   vintageLabel
 } from '../core/saved-query';
-import { SavedQueryStore } from '../core/saved-query.store';
+import { SAVE_FAILED, SavedQueryStore } from '../core/saved-query.store';
 import { WorkingQueryStore } from '../core/working-query.store';
 
 @Component({
@@ -28,6 +28,8 @@ export class SavedQueriesPage {
   protected readonly entries = this.saved.saved;
   protected readonly isEmpty = this.saved.isEmpty;
   protected readonly storageProblem = this.saved.storageProblem;
+  protected readonly status = this.saved.status;
+  protected readonly saving = this.saved.saving;
 
   protected readonly name = signal('');
 
@@ -40,7 +42,8 @@ export class SavedQueriesPage {
    * The design offers no other control, and a refused write otherwise latches
    * the card: `saveBlockedReason` reads `storageProblem()` first, so the button
    * stays disabled and the only write that could clear the flag is the one the
-   * flag prevents. Storage that is unusable outright stays reported.
+   * flag prevents. A failed move into the account stays reported: the next
+   * load retries that, not an edit.
    */
   protected setName(value: string): void {
     this.name.set(value);
@@ -54,10 +57,12 @@ export class SavedQueriesPage {
    * An unsendable query can be saved in principle, but the entry would be one
    * nothing can run and whose vintage ids are necessarily empty, so the console
    * declines it the way the result tabs decline to request it.
+   *
+   * A failed move into the account is not a reason: saving still works.
    */
   protected readonly saveBlockedReason = computed(() => {
-    if (this.storageProblem() !== null) {
-      return this.storageProblem();
+    if (this.storageProblem() === SAVE_FAILED) {
+      return SAVE_FAILED;
     }
     if (this.name().trim() === '') {
       return 'Name the query before saving it.';
@@ -68,7 +73,13 @@ export class SavedQueriesPage {
     return null;
   });
 
-  protected readonly canSave = computed(() => this.saveBlockedReason() === null);
+  /**
+   * Also closed until the list has loaded, where the loading or failed message
+   * already says why, and while a save is in flight, so one click is one write.
+   */
+  protected readonly canSave = computed(
+    () => this.status() === 'ready' && !this.saving() && this.saveBlockedReason() === null
+  );
 
   /**
    * The ids observed for the query as it stands now.
@@ -83,7 +94,11 @@ export class SavedQueriesPage {
 
   protected readonly recordedCount = computed(() => this.idsForCurrent().length);
 
-  protected save(): void {
+  /**
+   * The name clears and the confirmation shows only once the account holds the
+   * query. On failure the name stays, so nothing has to be retyped.
+   */
+  protected async save(): Promise<void> {
     if (!this.canSave()) {
       return;
     }
@@ -91,9 +106,9 @@ export class SavedQueriesPage {
     const name = this.name().trim();
     const ids = this.idsForCurrent();
 
-    this.saved.save(name, this.store.query(), ids);
+    const stored = await this.saved.save(name, this.store.query(), ids);
 
-    if (this.storageProblem() !== null) {
+    if (!stored) {
       return;
     }
 

@@ -80,6 +80,32 @@ describe('authInterceptor', () => {
       httpMock.verify();
     });
 
+    it('carries the access token to the visitor’s saved queries', async () => {
+      const { http, httpMock } = setUp(clientWith(TOKEN));
+
+      http.post('/api/saved-queries/import', { data: [] }).subscribe();
+      await TestBed.inject(SessionStore).ready;
+
+      const request = httpMock.expectOne('/api/saved-queries/import');
+
+      expect(request.request.headers.get('Authorization')).toBe(`Bearer ${TOKEN}`);
+      request.flush({ data: [] });
+      httpMock.verify();
+    });
+
+    it('does not mistake a lookalike path for an authenticated route', async () => {
+      const { http, httpMock } = setUp(clientWith(TOKEN));
+
+      http.get('/api/macroeconomics').subscribe();
+      await TestBed.inject(SessionStore).ready;
+
+      const request = httpMock.expectOne('/api/macroeconomics');
+
+      expect(request.request.headers.has('Authorization')).toBeFalse();
+      request.flush({});
+      httpMock.verify();
+    });
+
     it('leaves every other request alone, so no token travels where it is not needed', async () => {
       const { http, httpMock } = setUp(clientWith(TOKEN));
 
@@ -134,6 +160,22 @@ describe('authInterceptor', () => {
 
       expect(store.signedIn()).toBeFalse();
       expect(router.url).toBe('/sign-in?returnUrl=%2Fvintages');
+    });
+
+    it('treats a refusal from saved queries the same way', async () => {
+      const { http, httpMock, router, store } = setUp(clientWith(TOKEN));
+      await router.navigateByUrl('/saved-queries');
+
+      http.get('/api/saved-queries').subscribe({ error: () => undefined });
+      await store.ready;
+
+      httpMock
+        .expectOne('/api/saved-queries')
+        .flush({ error: 'no' }, { status: 401, statusText: 'Unauthorized' });
+      await settle();
+
+      expect(store.signedIn()).toBeFalse();
+      expect(router.url).toBe('/sign-in?returnUrl=%2Fsaved-queries');
     });
 
     it('re-raises, so the page still shows its own failure state', async () => {

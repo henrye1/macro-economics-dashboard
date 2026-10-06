@@ -46,8 +46,9 @@
   responses in a route.
 - Validate every request input (params, query, body) at the route boundary and
   return 400 on failure. Never trust a client-supplied identifier.
-  > TODO: no validation library is installed yet. The first feature that needs
-  > one picks it (Zod is the likely choice) and records it here.
+  Use **Zod** (`zod`, v4) for request bodies: one schema per body beside the
+  module that owns it, `safeParse` at the route, and a fixed-string `400` on
+  failure. Never echo the input or a Zod issue in the response.
 - Keep route handlers thin. Business logic and data access belong in modules a
   handler calls, not inline.
 

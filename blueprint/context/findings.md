@@ -841,3 +841,39 @@ server-side until the project's session limits end it.
 **Why it matters:** This feature ships the project URL and anon key in the production bundle (correctly, they are publishable) and publishes the API on a public `onrender.com` URL. `createAuthSeam` (`api/src/middleware/auth.ts:140`) admits any token the project signed with audience `authenticated` and a `sub`; it reads no role or invitation claim (role checks are feature 15). The product is invitation only (feature 14, Out of scope), but Supabase's email provider allows new sign-ups by default, and anonymous sign-ins, if enabled, also mint `authenticated` tokens. Anyone holding the shipped anon key can call the project's sign-up endpoint directly, get a token, and spend the M2M quota through the API, which is what the auth gate exists to stop. The deploy checklist (step 5, item 5) covers Site URL and the redirect allowlist only. Not P1 because the project's current auth settings were not inspected; if sign-ups are already off, the gap is the missing checklist line.
 **Suggested fix:** add to the checklist's Supabase item: Authentication, Sign In / Providers, turn off "Allow new users to sign up" and confirm anonymous sign-ins are off, before the deploy goes public. Feature 15's role check is the code-side backstop.
 **Resolution:** Re-examined 2026-10-06 by the independent review of `1f708e4` (feature 15, roles). The delta adds `requireRole` but, by its spec, gates no route: `/api/macro/*` still admits any verified `authenticated` token, and a self-signed-up user resolves to `Member`, which every read route accepts. The backstop exists but does not close this. Stays open.
+
+### F-99 [P3] open - The API admits saved-query values Postgres will refuse, so they answer 502 and a migrated one fails the whole move on every visit
+
+**File:** api/src/saved-queries/saved-query.schema.ts:31
+**Found:** 2026-10-06 by /audit (scope: current; lens: quality, security)
+**Why it matters:** `vintageIdsSchema` is `z.array(z.number().int())`, which
+Zod v4 bounds to safe integers, while the column is `integer[]` (int4, max
+2147483647). Strings are likewise unbounded for U+0000, which Postgres `text`
+and `jsonb` both reject. Such a body passes the `400` gate and fails in the
+repository as a `502` "could not be reached", which misreports a caller error
+as an outage. In the console, `isMovable` (ui/src/app/core/saved-query.store.ts:278)
+uses the same `Number.isSafeInteger` bound and no NUL check, so one hand-edited
+localStorage entry in that gap makes `POST /import` fail as a batch, keeps the
+key, and repeats the failure with the move message on every load. The spec's
+stated aim ("a locally valid entry is never rejected forever") is not met at
+the edge. Only reachable through hand-edited storage or a direct caller.
+**Suggested fix:** bound vintage ids to `.max(2147483647).min(-2147483648)`
+(or `nonnegative`) and refuse `\u0000` in name and query strings in the schema,
+then mirror both in `isMovable`.
+**Resolution:**
+
+### F-100 [P3] open - The real-seam test accepts 503, so it does not prove the spec's "no bearer gives 401"
+
+**File:** api/src/routes/saved-queries.routes.test.ts:292
+**Found:** 2026-10-06 by /audit (scope: current; lens: tests)
+**Why it matters:** Step 3 asks for a test that the real auth seam still guards
+the route with "no bearer gives `401`". The test asserts
+`[401, 503]`, depending on whether the developer's environment sets
+`SUPABASE_URL`. On a clean checkout it only proves the seam's not-configured
+`503`. Either way it would also pass with the seam unmounted, because
+`requireRole` answers `401` for any request without `req.auth`. It proves the
+`x-test-user` header is not honoured, not that the real seam answers `401`.
+**Suggested fix:** pin the seam's configuration for the test (inject a
+configured seam or stub `config.supabaseUrl`) and assert exactly `401` with
+the fixed `NO_SESSION` message, plus that the repository was never called.
+**Resolution:**

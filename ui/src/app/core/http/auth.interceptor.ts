@@ -7,10 +7,11 @@ import { SessionStore } from '../session.store';
 import { SUPABASE_CLIENT } from '../supabase/supabase.client';
 
 /**
- * Only the relay. Everything else the console fetches is its own asset, and a
+ * Only the API routes that verify a session: the relay and the visitor's own
+ * saved queries. Everything else the console fetches is its own asset, and a
  * token on a request that does not need one is a token in one more log.
  */
-const RELAY = '/api/macro';
+const AUTHENTICATED = ['/api/macro', '/api/saved-queries'];
 
 /**
  * Carries the visitor's access token to the relay, and takes a refusal
@@ -28,7 +29,7 @@ const RELAY = '/api/macro';
  * an error for a reason they cannot act on.
  */
 export const authInterceptor: HttpInterceptorFn = (request, next) => {
-  if (!request.url.startsWith(RELAY)) {
+  if (!AUTHENTICATED.some((prefix) => isUnder(request.url, prefix))) {
     return next(request);
   }
 
@@ -68,3 +69,8 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
     refused
   );
 };
+
+/** `/api/macro` and `/api/macro/...`, but never `/api/macroeconomics`. */
+function isUnder(url: string, prefix: string): boolean {
+  return url === prefix || url.startsWith(`${prefix}/`) || url.startsWith(`${prefix}?`);
+}
