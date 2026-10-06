@@ -337,15 +337,40 @@ describe('the account control', () => {
     fixture = await mount(new FixtureMacroDataProvider());
   });
 
-  it('names the visitor and their role', () => {
-    const account = rendered(fixture).querySelector('.account');
+  const el = () => rendered(fixture);
+  const trigger = () => el().querySelector<HTMLButtonElement>('.account-trigger')!;
+  const menu = () => el().querySelector('[role="menu"]');
+  const items = () =>
+    Array.from(el().querySelectorAll<HTMLElement>('[role="menuitem"]')).map((item) =>
+      item.textContent?.trim()
+    );
 
-    expect(account?.textContent).toContain('Thandi Mokoena');
-    expect(account?.textContent).toContain('Administrator');
+  async function open(): Promise<void> {
+    trigger().click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+  }
+
+  function becomeMember(role: string): void {
+    TestBed.inject(SessionStore).signIn({
+      email: 'lerato@treasuryrisk.co.za',
+      fullName: 'Lerato Dlamini',
+      organisation: 'Treasury Risk',
+      role
+    });
+    fixture.detectChanges();
+  }
+
+  it('names the visitor and their role on a closed menu button', () => {
+    expect(trigger().textContent).toContain('Thandi Mokoena');
+    expect(trigger().textContent).toContain('Administrator');
+    expect(trigger().getAttribute('aria-haspopup')).toBe('menu');
+    expect(trigger().getAttribute('aria-expanded')).toBe('false');
+    expect(menu()).toBeNull();
   });
 
   it('leaves the service-token pill saying what it always said', () => {
-    const pill = rendered(fixture).querySelector('.token-pill');
+    const pill = el().querySelector('.token-pill');
 
     // It reports the server's M2M client, not the visitor. Now that there is a
     // visitor to confuse it with, that distinction matters more, not less.
@@ -353,12 +378,77 @@ describe('the account control', () => {
     expect(pill?.getAttribute('title')).toContain('not your session');
   });
 
+  it('opens with the identity, Administration and Sign out, and focuses the first item', async () => {
+    await open();
+
+    expect(trigger().getAttribute('aria-expanded')).toBe('true');
+    expect(menu()?.textContent).toContain('Treasury Risk');
+    expect(items()).toEqual(['Administration', 'Sign out']);
+    expect(document.activeElement?.textContent?.trim()).toBe('Administration');
+  });
+
+  it('links Administration to its page and closes on the way', async () => {
+    await open();
+
+    el().querySelector<HTMLAnchorElement>('a[role="menuitem"]')!.click();
+    await fixture.whenStable();
+
+    expect(TestBed.inject(Router).url).toBe('/administration');
+    expect(menu()).toBeNull();
+  });
+
+  it('offers no Administration to a Member', async () => {
+    becomeMember('Member');
+    await open();
+
+    expect(items()).toEqual(['Sign out']);
+    expect(document.activeElement?.textContent?.trim()).toBe('Sign out');
+  });
+
+  it('offers no Administration to a session with no role, or a near-miss one', async () => {
+    becomeMember('');
+    await open();
+    expect(items()).toEqual(['Sign out']);
+
+    trigger().click();
+    becomeMember('administrator');
+    await open();
+    expect(items()).toEqual(['Sign out']);
+  });
+
+  it('closes on Escape and hands focus back to the button', async () => {
+    await open();
+
+    menu()!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    fixture.detectChanges();
+
+    expect(menu()).toBeNull();
+    expect(document.activeElement).toBe(trigger());
+  });
+
+  it('closes when the button is pressed again', async () => {
+    await open();
+    trigger().click();
+    fixture.detectChanges();
+
+    expect(menu()).toBeNull();
+  });
+
+  it('closes on a click anywhere else', async () => {
+    await open();
+
+    el().querySelector<HTMLElement>('.tabs')!.click();
+    fixture.detectChanges();
+
+    expect(menu()).toBeNull();
+  });
+
   it('signs out and shows the screen that can start a session', async () => {
-    rendered(fixture).querySelector<HTMLButtonElement>('.sign-out')!.click();
+    await open();
+    el().querySelector<HTMLButtonElement>('.sign-out')!.click();
     await fixture.whenStable();
 
     expect(TestBed.inject(SessionStore).signedIn()).toBeFalse();
     expect(TestBed.inject(Router).url).toBe('/sign-in');
   });
-
 });

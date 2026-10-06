@@ -1,0 +1,74 @@
+.admin-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin: var(--space-5) 0;
+
+  h1 {
+    margin: 0;
+    font-size: var(--text-lg);
+    color: var(--navy);
+  }
+
+  .organisation {
+    color: var(--muted);
+    font-size: var(--text-md);
+  }
+
+  .back {
+    margin-left: auto;
+  }
+}
+
+.back {
+  color: var(--accent-link);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+
+.card-head .meta {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.users tbody td {
+  white-space: nowrap;
+}
+
+.name {
+  font-weight: var(--weight-bold);
+}
+
+.you {
+  margin-left: var(--space-2);
+  color: var(--faint);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-normal);
+}
+
+.stamp {
+  font-family: var(--font-mono);
+}
+
+/* What a Member sees: one short card, centred like the design. */
+.denied {
+  max-width: 35rem;
+  margin: var(--space-6) auto;
+
+  p {
+    margin: 0 0 var(--space-3);
+    line-height: 1.6;
+  }
+
+  p:last-child {
+    margin-bottom: 0;
+  }
+
+  .muted {
+    color: var(--muted);
+  }
+}

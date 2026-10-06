@@ -877,3 +877,27 @@ the route with "no bearer gives `401`". The test asserts
 configured seam or stub `config.supabaseUrl`) and assert exactly `401` with
 the fixed `NO_SESSION` message, plus that the repository was never called.
 **Resolution:**
+
+### F-101 [P3] open - The account menu claims role="menu" but has no arrow-key navigation and holds a non-item child
+
+**File:** ui/src/app/shell/console-shell.html:44
+**Found:** 2026-10-06 by /audit independent (scope: current; lens: quality)
+**Why it matters:** `role="menu"` tells assistive technology to expect the ARIA menu pattern: arrow keys move between items, Tab leaves the menu, and every child is a `menuitem`, `group` or `separator`. The panel supports only Tab, Escape and click, and its first child is the `.account-identity` div with the name and `email · organisation`, which has no menu role. Screen-reader users are told to use arrows that do nothing, and the identity text may be skipped or announced oddly. The spec asked for these roles, so this is conformance to the spec with an accessibility gap, not a spec violation.
+**Suggested fix:** either add ArrowUp/ArrowDown/Home/End handling across the `menuitem`s and mark the identity block `role="presentation"` (or move it outside the `role="menu"` element), or drop the menu roles in favour of a plain disclosure (button with `aria-expanded` controlling a list of links/buttons).
+**Resolution:**
+
+### F-102 [P3] open - The admin real-seam test passes with the seam unmounted, like F-100
+
+**File:** api/src/routes/admin.routes.test.ts:196
+**Found:** 2026-10-06 by /audit independent (scope: current; lens: tests)
+**Why it matters:** The test accepts `[401, 503]`. `createAdminRouter` mounts `requireRole('Administrator')` first, and it answers `401` for any request without `req.auth`, so the test stays green if `app.use(authSeam)` is removed from `createApp`. It proves only that the `x-test-*` headers are ignored. The spec asks for exactly this shape ("401 or 503, as in the saved queries test"), so the code meets the spec; the guard it is meant to prove is the tenant boundary's front door.
+**Suggested fix:** inject a configured seam with a local key set (as `middleware/auth.test.ts` does) and assert exactly `401` with `NO_SESSION`, and that the fake directory was never asked. Fix together with F-100.
+**Resolution:**
+
+### F-103 [P3] unverified - Every admin page load reads the whole project's user list, and the paging stop assumes GoTrue honours perPage 1000
+
+**File:** api/src/admin/user-directory.ts:94
+**Found:** 2026-10-06 by /audit independent (scope: current; lens: performance)
+**Why it matters:** `listOrganisation` pages through every user in the Supabase project (all tenants), then filters, on each `GET /api/admin/users`, with no cache and no request timeout. Cost grows with the whole project, not the caller's organisation. The loop ends when a page returns fewer than 1000 users; if the auth server capped `per_page` below 1000, the first page would come back "short" and the list would be silently truncated (no cross-tenant leak, since filtering still applies). Unverified: the GoTrue cap was not checked against the live service and project size is unknown. The spec accepts listing everyone with no paging.
+**Suggested fix:** confirm the server-side `per_page` cap; if it is lower, stop on an empty page (or use the response's `nextPage`/`total`) instead of `length < PER_PAGE`. Revisit caching or a per-organisation store if the project grows.
+**Resolution:**

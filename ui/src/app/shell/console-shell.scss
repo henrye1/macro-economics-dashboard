@@ -80,42 +80,97 @@
 
 
 .account {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  font-size: var(--text-sm);
+  position: relative;
   padding-left: var(--space-5);
   border-left: 1px solid rgb(255 255 255 / 25%);
+}
+
+/* The visitor's name and role, opening the account menu. */
+.account-trigger {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
 
   .who {
-    display: flex;
-    align-items: baseline;
-    gap: var(--space-2);
+    font-weight: var(--weight-bold);
   }
 
   .role {
     opacity: 0.7;
   }
 
-  /* Square, like every other control in the console. */
-  .sign-out {
-    padding: 6px 12px;
-    border: 1px solid rgb(255 255 255 / 40%);
-    background: transparent;
-    color: inherit;
-    font: inherit;
-    font-size: var(--text-sm);
-    cursor: pointer;
+  .caret {
+    font-size: 10px;
+    opacity: 0.8;
   }
 
-  .sign-out:hover {
-    background: rgb(255 255 255 / 12%);
-  }
-
-  .sign-out:focus-visible {
+  &:focus-visible {
     outline: 2px solid var(--accent-bright);
     outline-offset: 2px;
   }
+}
+
+.account-menu {
+  position: absolute;
+  top: calc(100% + var(--space-3));
+  right: 0;
+  z-index: 10;
+  min-width: 240px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+}
+
+.account-identity {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+
+  .name {
+    font-weight: var(--weight-bold);
+  }
+
+  .detail {
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: var(--text-sm);
+    overflow-wrap: anywhere;
+  }
+}
+
+/* Square, like every other control in the console. */
+.menu-item {
+  display: block;
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-base);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    background: var(--surface-subtle);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--navy);
+    outline-offset: -2px;
+  }
+}
+
+.menu-separator {
+  border-top: 1px solid var(--border);
 }
 
 /* ---------- tab bar ---------- */

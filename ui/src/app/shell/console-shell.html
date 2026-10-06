@@ -20,17 +20,53 @@
     </div>
 
     <!-- The visitor's own session, which the pill above is deliberately not
-         about. Feature 19 left sign-out to this feature so the two would be
-         named once, together, rather than twice. -->
+         about. Names and organisation are rendered by interpolation only:
+         `fullName` comes from user_metadata, which the visitor can write. -->
     @if (session(); as who) {
-      <div class="account">
-        <span class="who">
-          {{ who.fullName }}
+      <div class="account" (keydown.escape)="closeMenu(true)">
+        <button
+          #trigger
+          type="button"
+          class="account-trigger"
+          aria-haspopup="menu"
+          aria-controls="account-menu"
+          [attr.aria-expanded]="menuOpen()"
+          (click)="toggleMenu()"
+        >
+          <span class="who">{{ who.fullName }}</span>
           @if (who.role) {
             <span class="role">{{ who.role }}</span>
           }
-        </span>
-        <button type="button" class="sign-out" (click)="signOut()">Sign out</button>
+          <span class="caret" aria-hidden="true">&#9662;</span>
+        </button>
+
+        @if (menuOpen()) {
+          <div id="account-menu" class="account-menu" role="menu" aria-label="Account">
+            <div class="account-identity">
+              <div class="name">{{ who.fullName }}</div>
+              <div class="detail">
+                {{ who.email }}@if (who.organisation) { &middot; {{ who.organisation }} }
+              </div>
+            </div>
+            @if (isAdministrator()) {
+              <a
+                #firstItem
+                role="menuitem"
+                class="menu-item"
+                routerLink="/administration"
+                (click)="closeMenu(false)"
+              >Administration</a>
+              <div class="menu-separator" role="separator"></div>
+            }
+            <button
+              #signOutItem
+              type="button"
+              role="menuitem"
+              class="menu-item sign-out"
+              (click)="signOut()"
+            >Sign out</button>
+          </div>
+        }
       </div>
     }
   </div>

@@ -62,3 +62,12 @@
   invitation issue and revoke, and role assignment. Not designed yet. Needs a
   mockup before it can be specced, and needs 14 and 15 to be real work rather
   than fixtures.
+  - [x] 20a. **Admin page and user list** - a user menu in the topbar, an admin-only
+    `/administration` page, and the user list for the administrator's own
+    organisation. A Member who opens the page sees a not-permitted card
+  - [ ] 20b. **Role assignment** - change a user's role between Member and
+    Administrator, never your own, and never leaving the organisation without an
+    Administrator
+  - [ ] 20c. **Invitations** - issue, revoke and resend invitations through
+    Supabase's invite email with a 7-day lifetime, and make the accept-invitation
+    screen real

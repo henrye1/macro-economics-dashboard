@@ -1,7 +1,16 @@
-import { Component, computed, inject } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { catchError, map, of } from 'rxjs';
+import {
+  Component,
+  ElementRef,
+  afterNextRender,
+  computed,
+  inject,
+  Injector,
+  signal,
+  viewChild
+} from '@angular/core';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { catchError, filter, map, of } from 'rxjs';
 
 import { macroErrorMessage } from '../core/http/macro-error';
 import { MACRO_DATA } from '../core/macro-data.provider';
@@ -18,7 +27,8 @@ const STRIP_UNAVAILABLE = 'Unavailable';
   selector: 'app-console-shell',
   imports: [RouterOutlet, RouterLink, RouterLinkActive],
   templateUrl: './console-shell.html',
-  styleUrl: './console-shell.scss'
+  styleUrl: './console-shell.scss',
+  host: { '(document:click)': 'closeOnOutsideClick($event)' }
 })
 export class ConsoleShell {
   /** Display order from the designs, which differs from the build order. */
@@ -39,12 +49,77 @@ export class ConsoleShell {
   /** The visitor, for the topbar. Null while signed out, which the guard prevents. */
   protected readonly session = this.sessionStore.session;
 
+  private readonly host = inject(ElementRef<HTMLElement>);
+  private readonly injector = inject(Injector);
+
+  private readonly trigger = viewChild<ElementRef<HTMLButtonElement>>('trigger');
+  private readonly firstItem = viewChild<ElementRef<HTMLElement>>('firstItem');
+  private readonly signOutItem = viewChild<ElementRef<HTMLElement>>('signOutItem');
+
+  protected readonly menuOpen = signal(false);
+
+  /**
+   * Whether to offer Administration. The exact rule the API's `resolveRole`
+   * applies, so the menu never offers a page the API will refuse. Display only:
+   * the API is the boundary, and a Member who types the URL gets its refusal.
+   */
+  protected readonly isAdministrator = computed(
+    () => this.session()?.role === 'Administrator'
+  );
+
+  constructor() {
+    // A navigation, from the menu or anywhere else, closes it.
+    this.router.events
+      .pipe(
+        filter((event) => event instanceof NavigationEnd),
+        takeUntilDestroyed()
+      )
+      .subscribe(() => this.menuOpen.set(false));
+  }
+
+  protected toggleMenu(): void {
+    if (this.menuOpen()) {
+      this.closeMenu(true);
+      return;
+    }
+
+    this.menuOpen.set(true);
+
+    // The items exist only once the panel has rendered.
+    afterNextRender(
+      () => (this.firstItem() ?? this.signOutItem())?.nativeElement.focus(),
+      { injector: this.injector }
+    );
+  }
+
+  /** Closes the menu; Escape also hands focus back to the button that opened it. */
+  protected closeMenu(returnFocus: boolean): void {
+    if (!this.menuOpen()) {
+      return;
+    }
+
+    this.menuOpen.set(false);
+
+    if (returnFocus) {
+      this.trigger()?.nativeElement.focus();
+    }
+  }
+
+  protected closeOnOutsideClick(event: MouseEvent): void {
+    const account = this.host.nativeElement.querySelector('.account');
+
+    if (this.menuOpen() && account !== null && !account.contains(event.target as Node)) {
+      this.menuOpen.set(false);
+    }
+  }
+
   /**
    * Ends the session and shows the screen that can start another one.
    * Navigating rather than leaving the guard to do it keeps the console from
    * painting a frame of signed-out chrome on the way out.
    */
   protected signOut(): void {
+    this.menuOpen.set(false);
     this.sessionStore.signOut();
     void this.router.navigate(['/sign-in']);
   }

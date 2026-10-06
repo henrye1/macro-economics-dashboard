@@ -93,6 +93,19 @@ describe('authInterceptor', () => {
       httpMock.verify();
     });
 
+    it('carries the access token to administration', async () => {
+      const { http, httpMock } = setUp(clientWith(TOKEN));
+
+      http.get('/api/admin/users').subscribe();
+      await TestBed.inject(SessionStore).ready;
+
+      const request = httpMock.expectOne('/api/admin/users');
+
+      expect(request.request.headers.get('Authorization')).toBe(`Bearer ${TOKEN}`);
+      request.flush({ data: [] });
+      httpMock.verify();
+    });
+
     it('does not mistake a lookalike path for an authenticated route', async () => {
       const { http, httpMock } = setUp(clientWith(TOKEN));
 

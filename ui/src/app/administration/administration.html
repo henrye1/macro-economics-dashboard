@@ -1,0 +1,78 @@
+@if (kind() === 'forbidden') {
+  <section class="card denied">
+    <div class="card-head">
+      <h2>Administration</h2>
+    </div>
+    <div class="card-body">
+      <p>Administration is for administrators.</p>
+      <p class="muted">Ask an administrator in your organisation to change your role.</p>
+      <p><a routerLink="/overview" class="back">Back to the console</a></p>
+    </div>
+  </section>
+} @else {
+  <div class="admin-head">
+    <h1>Administration</h1>
+    <!-- The organisation comes from app_metadata, rendered by interpolation. -->
+    @if (organisation()) {
+      <span class="organisation">{{ organisation() }}</span>
+    }
+    <a routerLink="/overview" class="back">Back to the console</a>
+  </div>
+
+  <section class="card users">
+    <div class="card-head">
+      <h2>Users</h2>
+      @if (kind() === 'ready') {
+        <span class="meta">{{ countLabel() }}</span>
+      }
+    </div>
+
+    @switch (kind()) {
+      @case ('loading') {
+        <p class="state" role="status">Loading users…</p>
+      }
+      @case ('failed') {
+        <p class="state" role="status">Could not load users.</p>
+      }
+      @case ('no-organisation') {
+        <p class="state" role="status">This account has no organisation to administer.</p>
+      }
+      @default {
+        @if (users().length === 0) {
+          <p class="state" role="status">No users in {{ organisation() }} yet.</p>
+        } @else {
+          <table class="grid">
+            <caption class="visually-hidden">
+              Everyone in {{ organisation() }}, by name, with their role and last sign-in.
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Name</th>
+                <th scope="col">Email</th>
+                <th scope="col">Role</th>
+                <th scope="col">Last sign-in</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (user of users(); track user.id) {
+                <tr>
+                  <!-- Names come from user_metadata, which the person can
+                       write. Interpolation only, which escapes them. -->
+                  <td class="name">
+                    {{ user.fullName }}
+                    @if (isYou(user)) {
+                      <span class="you">you</span>
+                    }
+                  </td>
+                  <td>{{ user.email }}</td>
+                  <td>{{ user.role }}</td>
+                  <td class="stamp">{{ lastSignIn(user) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      }
+    }
+  </section>
+}

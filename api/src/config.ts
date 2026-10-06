@@ -100,4 +100,7 @@ export const config = {
   authConfigured: isAuthConfigured(auth),
   supabaseServiceKey: savedQueries.supabaseServiceKey,
   savedQueriesConfigured: isSavedQueriesConfigured(savedQueries),
+  // The admin routes read the user directory with the same service role key,
+  // so they are usable exactly when the saved-query routes are.
+  adminConfigured: isSavedQueriesConfigured(savedQueries),
 } as const;

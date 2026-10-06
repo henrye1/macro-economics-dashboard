@@ -9,6 +9,7 @@ import { SeriesPage } from './series/series';
 import { AuthLayout } from './auth/auth-layout';
 import { ConsoleShell } from './shell/console-shell';
 import { AcceptInvitationPage } from './auth/accept-invitation';
+import { AdministrationPage } from './administration/administration';
 import { ResetPasswordPage } from './auth/reset-password';
 import { SetPasswordPage } from './auth/set-password';
 import { SignInPage } from './auth/sign-in';
@@ -47,7 +48,10 @@ export const routes: Routes = [
       { path: 'observations', component: ObservationsPage },
       { path: 'vintages', component: VintagesPage },
       { path: 'saved-queries', component: SavedQueriesPage },
-      { path: 'request-builder', component: RequestBuilderPage }
+      { path: 'request-builder', component: RequestBuilderPage },
+      // Reached from the account menu, not a tab. The page and the API both
+      // check the role; the session guard only requires a session.
+      { path: 'administration', component: AdministrationPage }
     ]
   },
   // No 404 page in the MVP scope, so an unknown path lands on Overview.

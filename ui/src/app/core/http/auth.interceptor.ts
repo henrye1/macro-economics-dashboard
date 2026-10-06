@@ -7,11 +7,12 @@ import { SessionStore } from '../session.store';
 import { SUPABASE_CLIENT } from '../supabase/supabase.client';
 
 /**
- * Only the API routes that verify a session: the relay and the visitor's own
- * saved queries. Everything else the console fetches is its own asset, and a
- * token on a request that does not need one is a token in one more log.
+ * Only the API routes that verify a session: the relay, the visitor's own
+ * saved queries, and administration. Everything else the console fetches is
+ * its own asset, and a token on a request that does not need one is a token in
+ * one more log.
  */
-const AUTHENTICATED = ['/api/macro', '/api/saved-queries'];
+const AUTHENTICATED = ['/api/macro', '/api/saved-queries', '/api/admin'];
 
 /**
  * Carries the visitor's access token to the relay, and takes a refusal
