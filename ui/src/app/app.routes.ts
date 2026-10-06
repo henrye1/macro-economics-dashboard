@@ -31,6 +31,10 @@ export const routes: Routes = [
     children: [
       { path: 'sign-in', component: SignInPage },
       { path: 'reset-password', component: ResetPasswordPage },
+      // Where Supabase's invite email lands (feature 20c). No token segment:
+      // like the reset link, the credential is in the fragment and the client
+      // consumes it on load. The token route stays for the fixture provider.
+      { path: 'accept-invite', component: AcceptInvitationPage },
       { path: 'accept-invite/:token', component: AcceptInvitationPage },
       // Where the reset email lands. No token segment: Supabase puts its
       // recovery token in the fragment and its client consumes it on load.

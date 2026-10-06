@@ -965,3 +965,19 @@ the fixed `NO_SESSION` message, plus that the repository was never called.
 **Why it matters:** Step 2 asks for "revoke and resend refusing confirmed users and other organisations (`not-found`)". Revoke covers confirmed, other-organisation and missing ids; resend covers only a confirmed user. Resend is the more destructive of the two (it deletes, then creates), so the other-organisation case is the one worth pinning. Both share `pendingIn`, so the risk today is low; the test is what keeps a later refactor of resend from skipping it.
 **Suggested fix:** extend the resend not-found case with an invitee in another organisation and a missing id, asserting `calls` stays empty.
 **Resolution:**
+
+### F-112 [P2] open - An invitee who already accepted is shown the invitation again, because `invited_by` stays on every account forever
+
+**File:** ui/src/app/core/supabase/supabase-auth.provider.ts:231
+**Found:** 2026-10-06 by /audit independent (scope: current; lens: quality, security, tests)
+**Why it matters:** `isInvited` treats any session whose `app_metadata.invited_by` is a non-empty string as an invitation. The API stamps that field at invite time and never removes it, so every account created through an invitation (that is, every account except a bootstrap administrator) keeps it after accepting. Such a user who opens `/accept-invite` while signed in with no error fragment (a bookmark, browser history, or the typed address; a spent link correctly lands on the dead end because its `otp_expired` fragment wins), sees "Accept your invitation" with their organisation and role and can re-submit a name and password. This follows the spec's literal rule but defeats its stated intent that an ordinary signed-in user is not shown an invitation. No authority is gained: the session can already change its password through `/set-password`, and organisation and role are read only from `app_metadata` via `toSession`. The provider spec's "ordinary signed-in visitor" case uses a user without `invited_by`, so it does not cover the common case.
+**Suggested fix:** also require the session to look unaccepted, for example no `user_metadata.full_name` yet, or have the API (or the accept call) clear `invited_by` / set an `accepted` marker in `app_metadata` once the password is set; add a provider spec for a signed-in user who still carries `invited_by` after accepting. Alternatively amend the spec to accept this behaviour explicitly.
+**Resolution:**
+
+### F-113 [P3] open - The sign-in screen's `?accepted=1` notice has no caller after this feature
+
+**File:** ui/src/app/auth/sign-in.ts:39
+**Found:** 2026-10-06 by /audit independent (scope: current; lens: quality)
+**Why it matters:** The accept screen no longer navigates to `/sign-in?accepted=1`, so the notice branch and its spec (`sign-in.spec.ts:211`) are now dead code. The spec notes record leaving it deliberately as outside this feature, so this is a follow-up candidate, not a defect in the delta.
+**Suggested fix:** remove the `accepted` query-param notice and its spec through `/fix`.
+**Resolution:**

@@ -3,7 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink } from '@angular/router';
 
 import { AUTH, type PasswordRejection } from '../core/auth.provider';
-import { passwordMeetsRules, passwordRules } from '../core/password-rules';
+import { WEAK_PASSWORD, passwordMeetsRules, passwordRules } from '../core/password-rules';
 import { SessionStore } from '../core/session.store';
 
 const UNAVAILABLE = 'We could not set your password just now. Try again in a moment.';
@@ -11,8 +11,7 @@ const UNAVAILABLE = 'We could not set your password just now. Try again in a mom
 /** What to change, for each password the service considered and refused. */
 const REJECTED: Record<PasswordRejection, string> = {
   'same-password': 'That is already your password. Choose a different one.',
-  'weak-password':
-    'That password is too easy to guess, or has appeared in a known data breach. Choose a different one.'
+  'weak-password': WEAK_PASSWORD
 };
 
 /** The form, or the dead end a spent link lands on. */

@@ -4,7 +4,6 @@ import type { AuthError, SupabaseClient, User } from '@supabase/supabase-js';
 import { firstValueFrom } from 'rxjs';
 
 import type { Session } from '../auth.provider';
-import { FIXTURE_INVITATIONS, FixtureAuthProvider } from '../fixtures/fixture-auth.provider';
 import { RESET_PATH, SupabaseAuthProvider } from './supabase-auth.provider';
 import { SUPABASE_CLIENT } from './supabase.client';
 
@@ -29,9 +28,10 @@ interface ClientStub {
   signInWithPassword: jasmine.Spy;
   resetPasswordForEmail: jasmine.Spy;
   updateUser: jasmine.Spy;
+  getSession: jasmine.Spy;
 }
 
-function make(stub: Partial<ClientStub> = {}, origin = 'https://console.cyte.co.za') {
+function make(stub: Partial<ClientStub> = {}, origin = 'https://console.cyte.co.za', hash = '') {
   const client: ClientStub = {
     signInWithPassword: jasmine
       .createSpy('signInWithPassword')
@@ -42,15 +42,17 @@ function make(stub: Partial<ClientStub> = {}, origin = 'https://console.cyte.co.
     updateUser: jasmine
       .createSpy('updateUser')
       .and.resolveTo({ data: { user: user() }, error: null }),
+    getSession: jasmine
+      .createSpy('getSession')
+      .and.resolveTo({ data: { session: null }, error: null }),
     ...stub
   };
 
   TestBed.configureTestingModule({
     providers: [
       SupabaseAuthProvider,
-      FixtureAuthProvider,
       { provide: SUPABASE_CLIENT, useValue: { auth: client } as unknown as SupabaseClient },
-      { provide: DOCUMENT, useValue: { location: { origin } } }
+      { provide: DOCUMENT, useValue: { location: { origin, hash } } }
     ]
   });
 
@@ -62,7 +64,6 @@ function makeUnconfigured() {
   TestBed.configureTestingModule({
     providers: [
       SupabaseAuthProvider,
-      FixtureAuthProvider,
       { provide: SUPABASE_CLIENT, useValue: null },
       { provide: DOCUMENT, useValue: { location: { origin: 'https://console.cyte.co.za' } } }
     ]
@@ -281,34 +282,144 @@ describe('SupabaseAuthProvider', () => {
     });
   });
 
-  describe('the two methods Supabase Auth cannot answer yet', () => {
-    it('reads an invitation through the fixture, unchanged', async () => {
-      const { provider } = make();
-      const expected = FIXTURE_INVITATIONS[0]!;
+  describe('invitation', () => {
+    const invitee = () =>
+      user({
+        email: 'kagiso@treasuryrisk.co.za',
+        invited_at: '2026-10-06T12:00:00.000Z',
+        app_metadata: {
+          provider: 'email',
+          organisation: 'Treasury Risk',
+          role: 'Administrator',
+          invited_by: 'a11ce000-0000-4000-8000-000000000001',
+          invited_by_name: 'Thandi Mokoena'
+        },
+        // A visitor-writable claim that must never become the role shown.
+        user_metadata: { role: 'Owner' }
+      });
 
-      await expectAsync(firstValueFrom(provider.invitation(expected.token))).toBeResolvedTo(expected);
+    const withSession = (sessionUser: User | null) =>
+      jasmine
+        .createSpy('getSession')
+        .and.resolveTo({ data: { session: sessionUser === null ? null : { user: sessionUser } }, error: null });
+
+    it('reads the invitation from the session the emailed link left behind', async () => {
+      const { provider } = make({ getSession: withSession(invitee()) });
+
+      await expectAsync(firstValueFrom(provider.invitation(''))).toBeResolvedTo({
+        token: '',
+        email: 'kagiso@treasuryrisk.co.za',
+        organisation: 'Treasury Risk',
+        role: 'Administrator',
+        invitedBy: 'Thandi Mokoena',
+        sentAt: '2026-10-06T12:00:00.000Z',
+        expiresAt: '',
+        status: 'valid'
+      });
     });
 
-    it('accepts an invitation through the fixture, unchanged', async () => {
-      const { provider } = make();
-      const valid = FIXTURE_INVITATIONS[0]!;
+    it('names "an administrator" when no inviter name was stamped', async () => {
+      const unnamed = invitee();
+      delete (unnamed.app_metadata as Record<string, unknown>)['invited_by_name'];
+      const { provider } = make({ getSession: withSession(unnamed) });
+
+      expect((await firstValueFrom(provider.invitation(''))).invitedBy).toBe('an administrator');
+    });
+
+    it('calls a refused link expired when Supabase says otp_expired', async () => {
+      const { provider } = make(
+        { getSession: withSession(null) },
+        'https://console.cyte.co.za',
+        '#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired'
+      );
+
+      expect((await firstValueFrom(provider.invitation(''))).status).toBe('expired');
+    });
+
+    it('lets a refused link win over a session already in this browser', async () => {
+      const { provider } = make(
+        { getSession: withSession(invitee()) },
+        'https://console.cyte.co.za',
+        '#error=access_denied&error_code=otp_expired'
+      );
+
+      expect((await firstValueFrom(provider.invitation(''))).status).toBe('expired');
+    });
+
+    it('treats any other refusal, or no link at all, as unknown', async () => {
+      const other = make({ getSession: withSession(null) }, 'https://console.cyte.co.za', '#error=server_error&error_code=unexpected_failure');
+      expect((await firstValueFrom(other.provider.invitation(''))).status).toBe('unknown');
+
+      TestBed.resetTestingModule();
+      const bare = make({ getSession: withSession(null) });
+      expect((await firstValueFrom(bare.provider.invitation(''))).status).toBe('unknown');
+    });
+
+    it('shows no invitation to an ordinary signed-in visitor', async () => {
+      const { provider } = make({ getSession: withSession(user()) });
+
+      expect((await firstValueFrom(provider.invitation(''))).status).toBe('unknown');
+    });
+
+    it('fails, rather than inventing a state, when the session cannot be read', async () => {
+      const { provider } = make({
+        getSession: jasmine.createSpy('getSession').and.resolveTo({ data: { session: null }, error: authError('unexpected_failure') })
+      });
+
+      await expectAsync(firstValueFrom(provider.invitation(''))).toBeRejected();
+    });
+
+    it('fails when this build has no project', async () => {
+      await expectAsync(firstValueFrom(makeUnconfigured().invitation(''))).toBeRejected();
+    });
+  });
+
+  describe('acceptInvitation', () => {
+    it('sets the trimmed name and the password on the invite session', async () => {
+      const accepted = user({ user_metadata: { full_name: 'Kagiso Molefe' } });
+      const { client, provider } = make({
+        updateUser: jasmine.createSpy('updateUser').and.resolveTo({ data: { user: accepted }, error: null })
+      });
 
       const result = (await firstValueFrom(
-        provider.acceptInvitation(valid.token, 'Lerato Khumalo', 'pw')
+        provider.acceptInvitation('', '  Kagiso Molefe ', 'N3w-passphrase!')
       )) as Session;
 
-      expect(result.email).toBe(valid.email);
-      expect(result.organisation).toBe(valid.organisation);
+      expect(client.updateUser).toHaveBeenCalledOnceWith({
+        password: 'N3w-passphrase!',
+        data: { full_name: 'Kagiso Molefe' }
+      });
+      expect(result.fullName).toBe('Kagiso Molefe');
     });
 
-    it('does not ask Supabase about either, so no half-built call reaches the project', async () => {
-      const { client, provider } = make();
+    function refusing(code: string, status = 422) {
+      return jasmine
+        .createSpy('updateUser')
+        .and.resolveTo({ data: { user: null }, error: { ...authError(code), status } });
+    }
 
-      await firstValueFrom(provider.invitation('valid-token'));
-      await firstValueFrom(provider.acceptInvitation('valid-token', 'Name', 'pw'));
+    it('answers denied when the link left no session', async () => {
+      const { provider } = make({ updateUser: refusing('session_not_found', 401) });
 
-      expect(client.signInWithPassword).not.toHaveBeenCalled();
-      expect(client.resetPasswordForEmail).not.toHaveBeenCalled();
+      await expectAsync(firstValueFrom(provider.acceptInvitation('', 'N', 'pw'))).toBeResolvedTo('denied');
+    });
+
+    it('answers weak-password when the project refuses the password', async () => {
+      const { provider } = make({ updateUser: refusing('weak_password') });
+
+      await expectAsync(firstValueFrom(provider.acceptInvitation('', 'N', 'pw'))).toBeResolvedTo(
+        'weak-password'
+      );
+    });
+
+    it('fails on anything else, so the screen says it is unavailable', async () => {
+      const { provider } = make({ updateUser: refusing('unexpected_failure', 500) });
+
+      await expectAsync(firstValueFrom(provider.acceptInvitation('', 'N', 'pw'))).toBeRejected();
+    });
+
+    it('fails when this build has no project', async () => {
+      await expectAsync(firstValueFrom(makeUnconfigured().acceptInvitation('', 'N', 'pw'))).toBeRejected();
     });
   });
 });

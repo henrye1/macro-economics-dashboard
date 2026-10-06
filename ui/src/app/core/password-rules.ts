@@ -37,3 +37,11 @@ export function passwordRules(candidate: string): PasswordRules {
 export function passwordMeetsRules(candidate: string): boolean {
   return Object.values(passwordRules(candidate)).every(Boolean);
 }
+
+/**
+ * What to say when the project refuses a password the screen's rules allowed:
+ * its own policy, leaked-password protection included, goes beyond the three.
+ * One sentence for the set-password and accept-invitation screens alike.
+ */
+export const WEAK_PASSWORD =
+  'That password is too easy to guess, or has appeared in a known data breach. Choose a different one.';

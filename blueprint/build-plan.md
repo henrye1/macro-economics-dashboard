@@ -58,7 +58,7 @@
   point at which the seam earns its keep. The reference draws only the
   request-a-link half of reset; the screen that consumes the emailed link reuses
   the accept-invitation form and needs a design review before it is built.
-- [ ] 20. **Administration** - the page the sign-in copy points at: user list,
+- [x] 20. **Administration** - the page the sign-in copy points at: user list,
   invitation issue and revoke, and role assignment. Not designed yet. Needs a
   mockup before it can be specced, and needs 14 and 15 to be real work rather
   than fixtures.
@@ -71,6 +71,6 @@
   - [x] 20c. **Invitations** - issue, revoke and resend invitations through
     Supabase's invite email, valid for the project's email-link lifetime, with
     the Invitations card and invite form on the Administration page
-  - [ ] 20d. **Accept invitation** - the accept-invitation screen reads the real
+  - [x] 20d. **Accept invitation** - the accept-invitation screen reads the real
     invitation from Supabase's link, including its expired state, and accepting
     sets the name and password

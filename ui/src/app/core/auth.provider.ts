@@ -74,11 +74,15 @@ export interface AuthProvider {
    */
   setPassword(password: string): Observable<Session | AuthFailure | PasswordRejection>;
 
+  /**
+   * Set the invitee's name and password. A password the service refuses is an
+   * answer the visitor fixes, as it is for `setPassword`.
+   */
   acceptInvitation(
     token: string,
     fullName: string,
     password: string
-  ): Observable<Session | AuthFailure>;
+  ): Observable<Session | AuthFailure | PasswordRejection>;
 }
 
 /** Inject this, never a concrete implementation. */

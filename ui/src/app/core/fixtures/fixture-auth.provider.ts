@@ -1,7 +1,13 @@
 import { Injectable } from '@angular/core';
 import { Observable, of } from 'rxjs';
 
-import type { AuthFailure, AuthProvider, Invitation, Session } from '../auth.provider';
+import type {
+  AuthFailure,
+  AuthProvider,
+  Invitation,
+  PasswordRejection,
+  Session
+} from '../auth.provider';
 
 /**
  * The one account this fixture knows, and its password.
@@ -135,7 +141,7 @@ export class FixtureAuthProvider implements AuthProvider {
     token: string,
     fullName: string,
     _password: string
-  ): Observable<Session | AuthFailure> {
+  ): Observable<Session | AuthFailure | PasswordRejection> {
     const found = FIXTURE_INVITATIONS.find((invitation) => invitation.token === token);
 
     if (found === undefined || found.status !== 'valid') {

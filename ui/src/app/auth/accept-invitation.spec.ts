@@ -5,7 +5,9 @@ import { Router, provideRouter } from '@angular/router';
 
 import { App } from '../app';
 import { routes } from '../app.routes';
-import { AUTH } from '../core/auth.provider';
+import { Observable, of } from 'rxjs';
+
+import { AUTH, type Invitation, type PasswordRejection, type Session } from '../core/auth.provider';
 import {
   FIXTURE_REFUSED_TOKEN,
   FixtureAuthProvider
@@ -15,7 +17,34 @@ import { provideNoSession } from '../core/fixtures/signed-in-session';
 import { MACRO_DATA } from '../core/macro-data.provider';
 import { SessionStore } from '../core/session.store';
 
-async function open(token: string): Promise<ComponentFixture<App>> {
+/** The fixture, but the project refuses every password as too weak. */
+class WeakPasswordAuth extends FixtureAuthProvider {
+  override acceptInvitation(): Observable<Session | PasswordRejection> {
+    return of('weak-password');
+  }
+}
+
+/** What the real provider answers for a link Supabase refused: no dates to show. */
+class RefusedLinkAuth extends FixtureAuthProvider {
+  override invitation(): Observable<Invitation> {
+    return of({
+      token: '',
+      email: '',
+      organisation: '',
+      role: '',
+      invitedBy: '',
+      sentAt: '',
+      expiresAt: '',
+      status: 'expired'
+    });
+  }
+}
+
+async function open(
+  token: string,
+  auth: new () => FixtureAuthProvider = FixtureAuthProvider,
+  path = `/accept-invite/${token}`
+): Promise<ComponentFixture<App>> {
   await TestBed.configureTestingModule({
     imports: [App],
     providers: [
@@ -24,12 +53,12 @@ async function open(token: string): Promise<ComponentFixture<App>> {
       provideHttpClientTesting(),
       provideNoSession(),
       { provide: MACRO_DATA, useClass: FixtureMacroDataProvider },
-      { provide: AUTH, useClass: FixtureAuthProvider }
+      { provide: AUTH, useClass: auth }
     ]
   }).compileComponents();
 
   const fixture = TestBed.createComponent(App);
-  await TestBed.inject(Router).navigateByUrl(`/accept-invite/${token}`);
+  await TestBed.inject(Router).navigateByUrl(path);
   fixture.detectChanges();
   return fixture;
 }
@@ -106,18 +135,17 @@ describe('Accept invitation', () => {
       expect(items[1]?.textContent).toContain('not met yet');
     });
 
-    it('activates the account and sends the visitor to sign in', async () => {
+    it('activates the account and lands in the console, signed in', async () => {
       type(fixture, 'fullName', 'Lerato Khumalo');
       type(fixture, 'password', 'Correct-horse-1');
       host(fixture).querySelector<HTMLFormElement>('form')!.dispatchEvent(new Event('submit'));
       await fixture.whenStable();
       fixture.detectChanges();
 
-      // Not into the console. Acceptance is still answered by the fixture, so
-      // there is no Supabase session behind it and every macro request would
-      // answer 401. The notice on sign-in explains the hand-off.
-      expect(TestBed.inject(Router).url).toBe('/sign-in?accepted=1');
-      expect(TestBed.inject(SessionStore).signedIn()).toBeFalse();
+      // The emailed link already signed them in; setting the password is the
+      // last step, as after a reset.
+      expect(TestBed.inject(Router).url).toBe('/overview');
+      expect(TestBed.inject(SessionStore).session()?.fullName).toBe('Lerato Khumalo');
     });
   });
 
@@ -140,13 +168,43 @@ describe('Accept invitation', () => {
     expect(TestBed.inject(SessionStore).signedIn()).toBeFalse();
   });
 
+  it('keeps the form and says why when the project refuses the password', async () => {
+    const fixture = await open('valid-token', WeakPasswordAuth);
+    type(fixture, 'fullName', 'Lerato Khumalo');
+    type(fixture, 'password', 'Correct-horse-1');
+    host(fixture).querySelector<HTMLFormElement>('form')!.dispatchEvent(new Event('submit'));
+    await fixture.whenStable();
+
+    const after = host(fixture);
+
+    expect(after.querySelector('.problem')?.textContent?.trim()).toBe(
+      'That password is too easy to guess, or has appeared in a known data breach. Choose a different one.'
+    );
+    expect(after.querySelector('form')).toBeTruthy();
+    expect(after.querySelector<HTMLInputElement>('input[name="password"]')!.value).toBe('');
+    expect(TestBed.inject(SessionStore).signedIn()).toBeFalse();
+  });
+
+  it('answers the address Supabase\'s email links to, which carries no token', async () => {
+    const page = host(await open('', RefusedLinkAuth, '/accept-invite'));
+
+    expect(page.querySelector('h2')?.textContent?.trim()).toBe('This invitation is no longer valid');
+  });
+
   describe('a dead end', () => {
-    it('names both dates when the invitation expired', async () => {
+    it('names both dates when the invitation expired, without promising a lifetime', async () => {
       const text = host(await open('expired-token')).querySelector('.alert')?.textContent ?? '';
 
       expect(text).toContain('d.jacobs@cyte.co.za');
       expect(text).toContain('8 September 2026');
       expect(text).toContain('15 September 2026');
+      expect(text).not.toContain('seven days');
+    });
+
+    it('says the link expired or was used when Supabase refused it with no dates', async () => {
+      const text = host(await open('', RefusedLinkAuth, '/accept-invite')).querySelector('.alert')?.textContent;
+
+      expect(text?.trim()).toBe('This invitation link has expired or has already been used.');
     });
 
     it('says something different when it was revoked', async () => {

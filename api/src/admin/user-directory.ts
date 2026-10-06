@@ -311,8 +311,20 @@ export function createDirectory(
       throw new Error('Supabase returned no invited user.');
     }
 
+    // The inviter's name as it is now, so the invitee's screen can say who
+    // invited them without a request it has no right to make. The card reads
+    // the live inviter instead; this stamp is only for the invitee.
+    const caller = members.find((member) => member.id === callerId);
+    const invitedByName = caller === undefined ? '' : toAdminUser(caller).fullName;
+
     const stamped = await client.updateUserById(user.id, {
-      app_metadata: { ...(user.app_metadata ?? {}), role, organisation, invited_by: callerId },
+      app_metadata: {
+        ...(user.app_metadata ?? {}),
+        role,
+        organisation,
+        invited_by: callerId,
+        invited_by_name: invitedByName,
+      },
     });
 
     if ((stamped.error !== null && stamped.error !== undefined) || stamped.data.user === null) {

@@ -3,7 +3,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import { AUTH, type Invitation, type InvitationStatus } from '../core/auth.provider';
-import { passwordMeetsRules, passwordRules } from '../core/password-rules';
+import { WEAK_PASSWORD, passwordMeetsRules, passwordRules } from '../core/password-rules';
+import { SessionStore } from '../core/session.store';
 
 const DENIED = 'This invitation could not be accepted. Ask for a new one.';
 const UNAVAILABLE = 'We could not activate your account just now. Try again in a moment.';
@@ -34,6 +35,7 @@ export class AcceptInvitationPage {
   private readonly auth = inject(AUTH);
   private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);
+  private readonly session = inject(SessionStore);
 
   protected readonly invitation = signal<Invitation | null>(null);
   protected readonly state = signal<ScreenState>('loading');
@@ -61,12 +63,17 @@ export class AcceptInvitationPage {
     const invite = this.invitation();
     const state = this.state();
 
-    if (state === 'expired' && invite !== null) {
-      return (
-        'Invitations expire seven days after they are sent. This one was sent to ' +
-        `${invite.email} on ${asDate(invite.sentAt)} and expired on ` +
-        `${asDate(invite.expiresAt)}.`
-      );
+    if (state === 'expired') {
+      // A real link that failed carries no dates: Supabase refused it before
+      // anything about the invitation could be read.
+      if (invite !== null && invite.email !== '' && invite.sentAt !== '' && invite.expiresAt !== '') {
+        return (
+          `This invitation was sent to ${invite.email} on ${asDate(invite.sentAt)} ` +
+          `and expired on ${asDate(invite.expiresAt)}.`
+        );
+      }
+
+      return 'This invitation link has expired or has already been used.';
     }
 
     if (state === 'revoked') {
@@ -122,12 +129,18 @@ export class AcceptInvitationPage {
           return;
         }
 
-        // Not into the console. Accepting an invitation is still answered by
-        // the fixture, so `result` is a display shape with no Supabase session
-        // behind it, and `/api/macro` would answer 401 to every request the
-        // first tab made. Sign-in is where an account becomes usable, and
-        // feature 20 is where an accepted invitation becomes a real account.
-        void this.router.navigate(['/sign-in'], { queryParams: { accepted: '1' } });
+        if (result === 'weak-password' || result === 'same-password') {
+          // The link is good; the password is what to change, so the form
+          // stays and says so beside the field.
+          this.password.set('');
+          this.problem.set(WEAK_PASSWORD);
+          return;
+        }
+
+        // The emailed link already signed them in and the password is now set,
+        // so the console is the right place to land, as after a reset.
+        this.session.signIn(result);
+        void this.router.navigateByUrl('/overview');
       },
       error: () => {
         this.busy.set(false);

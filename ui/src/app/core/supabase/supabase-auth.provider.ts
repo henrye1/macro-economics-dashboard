@@ -1,5 +1,5 @@
 import { DOCUMENT, Injectable, inject } from '@angular/core';
-import type { AuthError as SupabaseAuthError } from '@supabase/supabase-js';
+import type { AuthError as SupabaseAuthError, User } from '@supabase/supabase-js';
 import { Observable, from, map } from 'rxjs';
 
 import type {
@@ -9,7 +9,6 @@ import type {
   PasswordRejection,
   Session
 } from '../auth.provider';
-import { FixtureAuthProvider } from '../fixtures/fixture-auth.provider';
 import { SUPABASE_CLIENT } from './supabase.client';
 import { toSession } from './session-mapping';
 
@@ -19,13 +18,11 @@ export const RESET_PATH = '/set-password';
 /**
  * Authentication against Supabase Auth.
  *
- * Three of the five methods are real and the two invitation methods are still
- * fixtures, which is a decision rather than an oversight. Supabase Auth models a user and a
- * password; it does not model an invitation with the organisation, the inviter
- * and the two dates the accept screen renders. Feature 20 builds the
- * administration surface that issues those, and until something can issue one
- * there is nothing for this class to read. The delegation below is tested, so a
- * later reader can see it was chosen.
+ * All five methods are real. An invitation is Supabase's own: the API sends
+ * the invite email (feature 20c) and stamps the invitee's `app_metadata` with
+ * the organisation, role and inviter. Following the link leaves a session
+ * behind, so reading the invitation is reading that session's user, and
+ * accepting it is setting a name and password on it.
  *
  * A rejected credential is an answer, not an error, exactly as `AuthProvider`
  * says: a wrong password completes with `'denied'`, while an outage or a
@@ -36,7 +33,6 @@ export const RESET_PATH = '/set-password';
 export class SupabaseAuthProvider implements AuthProvider {
   private readonly client = inject(SUPABASE_CLIENT);
   private readonly document = inject(DOCUMENT);
-  private readonly fixture = inject(FixtureAuthProvider);
 
   signIn(email: string, password: string): Observable<Session | AuthFailure> {
     const client = this.client;
@@ -121,18 +117,82 @@ export class SupabaseAuthProvider implements AuthProvider {
     );
   }
 
-  /** Still the fixture. See the class comment. */
-  invitation(token: string): Observable<Invitation> {
-    return this.fixture.invitation(token);
+  /**
+   * The invitation the emailed link signed in, or why there is none.
+   *
+   * `getSession()` waits for the client to finish reading the link. Only a
+   * session whose user an administrator invited counts: an ordinary signed-in
+   * visitor who opens this page is not shown an invitation. With no session,
+   * Supabase's own reason is in the fragment; only its `error_code` is read,
+   * never anything else in it.
+   */
+  invitation(_token: string): Observable<Invitation> {
+    const client = this.client;
+
+    if (client === null) {
+      return unconfigured();
+    }
+
+    return from(client.auth.getSession()).pipe(
+      map(({ data, error }) => {
+        if (error !== null) {
+          throw serviceFailure(error);
+        }
+
+        // A link Supabase refused wins over any session already in this
+        // browser: supabase-js keeps the existing session on a failed link,
+        // and that could be the same invitee re-opening a spent one.
+        const refused = this.fragmentErrorCode();
+        if (refused !== null) {
+          return deadEnd(refused);
+        }
+
+        const user = data.session?.user;
+
+        return user !== undefined && isInvited(user) ? invitationOf(user) : deadEnd(null);
+      })
+    );
   }
 
-  /** Still the fixture. See the class comment. */
+  /** Sets the invitee's name and password on the session the link established. */
   acceptInvitation(
-    token: string,
+    _token: string,
     fullName: string,
     password: string
-  ): Observable<Session | AuthFailure> {
-    return this.fixture.acceptInvitation(token, fullName, password);
+  ): Observable<Session | AuthFailure | PasswordRejection> {
+    const client = this.client;
+
+    if (client === null) {
+      return unconfigured();
+    }
+
+    return from(
+      client.auth.updateUser({ password, data: { full_name: fullName.trim() } })
+    ).pipe(
+      map(({ data, error }) => {
+        if (error !== null) {
+          if (isSessionMissing(error)) {
+            return 'denied';
+          }
+
+          // `same-password` cannot happen to an invitee who never had one; a
+          // weak one is theirs to change.
+          return passwordRejection(error) === 'weak-password' ? 'weak-password' : rethrow(error);
+        }
+
+        if (data.user === null) {
+          throw new Error('Supabase accepted the invitation and returned no user.');
+        }
+
+        return toSession(data.user);
+      })
+    );
+  }
+
+  /** Supabase's reason a link failed, from `#error=…&error_code=…`, or null. */
+  private fragmentErrorCode(): string | null {
+    const hash = this.document.location?.hash ?? '';
+    return new URLSearchParams(hash.replace(/^#/, '')).get('error_code');
   }
 
   private resetUrl(): string {
@@ -165,6 +225,55 @@ function isRefusal(error: SupabaseAuthError): boolean {
  */
 function serviceFailure(error: SupabaseAuthError): Error {
   return new Error(`Supabase Auth failed: ${error.message}`);
+}
+
+/** Invited by an administrator: the API stamps `invited_by` on every invitee. */
+function isInvited(user: User): boolean {
+  const invitedBy = user.app_metadata?.['invited_by'];
+  return typeof invitedBy === 'string' && invitedBy !== '';
+}
+
+function stringAt(source: Record<string, unknown> | undefined, key: string): string {
+  const value = source?.[key];
+  return typeof value === 'string' ? value : '';
+}
+
+/**
+ * The invitation the screen renders. Organisation and role come from
+ * `app_metadata`, which only the API writes; nothing is read from
+ * `user_metadata`. There is no expiry to show: the link was still good.
+ */
+function invitationOf(user: User): Invitation {
+  const session = toSession(user);
+
+  return {
+    token: '',
+    email: session.email,
+    organisation: session.organisation,
+    role: session.role,
+    invitedBy: stringAt(user.app_metadata, 'invited_by_name') || 'an administrator',
+    sentAt: user.invited_at ?? '',
+    expiresAt: '',
+    status: 'valid'
+  };
+}
+
+/**
+ * No usable invitation. A revoked invitation's user is deleted, so Supabase
+ * rejects its link exactly as it rejects an expired one; `otp_expired` is
+ * the only reason told apart, and it covers both and a link already used.
+ */
+function deadEnd(errorCode: string | null): Invitation {
+  return {
+    token: '',
+    email: '',
+    organisation: '',
+    role: '',
+    invitedBy: '',
+    sentAt: '',
+    expiresAt: '',
+    status: errorCode === 'otp_expired' ? 'expired' : 'unknown'
+  };
 }
 
 /**

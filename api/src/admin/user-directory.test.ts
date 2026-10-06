@@ -500,6 +500,7 @@ describe('invitations', () => {
         role: 'Administrator',
         organisation: ORG,
         invited_by: ADMIN,
+        invited_by_name: 'Thandi Mokoena',
       });
       expect(invitation).toMatchObject({ role: 'Administrator', invitedBy: 'Thandi Mokoena', status: 'pending' });
     });
@@ -591,6 +592,8 @@ describe('invitations', () => {
       ]);
       expect(users.has('old')).toBe(false);
       expect(fresh).toMatchObject({ id: 'new-1', email: 'old@treasuryrisk.co.za', role: 'Administrator', status: 'pending' });
+      // The resender is the new inviter, by id and by name.
+      expect(users.get('new-1')?.app_metadata).toMatchObject({ invited_by: ADMIN, invited_by_name: 'Thandi Mokoena' });
     });
 
     it('answers not-found for anything but a pending invitee in the organisation', async () => {
