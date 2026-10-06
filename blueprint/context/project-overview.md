@@ -1,6 +1,6 @@
 # Cyte Macro Data Console - Project Overview
 
-<!-- blueprint:source-hash 42799ec12ce2607e17b5f69782e95b4605bcc1afaa3b48d6fcef679518e22faa -->
+<!-- blueprint:source-hash 460734d286553a6552111eb83f06713e6cccdad6d73fc579fc4ab5ab218e82d9 -->
 
 > A browsable console over the Cyte Core API `/api/macro` service, built to make
 > vintages, absent data and ETags tangible to anyone integrating.
@@ -62,7 +62,10 @@ ETag and vintage-pinning habits actually get taught.
 16. **Saved query accounts** (built) - saved queries in Supabase, keyed by user, with a one-time migration from localStorage.
 18. **App shell split** (built) - the shell moves into a console shell component beside an auth layout for full-bleed split-panel screens; the seven flat routes become parents with children so a route chooses its chrome. No visible change to the seven tabs.
 19. **Auth screens** (built) - sign in, reset password, and accept invitation with its expired state, against a typed auth provider seam backed by fixtures, plus the guard that sends a visitor with no session to sign-in.
-20. **Administration** - user list, invitation issue and revoke, role assignment. Not designed; needs a mockup, and 14 and 15 as real work.
+20. **Administration** - split into three, built in order:
+    - 20a. **Admin page and user list** (built) - a topbar user menu, an admin-only `/administration` page, and the users in the administrator's own organisation; a Member sees a not-permitted card.
+    - 20b. **Role assignment** - Member or Administrator; never your own role, never leaving an organisation without an Administrator.
+    - 20c. **Invitations** - issue, revoke and resend through Supabase's invite email, valid for 7 days, and a real accept-invitation screen.
 
 **Out of scope for MVP:** logins, roles, user accounts, merchandised browsing of
 non-curated `WEO_`-prefixed factors (reachable by typing a code), regional
@@ -144,10 +147,8 @@ move to the account on a signed-in visit.
 The Auth0 access token and its expiry, held in a module variable in the API
 process. Never persisted, never sent to the browser.
 
-### When logins land (Post-MVP)
-
-Supabase Postgres picks up users and roles (via Supabase Auth) and saved queries
-keyed by user id, migrated from localStorage on first sign-in.
+Users and roles live in Supabase Auth: `role` and `organisation` in
+`app_metadata`, which only an administrator can set.
 
 ## Tech stack
 
@@ -183,10 +184,7 @@ plus an origin allowlist, both throwaway.
 
 Not directly. A pre-sales and onboarding asset for the Core API macro service,
 measured in integration friction removed: fewer support questions about vintages
-and empty results, and a shorter path to a working M2M client. Recording
-`meta.vintages` ids alongside results is the habit consumers most often skip;
-every consumer who picks it up here is a data-quality escalation that never
-happens.
+and empty results, and a shorter path to a working M2M client.
 
 ## UI/UX
 
@@ -238,10 +236,6 @@ own root directory and runs its commands from there.
 | Publish directory | `dist/ui/browser`, relative to `ui`; `angular.json` sets no `outputPath`, so the builder defaults to the project name |
 | Rewrites, in order | 1. `/api/*` to the API service, as a proxy: the production twin of `proxy.conf.json`, so the console keeps its relative `/api/macro` and never makes a cross-origin request. 2. `/*` to `/index.html` (200) for client-side routing |
 | Env vars | **None.** Decided 2026-09-11, replacing an earlier `API_BASE_URL` build-time variable, which needed a generated file and one build per environment |
-
-> **Unverified (plan).** Render's rewrite-to-another-service behaviour must be
-> checked by `/release render`. If a static site cannot proxy to another service,
-> the fallback is a build-time generated file, and `API_BASE_URL` returns.
 
 **API (Express)** - Render Web Service
 

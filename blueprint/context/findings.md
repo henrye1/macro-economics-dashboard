@@ -900,4 +900,20 @@ the fixed `NO_SESSION` message, plus that the repository was never called.
 **Found:** 2026-10-06 by /audit independent (scope: current; lens: performance)
 **Why it matters:** `listOrganisation` pages through every user in the Supabase project (all tenants), then filters, on each `GET /api/admin/users`, with no cache and no request timeout. Cost grows with the whole project, not the caller's organisation. The loop ends when a page returns fewer than 1000 users; if the auth server capped `per_page` below 1000, the first page would come back "short" and the list would be silently truncated (no cross-tenant leak, since filtering still applies). Unverified: the GoTrue cap was not checked against the live service and project size is unknown. The spec accepts listing everyone with no paging.
 **Suggested fix:** confirm the server-side `per_page` cap; if it is lower, stop on an empty page (or use the response's `nextPage`/`total`) instead of `length < PER_PAGE`. Revisit caching or a per-organisation store if the project grows.
+**Resolution:** Still unverified at 4e203f2 (independent review, 2026-10-06). `setRole` now reuses the same `everyUser` scan inside its per-organisation lock (`api/src/admin/user-directory.ts:160`), so each role change also reads the whole project. A truncated page would fail safe there: a missing caller answers `caller-not-admin` and a missing target `not-found`; no write happens. Cap still not checked against the live service.
+
+### F-104 [P3] open - Other rows stay clickable while a role save is in flight, and the reply then closes or overwrites the row opened meanwhile
+
+**File:** ui/src/app/administration/administration.html:121
+**Found:** 2026-10-06 by /audit independent (scope: current; lens: quality)
+**Why it matters:** During `save`, only the editing row's controls are disabled. Another row's `Change role` stays enabled, so a click mid-save calls `startEditing` and replaces `editing`. When the PUT answers, `next` (`administration.ts:145`) sets `editing` to null and moves focus to the first row, closing the row just opened; `error` (`administration.ts:153`) restores the stale first-row edit with its error, discarding the new one. No wrong write occurs (the API enforces every rule and the request carries the first row's id and draft), so this is a UI-state glitch only.
+**Suggested fix:** disable every row's `Change role` while `editing()?.saving`, or have the callbacks apply only when `editing()?.id` still equals the saved row's id.
+**Resolution:**
+
+### F-105 [P3] open - The route suite has no no-op case although step 2 lists it
+
+**File:** api/src/routes/admin.routes.test.ts:211
+**Found:** 2026-10-06 by /audit independent (scope: current; lens: tests)
+**Why it matters:** Spec step 2 asks the route tests to cover "the no-op". The fake directory always returns the target with the requested role, so no test shows the route answering `200 { data }` with the user unchanged. The behaviour itself is proved in `user-directory.test.ts` ("writes nothing when the role already matches") and the route passes the directory's result through unaltered, so the risk is low; it is a spec-checklist gap.
+**Suggested fix:** add a route case where the fake returns the unchanged user and assert `200` and the unchanged body, or amend the spec to place the no-op only at the directory level.
 **Resolution:**

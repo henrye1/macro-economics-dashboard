@@ -28,4 +28,14 @@ export class AdminDirectory {
       .get<{ data: AdminUser[] }>(ADMIN_USERS_URL)
       .pipe(map((response) => response.data));
   }
+
+  /**
+   * Changes one person's role. The API enforces every rule, against the
+   * directory as it stands, and answers with the person as they now are.
+   */
+  setRole(id: string, role: AdminUser['role']): Observable<AdminUser> {
+    return this.http
+      .put<{ data: AdminUser }>(`${ADMIN_USERS_URL}/${encodeURIComponent(id)}/role`, { role })
+      .pipe(map((response) => response.data));
+  }
 }

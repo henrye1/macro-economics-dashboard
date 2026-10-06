@@ -65,7 +65,7 @@
   - [x] 20a. **Admin page and user list** - a user menu in the topbar, an admin-only
     `/administration` page, and the user list for the administrator's own
     organisation. A Member who opens the page sees a not-permitted card
-  - [ ] 20b. **Role assignment** - change a user's role between Member and
+  - [x] 20b. **Role assignment** - change a user's role between Member and
     Administrator, never your own, and never leaving the organisation without an
     Administrator
   - [ ] 20c. **Invitations** - issue, revoke and resend invitations through

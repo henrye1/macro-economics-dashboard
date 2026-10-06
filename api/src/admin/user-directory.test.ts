@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { User } from '@supabase/supabase-js';
 
 import {
+  RoleChangeError,
   createDirectory,
   inOrganisation,
   toAdminUser,
@@ -90,6 +91,9 @@ describe('createDirectory', () => {
         pages.push(page);
         return { data: { users: all.slice((page - 1) * perPage, page * perPage) }, error: null };
       },
+      async updateUserById() {
+        throw new Error('not expected');
+      },
     };
 
     return { stub, pages };
@@ -117,10 +121,181 @@ describe('createDirectory', () => {
       async listUsers() {
         return { data: { users: [] }, error: new Error('service unavailable') };
       },
+      async updateUserById() {
+        throw new Error('not expected');
+      },
     };
 
     await expect(createDirectory(failing).listOrganisation('Treasury Risk')).rejects.toThrow(
       'service unavailable',
     );
+  });
+});
+
+describe('setRole', () => {
+  const ORG = 'Treasury Risk';
+  const CALLER = 'caller-0000';
+
+  function person(id: string, role: string | undefined, organisation: string = ORG): User {
+    return user({
+      id,
+      email: `${id}@treasuryrisk.co.za`,
+      user_metadata: { full_name: id },
+      app_metadata: { provider: 'email', organisation, ...(role === undefined ? {} : { role }) },
+    });
+  }
+
+  /**
+   * A stateful stub: `updateUserById` replaces `app_metadata` wholesale, the
+   * harsher of the two behaviours Supabase could have, and each call yields a
+   * turn so concurrent calls genuinely interleave.
+   */
+  function project(people: User[]) {
+    const users = new Map(people.map((entry) => [entry.id, entry]));
+    const writes: { id: string; app_metadata: Record<string, unknown> }[] = [];
+
+    const stub: AdminUsersClient = {
+      async listUsers() {
+        await Promise.resolve();
+        return { data: { users: [...users.values()] }, error: null };
+      },
+      async updateUserById(id, { app_metadata }) {
+        await Promise.resolve();
+        writes.push({ id, app_metadata });
+        const updated = { ...users.get(id)!, app_metadata } as User;
+        users.set(id, updated);
+        return { data: { user: updated }, error: null };
+      },
+    };
+
+    return { directory: createDirectory(stub), writes, users };
+  }
+
+  async function refusal(promise: Promise<unknown>): Promise<string | undefined> {
+    try {
+      await promise;
+      return undefined;
+    } catch (error) {
+      expect(error).toBeInstanceOf(RoleChangeError);
+      return (error as RoleChangeError).reason;
+    }
+  }
+
+  it('promotes a Member, keeping every other app_metadata field', async () => {
+    const { directory, writes } = project([person(CALLER, 'Administrator'), person('pieter', 'Member')]);
+
+    const updated = await directory.setRole(ORG, CALLER, 'pieter', 'Administrator');
+
+    expect(updated.role).toBe('Administrator');
+    expect(updated.id).toBe('pieter');
+    expect(writes).toEqual([
+      { id: 'pieter', app_metadata: { provider: 'email', organisation: ORG, role: 'Administrator' } },
+    ]);
+  });
+
+  it('demotes an Administrator while another remains', async () => {
+    const { directory } = project([person(CALLER, 'Administrator'), person('johan', 'Administrator')]);
+
+    expect((await directory.setRole(ORG, CALLER, 'johan', 'Member')).role).toBe('Member');
+  });
+
+  it('writes nothing when the role already matches', async () => {
+    const { directory, writes } = project([person(CALLER, 'Administrator'), person('lerato', 'Member')]);
+
+    expect((await directory.setRole(ORG, CALLER, 'lerato', 'Member')).role).toBe('Member');
+    expect(writes).toEqual([]);
+  });
+
+  it('treats a user with no role as a Member being promoted', async () => {
+    const { directory, writes } = project([person(CALLER, 'Administrator'), person('sipho', undefined)]);
+
+    await directory.setRole(ORG, CALLER, 'sipho', 'Administrator');
+
+    expect(writes[0]?.app_metadata).toEqual({ provider: 'email', organisation: ORG, role: 'Administrator' });
+  });
+
+  it('refuses a caller the directory no longer calls an Administrator', async () => {
+    const { directory, writes } = project([person(CALLER, 'Member'), person('pieter', 'Member')]);
+
+    expect(await refusal(directory.setRole(ORG, CALLER, 'pieter', 'Administrator'))).toBe(
+      'caller-not-admin',
+    );
+    expect(writes).toEqual([]);
+  });
+
+  it('refuses a caller who has left the organisation', async () => {
+    const { directory } = project([person(CALLER, 'Administrator', 'Elsewhere'), person('pieter', 'Member')]);
+
+    expect(await refusal(directory.setRole(ORG, CALLER, 'pieter', 'Administrator'))).toBe(
+      'caller-not-admin',
+    );
+  });
+
+  it('answers not-found for a missing target and for one in another organisation alike', async () => {
+    const { directory, writes } = project([
+      person(CALLER, 'Administrator'),
+      person('outsider', 'Member', 'Elsewhere'),
+    ]);
+
+    expect(await refusal(directory.setRole(ORG, CALLER, 'nobody', 'Administrator'))).toBe('not-found');
+    expect(await refusal(directory.setRole(ORG, CALLER, 'outsider', 'Administrator'))).toBe(
+      'not-found',
+    );
+    expect(writes).toEqual([]);
+  });
+
+  it('refuses a change to your own role, even one that would also orphan the organisation', async () => {
+    const { directory } = project([person(CALLER, 'Administrator')]);
+
+    expect(await refusal(directory.setRole(ORG, CALLER, CALLER, 'Member'))).toBe('self');
+  });
+
+  it('cannot reach last-admin through the earlier rules, because the caller is always one left', async () => {
+    // Rule 2 makes the caller a live Administrator and rule 4 keeps them from
+    // being the target, so demoting anyone else always leaves the caller. The
+    // last-admin rule stays as a backstop should either rule ever change.
+    const { directory } = project([person(CALLER, 'Administrator'), person('johan', 'Administrator')]);
+
+    await directory.setRole(ORG, CALLER, 'johan', 'Member');
+
+    // Johan, now a Member, cannot then demote the caller.
+    expect(await refusal(directory.setRole(ORG, 'johan', CALLER, 'Member'))).toBe('caller-not-admin');
+  });
+
+  it('lets only one of two simultaneous demotions through, so an Administrator always remains', async () => {
+    const { directory, users } = project([person('a', 'Administrator'), person('b', 'Administrator')]);
+
+    const results = await Promise.allSettled([
+      directory.setRole(ORG, 'a', 'b', 'Member'),
+      directory.setRole(ORG, 'b', 'a', 'Member'),
+    ]);
+
+    expect(results.map((result) => result.status)).toEqual(['fulfilled', 'rejected']);
+    expect((results[1] as PromiseRejectedResult).reason.reason).toBe('caller-not-admin');
+    const admins = [...users.values()].filter((entry) => entry.app_metadata.role === 'Administrator');
+    expect(admins.map((entry) => entry.id)).toEqual(['a']);
+  });
+
+  it('keeps serving the queue after a refusal', async () => {
+    const { directory } = project([person(CALLER, 'Administrator'), person('pieter', 'Member')]);
+
+    await refusal(directory.setRole(ORG, CALLER, 'nobody', 'Member'));
+
+    expect((await directory.setRole(ORG, CALLER, 'pieter', 'Administrator')).role).toBe('Administrator');
+  });
+
+  it('rethrows a client failure on write', async () => {
+    const failing: AdminUsersClient = {
+      async listUsers() {
+        return { data: { users: [person(CALLER, 'Administrator'), person('pieter', 'Member')] }, error: null };
+      },
+      async updateUserById() {
+        return { data: { user: null }, error: new Error('rate limited') };
+      },
+    };
+
+    await expect(
+      createDirectory(failing).setRole(ORG, CALLER, 'pieter', 'Administrator'),
+    ).rejects.toThrow('rate limited');
   });
 });

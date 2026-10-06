@@ -20,6 +20,9 @@
   </div>
 
   <section class="card users">
+    @if (confirmation(); as message) {
+      <p class="confirm" role="status">{{ message }}</p>
+    }
     <div class="card-head">
       <h2>Users</h2>
       @if (kind() === 'ready') {
@@ -51,11 +54,12 @@
                 <th scope="col">Email</th>
                 <th scope="col">Role</th>
                 <th scope="col">Last sign-in</th>
+                <th scope="col"><span class="visually-hidden">Actions</span></th>
               </tr>
             </thead>
             <tbody>
               @for (user of users(); track user.id) {
-                <tr>
+                <tr [class.editing]="isEditing(user)">
                   <!-- Names come from user_metadata, which the person can
                        write. Interpolation only, which escapes them. -->
                   <td class="name">
@@ -65,8 +69,59 @@
                     }
                   </td>
                   <td>{{ user.email }}</td>
-                  <td>{{ user.role }}</td>
+                  <td>
+                    @if (editing(); as edit) {
+                      @if (edit.id === user.id) {
+                        <select
+                          class="role-select"
+                          [id]="'role-' + user.id"
+                          [attr.aria-label]="'Role for ' + user.fullName"
+                          [disabled]="edit.saving"
+                          (change)="setDraft($any($event.target).value)"
+                          (keydown.escape)="cancel(user)"
+                        >
+                          @for (role of roles; track role) {
+                            <option [value]="role" [selected]="role === edit.draft">{{ role }}</option>
+                          }
+                        </select>
+                      } @else {
+                        {{ user.role }}
+                      }
+                    } @else {
+                      {{ user.role }}
+                    }
+                  </td>
                   <td class="stamp">{{ lastSignIn(user) }}</td>
+                  <td class="actions">
+                    @if (isYou(user)) {
+                      <span class="note">You can't change your own role</span>
+                    } @else if (isEditing(user)) {
+                      <div class="row-actions">
+                        <button
+                          type="button"
+                          class="btn outline-muted"
+                          [disabled]="editing()?.saving"
+                          (click)="cancel(user)"
+                        >Cancel</button>
+                        <button
+                          type="button"
+                          class="btn primary"
+                          [disabled]="!canSave(user)"
+                          (click)="save(user)"
+                        >{{ editing()?.saving ? 'Saving…' : 'Save role' }}</button>
+                      </div>
+                      @if (editing()?.error; as error) {
+                        <p class="row-error" role="alert">{{ error }}</p>
+                      }
+                    } @else {
+                      <button
+                        type="button"
+                        class="btn outline-navy"
+                        [id]="'change-' + user.id"
+                        (click)="startEditing(user)"
+                      >Change role</button>
+                    }
+                  </td>
                 </tr>
               }
             </tbody>
