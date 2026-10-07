@@ -300,6 +300,7 @@ describe('/api/macro', () => {
       const response = await request('/api/macro/countries');
 
       expect(response.status).toBe(502);
+      expect(response.headers.get('x-error-source')).toBe('api');
       expect(await response.json()).toEqual({
         error: 'The Core API rejected the service credentials.',
       });

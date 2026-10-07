@@ -1,4 +1,4 @@
-import { HttpErrorResponse } from '@angular/common/http';
+import { HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 
 import { MacroRequestError, macroErrorMessage, toMacroRequestError } from './macro-error';
 
@@ -6,7 +6,50 @@ function errorResponse(status: number, error: unknown): HttpErrorResponse {
   return new HttpErrorResponse({ status, error, url: '/api/macro/observations' });
 }
 
+/** A failure answered by the API itself, which marks its own sentence. */
+function apiErrorResponse(status: number, error: unknown, marked = true): HttpErrorResponse {
+  return new HttpErrorResponse({
+    status,
+    error,
+    url: '/api/macro/observations',
+    headers: marked ? new HttpHeaders({ 'X-Error-Source': 'api' }) : new HttpHeaders()
+  });
+}
+
 describe('toMacroRequestError', () => {
+  describe('the API\u2019s own sentences', () => {
+    it('shows a sentence the API marked as its own', () => {
+      const mapped = toMacroRequestError(
+        apiErrorResponse(502, { error: 'The Core API rejected the service credentials.' })
+      );
+
+      expect(mapped.status).toBe(502);
+      expect(mapped.detail).toBe('The Core API rejected the service credentials.');
+    });
+
+    it('ignores an unmarked { error }, which may be relayed upstream text', () => {
+      const mapped = toMacroRequestError(apiErrorResponse(401, { error: 'expired' }, false));
+
+      expect(mapped.detail).toBeNull();
+    });
+
+    it('ignores a marked body whose error is empty or not a string', () => {
+      for (const body of [{ error: '' }, { error: 42 }, { error: null }, ['error'], 'error']) {
+        expect(toMacroRequestError(apiErrorResponse(502, body)).detail)
+          .withContext(JSON.stringify(body))
+          .toBeNull();
+      }
+    });
+
+    it('still prefers a problem detail over a marked error', () => {
+      const mapped = toMacroRequestError(
+        apiErrorResponse(400, { detail: 'Unknown indicator code(s): NOPE.', error: 'other' })
+      );
+
+      expect(mapped.detail).toBe('Unknown indicator code(s): NOPE.');
+    });
+  });
+
   it('takes the detail from a problem document', () => {
     const mapped = toMacroRequestError(
       errorResponse(400, {

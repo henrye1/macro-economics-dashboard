@@ -29,6 +29,31 @@ export class MacroRequestError extends Error {
   }
 }
 
+/** Set by the API's error handler on a sentence it wrote itself. */
+const ERROR_SOURCE_HEADER = 'X-Error-Source';
+
+/**
+ * Reads the API's own `{ error }` sentence, or null.
+ *
+ * Only when the API marked the response as its own: a relayed Core API body
+ * can carry an `error` field too, and that is upstream text the console must
+ * not present as an explanation.
+ */
+function apiSentence(response: HttpErrorResponse): string | null {
+  if (response.headers?.get(ERROR_SOURCE_HEADER) !== 'api') {
+    return null;
+  }
+
+  const body = response.error;
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    return null;
+  }
+
+  const error = (body as { error?: unknown }).error;
+
+  return typeof error === 'string' && error.length > 0 ? error : null;
+}
+
 /**
  * Reads the problem `detail` out of a parsed error body.
  *
@@ -57,7 +82,11 @@ function problemDetail(body: unknown): string | null {
  * to fall back to its own wording.
  */
 export function toMacroRequestError(response: HttpErrorResponse): MacroRequestError {
-  return new MacroRequestError(response.status, problemDetail(response.error));
+  // The Core API's problem first, then a sentence the API marked as its own.
+  return new MacroRequestError(
+    response.status,
+    problemDetail(response.error) ?? apiSentence(response)
+  );
 }
 
 /**
