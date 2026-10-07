@@ -92,7 +92,11 @@ describe('createResultState', () => {
     source = TestBed.inject(DeferredSource);
 
     state = TestBed.runInInjectionContext(() =>
-      createResultState<Observation>({ fetch: source.fetch, unavailable: UNAVAILABLE })
+      createResultState<Observation>({
+        fetch: source.fetch,
+        unavailable: UNAVAILABLE,
+        source: 'observations'
+      })
     );
   }
 

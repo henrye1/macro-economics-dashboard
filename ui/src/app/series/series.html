@@ -63,7 +63,7 @@
           <tr>
             <td><span class="code-text">{{ row.series.indicator }}</span></td>
             <td>{{ countryLabel(row.series.country) }}</td>
-            <td class="tight">{{ row.series.unit }}</td>
+            <td class="tight">{{ unitLabel(row.series.unit, row.series.scale) }}</td>
             <td>{{ row.series.source }}</td>
             <td>{{ row.series.vintage }}</td>
             <td class="num">{{ row.series.lastActualYear }}</td>

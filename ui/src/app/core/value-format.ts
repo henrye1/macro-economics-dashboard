@@ -16,3 +16,14 @@ const VALUE_FORMAT = new Intl.NumberFormat('en-GB', {
 export function formatValue(value: number): string {
   return VALUE_FORMAT.format(value);
 }
+
+/**
+ * The unit, with the scale beside it when the service gave one:
+ * `National currency (Billions)`. The guide says to read unit "and sometimes
+ * scale - never assume", and a value in billions shown as plain units is wrong
+ * by nine orders of magnitude. Display only.
+ */
+export function unitLabel(unit: string, scale: string | null | undefined): string {
+  const trimmed = scale?.trim() ?? '';
+  return trimmed === '' ? unit : `${unit} (${trimmed})`;
+}

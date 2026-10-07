@@ -270,6 +270,16 @@ describe('buildCharts', () => {
       expect(chart.table.rows[0].cells.length).toBe(3);
     });
 
+    it('puts the scale beside the unit wherever the unit is stated', () => {
+      const chart = buildCharts([
+        series({ unit: 'National currency', scale: 'Billions', points: [point(2024, 3)] })
+      ])[0];
+
+      expect(chart.table.rows[0].cells[0]?.value).toBe('3.0 National currency (Billions)');
+      expect(chart.metaLabel).toContain('National currency (Billions)');
+      expect(chart.points[0].value).toBe('3.0 National currency (Billions)');
+    });
+
     it('formats the value with its unit and marks forecasts', () => {
       const chart = buildCharts([
         series({ points: [point(2024, 3), point(2025, 4.25, true)] })

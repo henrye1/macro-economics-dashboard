@@ -6,6 +6,7 @@ import type { Series } from '../core/macro-contracts';
 import { MACRO_DATA } from '../core/macro-data.provider';
 import { createResultState } from '../core/result-state';
 import { buildCharts } from '../core/series-chart';
+import { unitLabel } from '../core/value-format';
 import { WorkingQueryStore } from '../core/working-query.store';
 import { PagingFooter } from '../query/paging-footer';
 import { WorkingQueryCard } from '../query/working-query-card';
@@ -43,9 +44,14 @@ export class SeriesPage {
 
   protected readonly query = this.store.query;
 
+  /** Unit with its scale, when the service gave one. */
+  protected readonly unitLabel = unitLabel;
+
   private readonly state = createResultState<Series>({
     fetch: (query) => this.macro.series(query),
-    unavailable: UNAVAILABLE
+    unavailable: UNAVAILABLE,
+    // `/series` pages series, so its totalCount must never be read as rows.
+    source: 'series'
   });
 
   protected readonly loading = this.state.loading;

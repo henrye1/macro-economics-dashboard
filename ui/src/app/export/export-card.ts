@@ -90,7 +90,7 @@ export class ExportCard {
    * the only honest answer, and the hint says how to fill it in.
    */
   protected readonly rowCount = computed<number | null>(
-    () => this.lastResult.metaFor(this.store.query())?.totalCount ?? null
+    () => this.lastResult.rowCountFor(this.store.query())
   );
 
   protected readonly scopeLine = computed(() => {

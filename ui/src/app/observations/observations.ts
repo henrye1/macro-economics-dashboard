@@ -46,7 +46,8 @@ export class ObservationsPage {
 
   private readonly state = createResultState<Observation>({
     fetch: (query) => this.macro.observations(query),
-    unavailable: UNAVAILABLE
+    unavailable: UNAVAILABLE,
+    source: 'observations'
   });
 
   protected readonly loading = this.state.loading;

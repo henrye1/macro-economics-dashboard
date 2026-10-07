@@ -3,9 +3,13 @@ import { Injectable, signal } from '@angular/core';
 import type { EnvelopeMeta } from './macro-contracts';
 import { type WorkingQuery, sameWorkingQuery } from './working-query';
 
+/** Which route answered. `/series` counts series in `totalCount`, not rows. */
+export type ResultSource = 'observations' | 'series';
+
 interface Observed {
   readonly query: WorkingQuery;
   readonly meta: EnvelopeMeta;
+  readonly source: ResultSource;
 }
 
 /**
@@ -31,8 +35,8 @@ export class LastResultMeta {
   private readonly observed = signal<Observed | null>(null);
 
   /** Called when a working-query result settles. Failures publish nothing. */
-  record(query: WorkingQuery, meta: EnvelopeMeta): void {
-    this.observed.set({ query, meta: { ...meta, vintages: [...meta.vintages] } });
+  record(query: WorkingQuery, meta: EnvelopeMeta, source: ResultSource = 'observations'): void {
+    this.observed.set({ query, meta: { ...meta, vintages: [...meta.vintages] }, source });
   }
 
   /**
@@ -55,5 +59,23 @@ export class LastResultMeta {
    */
   idsFor(query: WorkingQuery): number[] {
     return this.metaFor(query)?.vintages.map((vintage) => vintage.id) ?? [];
+  }
+
+  /**
+   * How many rows exactly this query returns, or null.
+   *
+   * Only an `/observations` answer knows: `/series` pages series, so its
+   * `totalCount` is a series count. After the Series tab the honest answer is
+   * "unknown", not a smaller number. Vintage ids above have no such caveat:
+   * either route's answer is provenance for the query.
+   */
+  rowCountFor(query: WorkingQuery): number | null {
+    const observed = this.observed();
+
+    return observed !== null &&
+      observed.source === 'observations' &&
+      sameWorkingQuery(observed.query, query)
+      ? observed.meta.totalCount
+      : null;
   }
 }

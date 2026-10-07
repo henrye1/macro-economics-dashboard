@@ -5,6 +5,7 @@ import { catchError, debounceTime, distinctUntilChanged, map, of, switchMap } fr
 import { macroErrorMessage } from '../core/http/macro-error';
 import type { Country, Indicator, SourceCode } from '../core/macro-contracts';
 import { MACRO_DATA } from '../core/macro-data.provider';
+import { unitLabel } from '../core/value-format';
 import { WorkingQueryStore } from '../core/working-query.store';
 
 export const CATALOGUE_SEARCH_DEBOUNCE_MS = 250;
@@ -50,6 +51,9 @@ interface Filters {
   styleUrl: './countries-indicators.scss'
 })
 export class CountriesIndicatorsPage {
+  /** Unit with its scale, when the service gave one. */
+  protected readonly unitLabel = unitLabel;
+
   private readonly macro = inject(MACRO_DATA);
   private readonly store = inject(WorkingQueryStore);
 

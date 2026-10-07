@@ -208,6 +208,15 @@ describe('ExportCard', () => {
       expect(states().some((line) => line.includes('Run this query on Observations'))).toBeFalse();
     });
 
+    it('reads an em dash, not a series count, after the Series tab answered', () => {
+      sendable();
+      lastResult.record(store.query(), meta({ totalCount: 2 }), 'series');
+      fixture.detectChanges();
+
+      expect(text()).toContain('— rows · 1 indicators · all countries');
+      expect(text()).not.toContain('2 rows');
+    });
+
     it('returns to the em dash when the query changes after its result', () => {
       // The guard: a count belongs to the query that produced it.
       sendable();

@@ -950,21 +950,21 @@ the fixed `NO_SESSION` message, plus that the repository was never called.
 **Suggested fix:** remove the `accepted` query-param notice and its spec through `/fix`.
 **Resolution:**
 
-### F-115 [P2] open - The Export card shows the Series total as a row count after the Series tab has run
+### F-115 [P2] fixed - The Export card shows the Series total as a row count after the Series tab has run
 
 **File:** ui/src/app/core/result-state.ts:121
 **Found:** 2026-10-07 by /audit (scope: full; lens: quality)
 **Why it matters:** `createResultState` records every settled envelope with `lastResult.record(asked, meta)`, and both Observations and Series use it (`series/series.ts:46`). `/series` `totalCount` counts series, not rows (guide 4.4), but `LastResultMeta.metaFor` (`core/last-result-meta.ts:44`) matches only the query, and `export/export-card.ts:93` renders that `totalCount` as "N rows". With one indicator and two countries, visiting Series then Saved queries shows "2 rows" while the download writes dozens. No spec covers a Series envelope reaching the Export card.
 **Suggested fix:** Record only from the observations pipeline (a `publish` option on `createResultState`), or key the record by endpoint; add a spec where Series settles and the Export card reads null.
-**Resolution:**
+**Resolution:** Fixed 2026-10-07 by fix/export-row-count-and-indicator-scale: `LastResultMeta.record` takes the answering route (`createResultState` passes `source`, Series says `series`), and the Export card reads `rowCountFor(query)`, which is the count only for an `/observations` answer and null otherwise; `idsFor` is unchanged so saving after Series still records vintage ids. Specs cover both sources, a different query, ids after Series, and the card showing the unknown count after Series. Marked `fixed`; a review has not looked at it yet.
 
-### F-116 [P2] open - `scale` is fetched but never shown, so a scaled value reads as plain units
+### F-116 [P2] fixed - `scale` is fetched but never shown, so a scaled value reads as plain units
 
 **File:** ui/src/app/countries-indicators/countries-indicators.html:146
 **Found:** 2026-10-07 by /audit (scope: full; lens: quality)
 **Why it matters:** The guide (3.1) says every indicator carries unit "and sometimes scale - read it, never assume", and the overview lists `scale` on `Indicator` and `Series`. No template renders it: not the catalogue, not the series metadata table (`series/series.html:191`), and not the chart tooltip or table text (`core/series-chart.ts:275`, `:336`, which build `${value} ${unit}`). Non-curated `WEO_` factors are reachable with Curated off, and a value in billions would read as plain units. The fixtures set `scale: null`, so nothing exercises it.
 **Suggested fix:** Render the scale beside the unit when it is non-null in those three places, and give one fixture a scale.
-**Resolution:**
+**Resolution:** Fixed 2026-10-07 by fix/export-row-count-and-indicator-scale: `unitLabel(unit, scale)` in `core/value-format.ts` shows `<unit> (<scale>)` when a scale is present; used in the catalogue and series Unit columns and in the chart tooltip, table text, meta line and description. The `GDP_PER_CAPITA_USD` fixture now carries WEO's `Units` scale, asserted in the catalogue row, the series table row and the chart. Marked `fixed`; a review has not looked at it yet.
 
 ### F-117 [P2] unverified - The Vintage select may show "latest" for a pinned query after the query card is recreated
 

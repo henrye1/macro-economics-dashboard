@@ -3,7 +3,7 @@ import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { type Observable, catchError, map, of, startWith, switchMap, tap } from 'rxjs';
 
 import { macroErrorMessage } from './http/macro-error';
-import { LastResultMeta } from './last-result-meta';
+import { LastResultMeta, type ResultSource } from './last-result-meta';
 import type { Envelope, EnvelopeMeta, ObservationsQuery } from './macro-contracts';
 import { WorkingQueryStore } from './working-query.store';
 
@@ -61,6 +61,8 @@ export interface ResultSignalsConfig<T> {
   readonly fetch: (query: ObservationsQuery) => Observable<Envelope<T>>;
   /** Shown when the request failed without the service explaining itself. */
   readonly unavailable: string;
+  /** Which route this tab reads, so a series count is never taken for rows. */
+  readonly source: ResultSource;
 }
 
 /**
@@ -78,7 +80,8 @@ export interface ResultSignalsConfig<T> {
  */
 export function createResultState<T>({
   fetch,
-  unavailable
+  unavailable,
+  source
 }: ResultSignalsConfig<T>): ResultSignals<T> {
   const store = inject(WorkingQueryStore);
   const lastResult = inject(LastResultMeta);
@@ -118,7 +121,7 @@ export function createResultState<T>({
                 // settled envelope. The vintages tab has its own pipeline and
                 // must not publish — its result is a revision list, not the
                 // working query's answer.
-                lastResult.record(asked, envelope.meta);
+                lastResult.record(asked, envelope.meta, source);
               }),
               map(
                 (envelope): ResultStatus<T> => ({

@@ -174,7 +174,7 @@ export const FIXTURE_INDICATORS: readonly Indicator[] = [
     code: 'GDP_PER_CAPITA_USD',
     name: 'GDP per capita, current prices',
     unit: 'US dollars',
-    scale: null,
+    scale: 'Units',
     category: 'growth',
     curated: true,
     sources: [

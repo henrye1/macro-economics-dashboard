@@ -174,6 +174,15 @@ describe('CountriesIndicatorsPage', () => {
         .toContain('Percent');
     });
 
+    it('shows the scale beside the unit for an indicator that has one', () => {
+      const { fixture } = build();
+      const row = Array.from(el(fixture).querySelectorAll('tbody tr')).find((tr) =>
+        tr.textContent?.includes('GDP_PER_CAPITA_USD')
+      );
+
+      expect(row?.querySelectorAll('td')[2].textContent?.trim()).toBe('US dollars (Units)');
+    });
+
     it('marks every curated row with the curated badge', () => {
       const { fixture } = build();
 

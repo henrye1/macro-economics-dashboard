@@ -163,6 +163,15 @@ describe('SeriesPage', () => {
       expect(first?.querySelector('.sr-only')?.textContent).toContain('actual through 2025');
     });
 
+    it('shows the scale beside the unit for an indicator that has one', () => {
+      store.reset();
+      store.addIndicator('GDP_PER_CAPITA_USD');
+      store.addCountry('ZAF');
+      fixture.detectChanges();
+
+      expect(metaRows()[0][2]).toBe('US dollars (Units)');
+    });
+
     it('lists every series on the page in the metadata table', () => {
       const rows = metaRows();
 

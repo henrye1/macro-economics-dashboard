@@ -1,4 +1,5 @@
 import type { Series } from './macro-contracts';
+import { unitLabel } from './value-format';
 
 /**
  * Chart geometry for the Series tab.
@@ -272,7 +273,7 @@ function buildChart(
         fill: point.isForecast ? '#ffffff' : color,
         color,
         head: `${item.country} · ${point.year} · ${point.isForecast ? 'forecast' : 'actual'}`,
-        value: `${ONE_DECIMAL_FORMAT.format(point.value)} ${item.unit}`,
+        value: `${ONE_DECIMAL_FORMAT.format(point.value)} ${unitLabel(item.unit, item.scale)}`,
         leftPercent: (cx / CHART_WIDTH) * 100,
         topPercent: (cy / CHART_HEIGHT) * 100
       });
@@ -292,7 +293,7 @@ function buildChart(
     indicator,
     name: head.name,
     metaLabel: [
-      head.unit,
+      unitLabel(head.unit, head.scale),
       group.map((s) => s.country).join(', '),
       head.source,
       head.vintage
@@ -333,7 +334,7 @@ function buildTable(years: readonly number[], group: readonly Series[]): ChartTa
           return point === undefined
             ? null
             : {
-                value: `${ONE_DECIMAL_FORMAT.format(point.value)} ${item.unit}`,
+                value: `${ONE_DECIMAL_FORMAT.format(point.value)} ${unitLabel(item.unit, item.scale)}`,
                 forecast: point.isForecast
               };
         })
@@ -407,7 +408,7 @@ function describe(
   const high = formatTick(Math.max(...values), span);
 
   return (
-    `Line chart of ${head.name} in ${head.unit} for ${countries}, ` +
+    `Line chart of ${head.name} in ${unitLabel(head.unit, head.scale)} for ${countries}, ` +
     `${firstYear} to ${lastYear}, ranging ${low} to ${high}, ` +
     `actual through ${lastActualYear} and forecast after it.`
   );

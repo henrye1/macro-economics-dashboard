@@ -66,6 +66,35 @@ describe('LastResultMeta', () => {
     expect(service.idsFor(rebuilt)).toEqual([2]);
   });
 
+  describe('rowCountFor', () => {
+    it('reports the total once an observations answer settled for this query', () => {
+      const asked = query();
+      service.record(asked, meta([WDI]), 'observations');
+
+      expect(service.rowCountFor(asked)).toBe(56);
+    });
+
+    it('reports null after a series answer, whose totalCount counts series', () => {
+      const asked = query();
+      service.record(asked, meta([WDI], { totalCount: 2 }), 'series');
+
+      expect(service.rowCountFor(asked)).toBeNull();
+    });
+
+    it('reports null for a different query', () => {
+      service.record(query(), meta([WDI]), 'observations');
+
+      expect(service.rowCountFor(query({ countries: ['NGA'] }))).toBeNull();
+    });
+
+    it('still reports the vintage ids after a series answer', () => {
+      const asked = query();
+      service.record(asked, meta([WDI]), 'series');
+
+      expect(service.idsFor(asked)).toEqual([12]);
+    });
+  });
+
   describe('the query-match guard', () => {
     it('refuses the ids once the query has changed', () => {
       // The point of storing the query with the ids: editing a filter and
