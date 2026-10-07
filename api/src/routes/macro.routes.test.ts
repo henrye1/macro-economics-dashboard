@@ -287,6 +287,24 @@ describe('/api/macro', () => {
   });
 
   describe('when the upstream cannot be reached', () => {
+    it('answers 502, never 401, when the Core API refuses the service credentials', async () => {
+      const refused: MacroClient = {
+        async get() {
+          throw Object.assign(new Error('The Core API rejected the service credentials.'), {
+            status: 502,
+          });
+        },
+      };
+      const request = await serve({ macroClient: refused, macroConfigured: true });
+
+      const response = await request('/api/macro/countries');
+
+      expect(response.status).toBe(502);
+      expect(await response.json()).toEqual({
+        error: 'The Core API rejected the service credentials.',
+      });
+    });
+
     it('answers 502 with a message that leaks nothing', async () => {
       const request = await serve({ macroClient: failingClient, macroConfigured: true });
 

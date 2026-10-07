@@ -229,30 +229,57 @@ describe('createMacroClient', () => {
       expect(JSON.parse(result.body).data).toEqual(['after retry']);
     });
 
-    it('gives up after the single retry and returns the second 401', async () => {
+    it('gives up after the single retry and fails as a bad gateway, never a 401', async () => {
       const provider = tokens();
       const fetch = responding(
-        new Response('{"error":"expired"}', { status: 401 }),
-        new Response('{"error":"expired"}', { status: 401 }),
+        new Response('{"error":"client super-secret-value revoked"}', { status: 401 }),
+        new Response('{"error":"client super-secret-value revoked"}', { status: 401 }),
         json({ data: ['never reached'] }),
       );
 
-      const result = await build(fetch, provider).get('/countries', '');
+      const failure = await build(fetch, provider)
+        .get('/countries', '')
+        .then(
+          () => null,
+          (error: unknown) => error as { status?: number; message?: string },
+        );
 
       expect(fetch).toHaveBeenCalledTimes(2);
       expect(provider.invalidations).toBe(1);
-      expect(result.status).toBe(401);
+      // The service's credential, not the visitor's session: a 401 here would
+      // sign every visitor out of the console.
+      expect(failure?.status).toBe(502);
+      expect(failure?.message).toBe('The Core API rejected the service credentials.');
+      expect(failure?.message).not.toContain('super-secret-value');
     });
 
-    it('does not retry any other status', async () => {
+    it('fails a 403 as a bad gateway at once, without refreshing the token', async () => {
       const provider = tokens();
-      const fetch = responding(new Response('{}', { status: 403 }), json({ data: [] }));
+      const fetch = responding(new Response('{"error":"insufficient scope"}', { status: 403 }), json({ data: [] }));
+
+      const failure = await build(fetch, provider)
+        .get('/countries', '')
+        .then(
+          () => null,
+          (error: unknown) => error as { status?: number; message?: string },
+        );
+
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(provider.invalidations).toBe(0);
+      expect(failure?.status).toBe(502);
+      expect(failure?.message).toBe('The Core API rejected the service credentials.');
+    });
+
+    it.each([400, 404])('relays a %i without retrying', async (status) => {
+      const provider = tokens();
+      const fetch = responding(new Response('{"title":"Bad"}', { status }), json({ data: [] }));
 
       const result = await build(fetch, provider).get('/countries', '');
 
       expect(fetch).toHaveBeenCalledTimes(1);
       expect(provider.invalidations).toBe(0);
-      expect(result.status).toBe(403);
+      expect(result.status).toBe(status);
+      expect(result.body).toBe('{"title":"Bad"}');
     });
 
     it('forwards If-None-Match on the retry too', async () => {

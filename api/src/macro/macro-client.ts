@@ -89,10 +89,22 @@ export function createMacroClient({ fetch, tokenProvider, config }: MacroClientD
         response = await attempt(path, search, ifNoneMatch, await tokenProvider.getToken());
       }
 
+      // Still refused, or refused for want of permission: that is this
+      // service's M2M credential, not the visitor's session. Relaying it as a
+      // 401 would tell the console the visitor is signed out, and it would sign
+      // every visitor out. A 403 is not retried: a new token carries the same
+      // permissions.
+      if (response.status === 401 || response.status === 403) {
+        throw badGateway(CREDENTIALS_REFUSED);
+      }
+
       return read(response);
     },
   };
 }
+
+/** Fixed: names no upstream detail, token, client or URL. */
+const CREDENTIALS_REFUSED = 'The Core API rejected the service credentials.';
 
 async function read(response: Response): Promise<UpstreamResponse> {
   const headers: Record<string, string> = {};

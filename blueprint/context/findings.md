@@ -949,3 +949,171 @@ the fixed `NO_SESSION` message, plus that the repository was never called.
 **Why it matters:** The accept screen no longer navigates to `/sign-in?accepted=1`, so the notice branch and its spec (`sign-in.spec.ts:211`) are now dead code. The spec notes record leaving it deliberately as outside this feature, so this is a follow-up candidate, not a defect in the delta.
 **Suggested fix:** remove the `accepted` query-param notice and its spec through `/fix`.
 **Resolution:**
+
+### F-115 [P2] open - The Export card shows the Series total as a row count after the Series tab has run
+
+**File:** ui/src/app/core/result-state.ts:121
+**Found:** 2026-10-07 by /audit (scope: full; lens: quality)
+**Why it matters:** `createResultState` records every settled envelope with `lastResult.record(asked, meta)`, and both Observations and Series use it (`series/series.ts:46`). `/series` `totalCount` counts series, not rows (guide 4.4), but `LastResultMeta.metaFor` (`core/last-result-meta.ts:44`) matches only the query, and `export/export-card.ts:93` renders that `totalCount` as "N rows". With one indicator and two countries, visiting Series then Saved queries shows "2 rows" while the download writes dozens. No spec covers a Series envelope reaching the Export card.
+**Suggested fix:** Record only from the observations pipeline (a `publish` option on `createResultState`), or key the record by endpoint; add a spec where Series settles and the Export card reads null.
+**Resolution:**
+
+### F-116 [P2] open - `scale` is fetched but never shown, so a scaled value reads as plain units
+
+**File:** ui/src/app/countries-indicators/countries-indicators.html:146
+**Found:** 2026-10-07 by /audit (scope: full; lens: quality)
+**Why it matters:** The guide (3.1) says every indicator carries unit "and sometimes scale - read it, never assume", and the overview lists `scale` on `Indicator` and `Series`. No template renders it: not the catalogue, not the series metadata table (`series/series.html:191`), and not the chart tooltip or table text (`core/series-chart.ts:275`, `:336`, which build `${value} ${unit}`). Non-curated `WEO_` factors are reachable with Curated off, and a value in billions would read as plain units. The fixtures set `scale: null`, so nothing exercises it.
+**Suggested fix:** Render the scale beside the unit when it is non-null in those three places, and give one fixture a scale.
+**Resolution:**
+
+### F-117 [P2] unverified - The Vintage select may show "latest" for a pinned query after the query card is recreated
+
+**File:** ui/src/app/query/working-query-card.html:154
+**Found:** 2026-10-07 by /audit (scope: full; lens: quality)
+**Why it matters:** The select binds `[value]` while its options arrive asynchronously from `vintageOptions()`. If `[value]` is applied before the options exist and not re-applied when they render, the browser falls back to the first option, "latest (per source)", so a vintage pinned on Observations would display as unpinned on Series or Request builder - the reproducibility claim the console teaches. A label-pinned vintage (a string) never matches an option either, because option values are `String(id)`. Specs use the synchronous fixture provider, so they cannot see this. Needs confirming in a browser.
+**Suggested fix:** Add `[selected]` on each option (as the year selects and the admin role select already do), likewise for source and forecast; add a spec that pins, recreates the card, then resolves the options.
+**Resolution:**
+
+### F-118 [P3] open - The admin list routes authorise from the token alone, so a demoted Administrator keeps reading the organisation for up to an hour
+
+**File:** api/src/routes/admin.ts:29
+**Found:** 2026-10-07 by /audit (scope: full; lens: security)
+**Why it matters:** `adminGuards` checks `req.auth.role` and `req.auth.organisation` from the JWT. Every mutation re-checks the caller live (`asAdministrator`, `changeRole`), but `listOrganisation` and `listInvitations` do not, so a demoted or moved Administrator keeps reading member emails, last sign-ins and pending invitations until their token refreshes (Supabase default one hour). Also `routes/invitations.ts:41`.
+**Suggested fix:** Run the existing live caller check in both list methods (they already load every user) and map `caller-not-admin` to 403; add a route test for a token Administrator who is a live Member.
+**Resolution:**
+
+### F-119 [P3] open - `errorHandler` relays every non-500 message verbatim, and JSON is parsed before the auth seam
+
+**File:** api/src/middleware/error-handler.ts:9
+**Found:** 2026-10-07 by /audit (scope: full; lens: security)
+**Why it matters:** The handler masks only status exactly 500; any other status, including 501-599 or a library 4xx, relays `err.message`. Reachable today: `express.json()` runs before the auth seam (`app.ts:37`), so an unauthenticated request with malformed JSON gets body-parser's message with a 400 instead of the fixed 401. No current 5xx path relays a library error, so the 5xx half is latent. Related to F-75 (body parsed before auth).
+**Suggested fix:** Relay `err.message` only when `status < 500` (fixed text per 5xx status); mount `express.json()` after the seam or only on the routers that take bodies.
+**Resolution:**
+
+### F-120 [P3] open - The production config still provides `FixtureAuthProvider` behind a comment that is no longer true
+
+**File:** ui/src/app/app.config.ts:22
+**Found:** 2026-10-07 by /audit (scope: full; lens: quality)
+**Why it matters:** The comment says two of four auth methods delegate to the fixture; since feature 20d none do (`supabase-auth.provider.ts` says all five are real) and nothing outside specs injects it. The production bundle therefore carries the fixture's Administrator session, password and invitations. Harmless but misleading. The `accept-invite/:token` route (`app.routes.ts:38`) kept "for the fixture" is also live and ignores its token.
+**Suggested fix:** Remove the provider line and the stale comment; keep the `:token` route only if a spec still needs it.
+**Resolution:**
+
+### F-121 [P3] open - Three root stores keep the previous visitor's state after sign-out
+
+**File:** ui/src/app/core/working-query.store.ts:23
+**Found:** 2026-10-07 by /audit (scope: full; lens: security, quality)
+**Why it matters:** `SavedQueryStore` empties on sign-out so one visitor's list never shows to the next, but `WorkingQueryStore`, `LastResultMeta` (`core/last-result-meta.ts:29`) and `RequestSendService`'s held ETag (`core/request/request-send.service.ts:56`) do not. Sign out and sign in as someone else in the same tab (no reload) and the second visitor inherits the first's working query, observed vintage ids (which a save records) and validator. The data is public, so the impact is low; it contradicts the stated rule.
+**Suggested fix:** Give each a `reset()` and call it from the session-change path (or `SessionStore.signOut`).
+**Resolution:**
+
+### F-122 [P3] open - A failed saved-queries load never retries within the tab
+
+**File:** ui/src/app/core/saved-query.store.ts:156
+**Found:** 2026-10-07 by /audit (scope: full; lens: quality)
+**Why it matters:** `follow` returns early when the email is unchanged, so `status: 'failed'` latches: revisiting the tab shows "Could not load saved queries.", Save stays closed, and only a reload or a new sign-in recovers.
+**Suggested fix:** Expose `retry()` that re-runs the load when failed, called from the page on entry or a Retry button.
+**Resolution:**
+
+### F-123 [P3] open - The role save is not torn down and can throw after the page is gone
+
+**File:** ui/src/app/administration/administration.ts:150
+**Found:** 2026-10-07 by /audit (scope: full; lens: quality)
+**Why it matters:** `save` subscribes with no `takeUntilDestroyed`. Navigating away mid-save lets `next` run `focusAfterRender` on a destroyed injector, which throws into the global error handler. The auth screens use `takeUntilDestroyed`; this drifts from that pattern. `InvitationsStore` actions are also unbound but only set signals.
+**Suggested fix:** Inject `DestroyRef` and pipe `takeUntilDestroyed`.
+**Resolution:**
+
+### F-124 [P3] open - The auth screens disable the focused submit button and leave focus on the page body after a refusal
+
+**File:** ui/src/app/auth/accept-invitation.html:48
+**Found:** 2026-10-07 by /audit (scope: full; lens: quality)
+**Why it matters:** Sign-in and reset disable submit while busy (`sign-in.html:42`, `reset-password.html:30`); accept and set-password disable it until valid and clear the password on a refusal, so the button stays disabled. Nothing returns focus to the field, so keyboard and screen-reader users are left on `body`. F-110 covers the same pattern on the admin screens.
+**Suggested fix:** On a refusal, focus the password input after render (or use `aria-disabled` with a guard instead of `disabled`).
+**Resolution:**
+
+### F-125 [P3] open - API-message extraction and the password-rule labels are each written more than once
+
+**File:** ui/src/app/administration/invitations.store.ts:174
+**Found:** 2026-10-07 by /audit (scope: full; lens: quality)
+**Why it matters:** The `{ error }` sentence extraction exists three times (`changeMessage` and `failure` in `administration.ts`, `apiMessage` in `invitations.store.ts`); the three password-rule labels exist in both `accept-invitation.ts` and `set-password.ts` beside `core/password-rules.ts`.
+**Suggested fix:** Export one `apiMessage` from `core/admin-directory.ts` and one `passwordRuleList(password)` from `core/password-rules.ts`.
+**Resolution:**
+
+### F-126 [P3] open - The interceptor spec covers a 401 from `/api/macro` and `/api/saved-queries` but not from `/api/admin`
+
+**File:** ui/src/app/core/http/auth.interceptor.spec.ts:160
+**Found:** 2026-10-07 by /audit (scope: full; lens: tests)
+**Why it matters:** The most privileged prefix is covered for the header but not for the sign-out-on-401 path.
+**Suggested fix:** Add one case mirroring the saved-queries refusal test.
+**Resolution:**
+
+### F-127 [P3] open - Two SavedQueryStore specs have no expectations
+
+**File:** ui/src/app/core/saved-query.store.spec.ts:220
+**Found:** 2026-10-07 by /audit (scope: full; lens: tests)
+**Why it matters:** Jasmine warns that "just lists when nothing is stored locally, or the stored value is unreadable" and "just lists when the browser has no usable storage" have no expectations. They do assert implicitly (`expectOne` throws if the GET is missing), but the warning hides that and a future edit could remove the only check.
+**Suggested fix:** Assert the store reached `ready` and that no import request was made.
+**Resolution:**
+
+### F-128 [P3] open - With all countries one chart draws up to 25 lines in 6 repeating colours, and never says it shows one page
+
+**File:** ui/src/app/core/series-chart.ts:246
+**Found:** 2026-10-07 by /audit (scope: full; lens: quality)
+**Why it matters:** Colours are `SERIES_COLORS[index % 6]`, so countries share colours in the chart and legend. The default `countries: []` with `pageSize: 25` makes this the first chart a visitor sees, and because `/series` pages series, one indicator's countries can spill onto page 2 without the chart saying so.
+**Suggested fix:** Cap the lines per chart or state "N of M countries on this page"; at least label the chart as page-scoped.
+**Resolution:**
+
+### F-129 [P3] open - Revisions smaller than 0.05 render as "+0.0" or "-0.0" in an up or down colour
+
+**File:** ui/src/app/vintages/vintages.ts:305
+**Found:** 2026-10-07 by /audit (scope: full; lens: quality)
+**Why it matters:** The change is formatted to one decimal but coloured from the unrounded value, so a real 0.04 revision reads "+0.0" in green.
+**Suggested fix:** Use more precision for small changes, or colour from the rounded value.
+**Resolution:**
+
+### F-130 [P3] open - The e2e stub drifts from the contract and ignores the requested countries
+
+**File:** ui/e2e/stub-api.ts:30
+**Found:** 2026-10-07 by /audit (scope: full; lens: tests)
+**Why it matters:** Indicator `sources` is `{ source, vintage }` where the contract (and the stub's own comment) is `{ source, sourceCode, preferred }`. `/series` always returns ZAF and NGA (`:101`) while `seedQuery` adds only ZAF, so `series-chart.spec.ts` asserts a two-country chart a one-country query cannot produce, and a regression that stopped sending `countries` would pass.
+**Suggested fix:** Correct the `sources` shape, and filter stubbed series by the `countries` parameter or seed both countries.
+**Resolution:**
+
+### F-131 [P3] unverified - A late 401 could nest `returnUrl` and land a visitor back on sign-in after signing in
+
+**File:** ui/src/app/core/http/auth.interceptor.ts:44
+**Found:** 2026-10-07 by /audit (scope: full; lens: security)
+**Why it matters:** The interceptor navigates to sign-in with `returnUrl = router.url` without checking whether it is already there. A root-service request that navigation does not cancel (`RequestSendService.send`, `SavedQueryStore`) answering 401 after the first redirect would produce `returnUrl=/sign-in?returnUrl=...`, which `safeReturnUrl` accepts. Timing not reproduced.
+**Suggested fix:** Skip the navigation when already on an auth route, and have `safeReturnUrl` reject auth-layout paths.
+**Resolution:**
+
+### F-132 [P3] unverified - The curl command double-quotes the URL, so `$(...)` in a query value would run when pasted
+
+**File:** ui/src/app/core/request/request-text.ts:81
+**Found:** 2026-10-07 by /audit (scope: full; lens: security)
+**Why it matters:** `HttpParams` leaves `$` unescaped and `encodeURIComponent` leaves `(` `)`, so a vintage label containing `$(cmd)` would be expanded by the shell inside double quotes. Today such a string can come only from service labels or the visitor's own saved queries, so it is self-injection at most.
+**Suggested fix:** Single-quote the URL in the curl text.
+**Resolution:**
+
+### F-133 [P3] unverified - `/set-password` changes the password of any signed-in session without the current password
+
+**File:** ui/src/app/auth/set-password.ts:96
+**Found:** 2026-10-07 by /audit (scope: full; lens: security)
+**Why it matters:** The route is outside the guard and calls `updateUser({ password })` for whatever session exists, so anyone at an unlocked signed-in browser could change the password. Whether Supabase also requires reauthentication depends on the project's "Secure password change" setting, which cannot be read from code.
+**Suggested fix:** Confirm "Secure password change" is on in Supabase Auth; if not, either enable it or require a recovery session (`PASSWORD_RECOVERY`) before showing the form.
+**Resolution:**
+
+### F-134 [P3] open - The relay's doc comment still says every upstream non-2xx is a relayed payload
+
+**File:** api/src/macro/macro-client.ts:46
+**Found:** 2026-10-07 by /audit independent (scope: current; lens: quality)
+**Why it matters:** The `createMacroClient` comment says "An upstream non-2xx is a payload, not an exception ... Only our own failures throw." After F-114 an upstream 401 (after retry) or 403 throws a 502. A later reader trusting the comment could reintroduce the relay of 401.
+**Suggested fix:** Amend the comment to name the 401/403 exception and why.
+**Resolution:**
+
+### F-135 [P3] unverified - Refused responses are dropped without consuming or cancelling their bodies
+
+**File:** api/src/macro/macro-client.ts:87
+**Found:** 2026-10-07 by /audit independent (scope: current; lens: performance)
+**Why it matters:** The first 401 (pre-existing) and now the final 401/403 are discarded without `response.body?.cancel()` or reading the text. Undici advises consuming or cancelling bodies so the connection returns to the pool promptly; during a credential outage every console request leaves up to two such bodies. Small bodies are usually buffered, so impact is unproven without load evidence.
+**Suggested fix:** Call `await response.body?.cancel()` (in a try) before retrying and before throwing.
+**Resolution:**
